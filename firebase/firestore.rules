@@ -1,0 +1,85 @@
+rules_version = '2';
+
+// 우리둘 Firestore 보안 규칙
+// - 커플 공간(couples/{id})은 members 에 들어 있는 최대 2명만 읽고 쓸 수 있다.
+// - 두 번째 멤버는 유효한 1회용 초대 토큰(invites/{token})을 "같은 배치에서 삭제"하면서만 들어올 수 있다.
+// - 서버 함수 없이 규칙만으로 처리하므로 무료(Spark) 요금제에서 동작한다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function coupleAfter(coupleId) {
+      return getAfter(/databases/$(database)/documents/couples/$(coupleId));
+    }
+
+    // 내 프로필 (coupleId, displayName). 본인만 접근.
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // 1회용 초대 토큰. 문서 ID(토큰)를 아는 사람만 단건 조회 가능, 목록 조회는 불가.
+    match /invites/{token} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && token.size() >= 32
+        && request.resource.data.keys().hasOnly(['coupleId', 'createdBy', 'createdAt', 'expiresAt'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt < request.time + duration.value(25, 'h')
+        && coupleAfter(request.resource.data.coupleId).data.members == [request.auth.uid];
+
+      // 만든 사람은 언제든 삭제, 참여자는 연결 배치 안에서 삭제
+      allow delete: if signedIn()
+        && (resource.data.createdBy == request.auth.uid
+            || request.auth.uid in coupleAfter(resource.data.coupleId).data.members);
+
+      allow update: if false;
+    }
+
+    match /couples/{coupleId} {
+
+      function isMember() {
+        return signedIn() && request.auth.uid in resource.data.members;
+      }
+
+      allow get: if isMember();
+      allow list: if false;
+
+      // 커플 공간 생성: 만든 사람 혼자인 상태로만 생성 가능
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['members', 'names', 'startDate', 'countFromOne', 'createdAt'])
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.names.keys().hasOnly([request.auth.uid])
+        && request.resource.data.startDate is string
+        && request.resource.data.countFromOne is bool;
+
+      // 멤버의 일반 수정: 멤버 목록은 못 바꾸고, 이름은 자기 것만
+      allow update: if isMember()
+        && request.resource.data.members == resource.data.members
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['startDate', 'countFromOne', 'names'])
+        && request.resource.data.names.diff(resource.data.names).affectedKeys()
+             .hasOnly([request.auth.uid]);
+
+      // 초대 링크로 참여: 아직 1명인 공간에, 유효한 토큰을 같은 배치에서 소진하며 나 자신만 추가
+      allow update: if signedIn()
+        && resource.data.members.size() == 1
+        && !(request.auth.uid in resource.data.members)
+        && request.resource.data.members == resource.data.members.concat([request.auth.uid])
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['members', 'names', 'joinToken'])
+        && request.resource.data.names.diff(resource.data.names).affectedKeys()
+             .hasOnly([request.auth.uid])
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.joinToken)).data.coupleId == coupleId
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.joinToken)).data.expiresAt > request.time
+        && !existsAfter(/databases/$(database)/documents/invites/$(request.resource.data.joinToken));
+
+      allow delete: if false;
+    }
+  }
+}

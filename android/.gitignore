@@ -1,0 +1,9 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+# Firebase 설정 파일은 개인 프로젝트 정보가 들어 있으므로 저장소에 올리지 않는다
+app/google-services.json

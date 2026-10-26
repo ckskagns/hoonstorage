@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.uridul.app",
+      "sha256_cert_fingerprints": [
+        "2D:47:4F:9C:E5:D9:12:9B:DC:39:04:33:7D:F6:95:A2:3B:20:F9:E8:7E:D8:32:8C:71:A3:85:48:36:8E:D9:90"
+      ]
+    }
+  }
+]

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">우리둘</string>
+    <string name="widget_name">우리둘 디데이</string>
+    <string name="widget_description">함께한 날과 다가오는 기념일을 보여줘요</string>
+</resources>

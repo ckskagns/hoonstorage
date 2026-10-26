@@ -1,0 +1,18 @@
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 비밀·개인 설정 (절대 올리지 않음)
+**/google-services.json
+**/local.properties
+*.jks
+*.keystore
+.env
+.env.*
+
+# Firebase CLI
+firebase/.firebase/
+firebase/firebase-debug*.log
+firebase/node_modules/

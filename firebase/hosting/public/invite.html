@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>우리둘 초대</title>
+  <style>
+    :root {
+      --bg: #fff8f8; --card: #ffffff; --text: #22191c; --sub: #74565f;
+      --primary: #d14d72; --on-primary: #ffffff; --line: #f3dde1;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #191113; --card: #241a1d; --text: #f0dee2; --sub: #d6c1c6;
+        --primary: #ffb1c5; --on-primary: #5e1133; --line: #524347;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, "Samsung Sans", "Noto Sans KR", sans-serif;
+      padding: 24px 16px;
+    }
+    main {
+      width: 100%; max-width: 420px; background: var(--card);
+      border: 1px solid var(--line); border-radius: 28px; padding: 32px 24px; text-align: center;
+    }
+    .heart { font-size: 56px; line-height: 1; }
+    h1 { font-size: 24px; margin: 16px 0 8px; }
+    p { color: var(--sub); line-height: 1.6; margin: 0 0 24px; }
+    .btn {
+      display: block; width: 100%; padding: 16px; border-radius: 999px; border: 0;
+      background: var(--primary); color: var(--on-primary);
+      font-size: 17px; font-weight: 700; text-decoration: none; cursor: pointer;
+    }
+    .btn.secondary { background: transparent; color: var(--primary); border: 1px solid var(--line); margin-top: 12px; }
+    small { display: block; margin-top: 20px; color: var(--sub); line-height: 1.5; }
+    .error { color: var(--primary); }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="heart">💕</div>
+    <h1>우리둘에 초대받았어요</h1>
+    <p id="desc">앱에서 열면 두 사람만의 공간으로 연결돼요.<br>이 링크는 24시간 동안 한 번만 쓸 수 있어요.</p>
+    <a id="open" class="btn" href="#">앱에서 열기</a>
+    <button id="copy" class="btn secondary" type="button">링크 복사하기</button>
+    <small>앱이 열리지 않으면 링크를 복사한 뒤<br>앱의 "초대받았어요" 칸에 붙여넣어 주세요.</small>
+  </main>
+  <script>
+    (function () {
+      var match = location.pathname.match(/\/invite\/([A-Za-z0-9_-]{32,64})/);
+      var openBtn = document.getElementById('open');
+      var copyBtn = document.getElementById('copy');
+      if (!match) {
+        document.getElementById('desc').innerHTML = '<span class="error">초대 링크가 올바르지 않아요.</span><br>상대에게 새 링크를 요청해 주세요.';
+        openBtn.style.display = 'none';
+        copyBtn.style.display = 'none';
+        return;
+      }
+      var token = match[1];
+      // 앱 링크 인증 전이거나 브라우저에서 열린 경우를 위한 대체 경로
+      openBtn.href = 'intent://invite/' + token + '#Intent;scheme=uridul;package=com.uridul.app;end';
+      copyBtn.addEventListener('click', function () {
+        var text = location.origin + '/invite/' + token;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(function () { copyBtn.textContent = '복사했어요!'; });
+        } else {
+          prompt('아래 링크를 복사해 주세요', text);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
