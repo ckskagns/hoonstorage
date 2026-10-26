@@ -11,7 +11,7 @@
 |---|---|
 | [`android/`](android/) | Android Studio 프로젝트 |
 | [`firebase/`](firebase/) | Firestore 보안 규칙, 초대 링크 웹페이지 |
-| [`docs/`](docs/) | [개발 검토안](docs/커플앱_개발검토안.md), [MVP 설정 가이드](docs/MVP_설정가이드.md) |
+| [`docs/`](docs/) | [개발 검토안](docs/커플앱_개발검토안.md), [MVP 설정 가이드](docs/MVP_설정가이드.md), [PowerShell 진행 가이드](docs/PowerShell_진행가이드.md) |
 
 ## 진행 상황
 
@@ -27,4 +27,4 @@
 cd android && ./gradlew assembleDebug
 ```
 
-Firebase 연결 방법은 [MVP 설정 가이드](docs/MVP_설정가이드.md)를 참고하세요. `google-services.json`은 저장소에 포함하지 않습니다.
+Firebase 연결부터 폰 설치까지는 [PowerShell 진행 가이드](docs/PowerShell_진행가이드.md)를 따라 명령어를 복사·실행하면 됩니다. `google-services.json`은 저장소에 포함하지 않습니다.
