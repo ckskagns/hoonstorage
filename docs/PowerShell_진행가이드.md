@@ -4,6 +4,8 @@ Firebase 연결부터 두 폰 설치·테스트까지 **PowerShell 명령어를 
 브라우저를 꼭 써야 하는 단계는 두 군데뿐입니다(Firebase 약관 동의 · Google 로그인 켜기). 이 단계는 **🖱️ 브라우저 단계**로 표시했습니다.
 
 > 이 PC 기준으로 확인한 환경: Windows 10, PowerShell 5.1, JDK 21, Android SDK, winget 설치됨
+>
+> ✅ **진행 현황 (2026-10-26):** 0~8단계 완료. Firebase 프로젝트는 **`rabbithooni-5d8f4`** (계정 namhuncha@gmail.com), 초대 링크 주소는 `https://rabbithooni-5d8f4.web.app`. **9단계(폰 연결)부터 진행하면 됩니다.**
 
 ---
 
@@ -506,6 +508,9 @@ firebase.cmd deploy --only "firestore:rules,hosting" --project $ProjectId
 | `node` 인식 안 됨 (설치 직후) | PATH 갱신 전 | 2-1의 PATH 새로 읽기 명령 실행 또는 창 다시 열기 |
 | `projects:create` 실패 – terms | 약관 미동의 | 3-2 브라우저 단계 진행 |
 | `projects:create` 실패 – already exists | ID 중복 | 3-3을 다시 실행 (숫자 새로 뽑힘) |
+| `Adding Firebase resources` 단계에서 403 (The caller does not have permission) | Firebase 약관 미동의 (Google Cloud 약관과 별개) | Firebase 콘솔에서 **새 Firebase 프로젝트 만들기**로 직접 생성 → 만들어진 프로젝트 ID로 3-4부터 진행 |
+| google-services.json 에 `"client_type": 3` 이 없음 | Authentication **시작하기**를 안 눌렀거나 Google 저장 안 됨, 또는 다른 프로젝트에서 설정함 | 콘솔 왼쪽 위 프로젝트 이름 확인 → Authentication → 시작하기 → Google 사용 설정 → 저장 후 6단계 다시 |
+| Claude 앱에서 설치한 `firebase` 가 내 PowerShell 에서 안 보임 | Claude 앱은 AppData 폴더를 별도 공간에 저장 | 내 PowerShell 창에서 `npm.cmd install -g firebase-tools` 를 직접 실행 |
 | 배포 시 Hosting 사이트 없음 오류 | 기본 사이트 미생성 | `firebase.cmd hosting:sites:create $ProjectId --project $ProjectId` 후 다시 배포 |
 | 앱에 "Firebase 설정이 필요해요" | google-services.json 없음 | 6단계 후 8단계 다시 빌드·설치 |
 | 로그인 시 "Google 로그인이 켜져 있지 않아요" | 5단계 전에 받은 json | 6단계 다시 실행 → 다시 빌드·설치 |
