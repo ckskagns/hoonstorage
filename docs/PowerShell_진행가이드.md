@@ -5,7 +5,8 @@ Firebase 연결부터 두 폰 설치·테스트까지 **PowerShell 명령어를 
 
 > 이 PC 기준으로 확인한 환경: Windows 10, PowerShell 5.1, JDK 21, Android SDK, winget 설치됨
 >
-> ✅ **진행 현황 (2026-10-26):** 0~8단계 완료. Firebase 프로젝트는 **`rabbithooni-5d8f4`** (계정 namhuncha@gmail.com), 초대 링크 주소는 `https://rabbithooni-5d8f4.web.app`. **9단계(폰 연결)부터 진행하면 됩니다.**
+> ✅ **진행 현황 (2026-10-27):** 0~8단계 완료. Firebase 프로젝트는 **`rabbithooni-5d8f4`** (계정 namhuncha@gmail.com), 초대 링크 주소는 `https://rabbithooni-5d8f4.web.app`.
+> Fold8(USB 연결, 기기 번호 `RFKL9035J3Z`)에 설치와 초대 링크 인증까지 완료했습니다. 남은 것은 **S26 Ultra 설치**와 **11단계 동작 테스트**입니다.
 
 ---
 
