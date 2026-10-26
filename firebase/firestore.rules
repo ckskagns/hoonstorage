@@ -47,7 +47,8 @@ service cloud.firestore {
         return signedIn() && request.auth.uid in resource.data.members;
       }
 
-      allow get: if isMember();
+      // 아직 없는 문서는 읽어도 아무 정보가 없으므로 허용 (만들기 직후 화면 되돌아감 방지)
+      allow get: if signedIn() && (resource == null || isMember());
       allow list: if false;
 
       // 커플 공간 생성: 만든 사람 혼자인 상태로만 생성 가능

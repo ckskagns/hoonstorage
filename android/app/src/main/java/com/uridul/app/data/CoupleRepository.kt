@@ -6,13 +6,17 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.uridul.app.domain.InviteToken
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.util.Date
@@ -32,7 +36,8 @@ class CoupleRepository(private val db: FirebaseFirestore) {
 
     /** 내가 속한 커플 공간 ID. 연결 전이면 null. */
     fun observeCoupleId(uid: String): Flow<String?> = callbackFlow {
-        val reg = users.document(uid).addSnapshotListener { snap, error ->
+        // 저장이 서버에서 확정된 순간도 알림을 받아야 하므로 메타데이터 변경까지 구독한다
+        val reg = users.document(uid).addSnapshotListener(MetadataChanges.INCLUDE) { snap, error ->
             if (error != null) {
                 trySend(null)
                 return@addSnapshotListener
@@ -40,15 +45,18 @@ class CoupleRepository(private val db: FirebaseFirestore) {
             if (snap == null) return@addSnapshotListener
             // 새 기기에서 캐시가 비어 있을 때 "연결 안 됨"으로 잠깐 보이는 것을 막는다
             if (!snap.exists() && snap.metadata.isFromCache) return@addSnapshotListener
+            // 만들기/참여 직후 서버 저장이 끝나기 전에는 새 공간으로 넘어가지 않는다.
+            // (서버에 아직 없는 공간을 읽으면 권한 거부가 나서 화면이 되돌아가던 문제)
+            if (snap.metadata.hasPendingWrites()) return@addSnapshotListener
             trySend(snap.getString("coupleId"))
         }
         awaitClose { reg.remove() }
     }.distinctUntilChanged()
 
-    fun observeCouple(coupleId: String): Flow<Couple?> = callbackFlow {
+    fun observeCouple(coupleId: String): Flow<Couple?> = callbackFlow<Couple?> {
         val reg = couples.document(coupleId).addSnapshotListener { snap, error ->
             if (error != null) {
-                trySend(null)
+                close(error)
                 return@addSnapshotListener
             }
             if (snap == null) return@addSnapshotListener
@@ -56,7 +64,21 @@ class CoupleRepository(private val db: FirebaseFirestore) {
             trySend(snap.toCouple())
         }
         awaitClose { reg.remove() }
-    }.distinctUntilChanged()
+    }
+        // 일시적인 권한 거부·네트워크 오류는 잠시 뒤 다시 시도한다
+        .retryWhen { cause, attempt ->
+            val retryable = cause is FirebaseFirestoreException &&
+                (cause.code == FirebaseFirestoreException.Code.PERMISSION_DENIED ||
+                    cause.code == FirebaseFirestoreException.Code.UNAVAILABLE)
+            if (retryable && attempt < 3) {
+                delay(1_000L * (attempt + 1))
+                true
+            } else {
+                false
+            }
+        }
+        .catch { emit(null) }
+        .distinctUntilChanged()
 
     suspend fun createCouple(uid: String, name: String, startDate: LocalDate): String {
         val ref = couples.document()
