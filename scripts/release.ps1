@@ -26,7 +26,8 @@ param(
 
 $Repo = "ckskagns/hoonstorage"
 
-$ErrorActionPreference = "Stop"
+# gh·firebase 는 정상 진행 메시지도 오류 출력으로 내보내므로, 성공 여부는 종료 코드($LASTEXITCODE)로 판단한다
+$ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $PSScriptRoot
 $Gradle = Join-Path $Root "android\app\build.gradle.kts"
 $Download = Join-Path $Root "firebase\hosting\public\download"
@@ -75,6 +76,8 @@ if ($NoDeploy) {
 }
 
 # 3) GitHub Releases 에 APK 올리기
+# 로그인 정보를 어느 창에서든 같이 쓰도록 공용 폴더에 둔다 (gh auth login 할 때도 같은 값 사용)
+if (-not $env:GH_CONFIG_DIR) { $env:GH_CONFIG_DIR = Join-Path $env:USERPROFILE ".config\gh" }
 $gh = (Get-Command gh -ErrorAction SilentlyContinue).Source
 if (-not $gh) { $gh = "C:\Program Files\GitHub CLI\gh.exe" }
 if (-not (Test-Path $gh)) { throw "GitHub CLI(gh)가 없어요. 설치 후 'gh auth login' 을 먼저 해 주세요." }
@@ -82,7 +85,7 @@ $tag = "v$newName"
 $title = "우리둘 $newName"
 $notesFile = Join-Path $work "notes.txt"
 [IO.File]::WriteAllText($notesFile, $(if ($Notes) { $Notes } else { "우리둘 $newName" }), $Utf8)
-& $gh release view $tag --repo $Repo *> $null
+& $gh release view $tag --repo $Repo 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
     & $gh release upload $tag $apk --repo $Repo --clobber
 } else {
