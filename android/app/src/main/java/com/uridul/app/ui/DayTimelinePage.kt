@@ -152,10 +152,12 @@ fun DayTimelinePage(
     LaunchedEffect(incomingPlace) {
         val p = incomingPlace ?: return@LaunchedEffect
         val e = edit
-        if (e != null) {
-            setEdit(e.withPlace(p))
-        } else {
-            PlaceInbox.eventTarget?.let { onAttachPlace(it.eventId, it.slot, p) }
+        val target = PlaceInbox.eventTarget
+        when {
+            e != null -> setEdit(e.withPlace(p))
+            target != null -> onAttachPlace(target.eventId, target.slot, p)
+            // 편집 칸이 닫혀 있으면 그 장소로 새 일정을 연다 (버리지 않는다)
+            else -> setEdit(newEdit(date, today).withPlace(p))
         }
         onIncomingPlaceConsumed()
     }
@@ -754,8 +756,9 @@ private data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Boo
     fun finalDraft(): EventDraft = if (slot < 0) {
         draft.copy(time = null, timeline = emptyList())
     } else {
-        val sorted = draft.timeline
-        draft.copy(time = sorted.firstOrNull()?.start, place = null)
+        // 저장할 때는 시간 순으로 (대표 시작 시각·알림·정렬이 맞도록)
+        val sorted = draft.timeline.sortedBy { it.start }
+        draft.copy(time = sorted.firstOrNull()?.start, place = null, timeline = sorted)
     }
 
     fun updateSlot(change: (TimeSlot) -> TimeSlot): SlotEdit {

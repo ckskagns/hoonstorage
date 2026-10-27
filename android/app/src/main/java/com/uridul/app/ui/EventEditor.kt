@@ -128,7 +128,10 @@ fun EventEditorDialog(
     }
 
     val save: () -> Unit = {
-        if (onSave(buildDraft())) onDismiss()
+        // 저장할 때는 시간대를 시간 순으로 (대표 시작 시각·알림이 맞도록)
+        val d = buildDraft()
+        val sorted = d.timeline.sortedBy { it.start }
+        if (onSave(d.copy(timeline = sorted, time = sorted.firstOrNull()?.start ?: d.time))) onDismiss()
     }
     // 뒤로 가기·취소: 바꾼 내용이 있으면 한 번 더 묻는다 (키보드 내리려다 내용이 날아가는 것 방지)
     val requestClose: () -> Unit = {
