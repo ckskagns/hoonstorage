@@ -46,8 +46,9 @@
     <h1>우리둘에 초대받았어요</h1>
     <p id="desc">앱에서 열면 두 사람만의 공간으로 연결돼요.<br>이 링크는 24시간 동안 한 번만 쓸 수 있어요.</p>
     <a id="open" class="btn" href="#">앱에서 열기</a>
+    <a id="install" class="btn secondary" href="/download/">앱이 아직 없어요 · 설치하기</a>
     <button id="copy" class="btn secondary" type="button">링크 복사하기</button>
-    <small>앱이 열리지 않으면 링크를 복사한 뒤<br>앱의 "초대받았어요" 칸에 붙여넣어 주세요.</small>
+    <small>앱을 설치한 뒤 이 링크를 다시 열어 주세요.<br>앱이 열리지 않으면 링크를 복사해서<br>앱의 "초대받았어요" 칸에 붙여넣어 주세요.</small>
   </main>
   <script>
     (function () {
@@ -61,8 +62,13 @@
         return;
       }
       var token = match[1];
-      // 앱 링크 인증 전이거나 브라우저에서 열린 경우를 위한 대체 경로
-      openBtn.href = 'intent://invite/' + token + '#Intent;scheme=uridul;package=com.uridul.app;end';
+      // 앱 링크 인증 전이거나 브라우저에서 열린 경우를 위한 대체 경로.
+      // 앱이 없으면 설치 페이지로 보내고, 설치 후 이 초대 링크로 돌아오게 한다.
+      var back = encodeURIComponent('/invite/' + token);
+      var installUrl = location.origin + '/download/?next=' + back;
+      document.getElementById('install').href = installUrl;
+      openBtn.href = 'intent://invite/' + token + '#Intent;scheme=uridul;package=com.uridul.app;S.browser_fallback_url=' +
+        encodeURIComponent(installUrl) + ';end';
       copyBtn.addEventListener('click', function () {
         var text = location.origin + '/invite/' + token;
         if (navigator.clipboard) {

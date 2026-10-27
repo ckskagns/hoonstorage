@@ -19,6 +19,9 @@ import com.uridul.app.ui.LoginScreen
 import com.uridul.app.ui.NotConfiguredScreen
 import com.uridul.app.ui.ReadyScreen
 import com.uridul.app.ui.SetupScreen
+import com.uridul.app.ui.UpdateDialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.uridul.app.ui.shareInviteLink
 import com.uridul.app.ui.theme.UridulTheme
 import com.uridul.app.widget.MainExtras
@@ -69,6 +72,16 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val month by viewModel.visibleMonth.collectAsStateWithLifecycle()
     val monthEvents by viewModel.monthEvents.collectAsStateWithLifecycle()
     val openRequest by viewModel.openRequest.collectAsStateWithLifecycle()
+    val update by viewModel.update.collectAsStateWithLifecycle()
+
+    // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumeAfterPermission() }
+    UpdateDialog(
+        state = update,
+        onUpdate = viewModel::startUpdate,
+        onOpenPermission = viewModel::openInstallPermission,
+        onDismiss = viewModel::dismissUpdate,
+    )
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -112,6 +125,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onChangeStartDate = viewModel::updateStartDate,
             onSetCountFromOne = viewModel::setCountFromOne,
             onUpdateProfile = viewModel::updateProfile,
+            onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
             onSignOut = { viewModel.signOut(context) },
         )
     }

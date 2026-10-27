@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.uridul.app.data.AppRelease
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
@@ -40,6 +41,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+
+/** 앱 업데이트 진행 상태 */
+sealed interface UpdateState {
+    data object Idle : UpdateState
+    data class Available(val release: AppRelease) : UpdateState
+    /** "출처를 알 수 없는 앱 설치" 허용이 필요함 */
+    data class NeedPermission(val release: AppRelease) : UpdateState
+    data class Downloading(val release: AppRelease, val progress: Float) : UpdateState
+}
 
 /** 위젯에서 앱을 열 때 이동할 곳 */
 data class OpenRequest(
@@ -156,7 +166,66 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── 앱 업데이트 (링크 설치용) ─────────────────────────────
+
+    private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val update: StateFlow<UpdateState> = _update.asStateFlow()
+
+    /** 새 버전 확인. manual = 메뉴에서 직접 눌렀을 때 (최신이면 안내) */
+    fun checkForUpdate(manual: Boolean) = viewModelScope.launch {
+        val updater = container.updater
+        val latest = updater.fetchLatest()
+        when {
+            latest == null -> if (manual) _message.value = "업데이트 정보를 확인하지 못했어요. 인터넷 연결을 확인해 주세요."
+            updater.isNewer(latest) -> _update.value = UpdateState.Available(latest)
+            manual -> _message.value = "최신 버전이에요 (${BuildConfig.VERSION_NAME})"
+        }
+    }
+
+    /** 업데이트 시작: 설치 허용 확인 → 내려받기 → 설치 화면 */
+    fun startUpdate() {
+        val release = when (val s = _update.value) {
+            is UpdateState.Available -> s.release
+            is UpdateState.NeedPermission -> s.release
+            else -> return
+        }
+        val updater = container.updater
+        if (!updater.canInstall()) {
+            _update.value = UpdateState.NeedPermission(release)
+            return
+        }
+        viewModelScope.launch {
+            _update.value = UpdateState.Downloading(release, 0f)
+            try {
+                val apk = updater.download(release) { p -> _update.value = UpdateState.Downloading(release, p) }
+                _update.value = UpdateState.Idle
+                getApplication<Application>().startActivity(updater.installIntent(apk))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _update.value = UpdateState.Available(release)
+                _message.value = e.toUserMessage() ?: "업데이트를 내려받지 못했어요."
+            }
+        }
+    }
+
+    /** 설치 허용 화면 열기 */
+    fun openInstallPermission() {
+        getApplication<Application>().startActivity(container.updater.installPermissionIntent())
+    }
+
+    /** 앱으로 돌아왔을 때: 설치를 허용했으면 바로 이어서 진행 */
+    fun onResumeAfterPermission() {
+        if (_update.value is UpdateState.NeedPermission && container.updater.canInstall()) startUpdate()
+    }
+
+    fun dismissUpdate() {
+        if (_update.value !is UpdateState.Downloading) _update.value = UpdateState.Idle
+    }
+
     init {
+        // 앱을 열 때 새 버전이 있는지 한 번 확인한다
+        checkForUpdate(manual = false)
         // 커플 정보가 바뀔 때마다 위젯용 데이터를 저장하고 위젯을 다시 그린다
         viewModelScope.launch {
             state

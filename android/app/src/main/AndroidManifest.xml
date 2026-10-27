@@ -9,6 +9,8 @@
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
+    <!-- 링크로 설치한 앱의 자체 업데이트: 새 버전 APK 설치 화면 열기 (사용자가 직접 허용해야 동작) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".UridulApp"
@@ -50,6 +52,17 @@
                     android:host="invite" />
             </intent-filter>
         </activity>
+
+        <!-- 업데이트 APK 를 설치 화면에 넘길 때 쓰는 파일 공유 (앱 전용 캐시 폴더만) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
 
         <receiver
             android:name=".widget.DDayWidgetReceiver"

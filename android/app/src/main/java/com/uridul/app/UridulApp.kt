@@ -5,6 +5,7 @@ import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.uridul.app.data.AppUpdater
 import com.uridul.app.data.AuthRepository
 import com.uridul.app.data.CoupleRepository
 import com.uridul.app.data.EventRepository
@@ -32,6 +33,9 @@ class AppContainer(context: Context) {
     val couples: CoupleRepository? by lazy {
         if (firebaseReady) CoupleRepository(FirebaseFirestore.getInstance()) else null
     }
+
+    /** 링크로 설치한 앱의 자체 업데이트 (Firebase 설정과 무관하게 동작) */
+    val updater: AppUpdater = AppUpdater(context.applicationContext)
 
     val events: EventRepository? by lazy {
         if (firebaseReady) EventRepository(FirebaseFirestore.getInstance()) else null

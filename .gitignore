@@ -12,6 +12,9 @@ Thumbs.db
 .env
 .env.*
 
+# APK 는 저장소 파일이 아니라 GitHub Releases 에 올림 (version.json 은 기록용으로 커밋)
+*.apk
+
 # Firebase CLI
 firebase/.firebase/
 **/firebase-debug*.log

@@ -79,6 +79,7 @@ fun ReadyScreen(
     onSetCountFromOne: (Boolean) -> Unit,
     onUpdateProfile: (String, Character, PartnerDefaults?) -> Unit,
     onSignOut: () -> Unit,
+    onCheckUpdate: () -> Unit = {},
 ) {
     var editingProfile by remember { mutableStateOf(false) }
     var tabKey by rememberSaveable { mutableStateOf(Tab.Home.key) }
@@ -143,6 +144,10 @@ fun ReadyScreen(
                                 )
                             }
                             HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
+                                onClick = { menuOpen = false; onCheckUpdate() },
+                            )
                             DropdownMenuItem(
                                 text = { Text("로그아웃") },
                                 onClick = { menuOpen = false; onSignOut() },

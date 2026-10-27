@@ -5,7 +5,7 @@
   },
   "hosting": {
     "public": "hosting/public",
-    "ignore": ["firebase.json", "**/node_modules/**"],
+    "ignore": ["firebase.json", "**/node_modules/**", "**/*.apk"],
     "rewrites": [
       { "source": "/invite/**", "destination": "/invite.html" }
     ],
@@ -13,6 +13,13 @@
       {
         "source": "/.well-known/assetlinks.json",
         "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      },
+      {
+        "source": "/download/version.json",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+          { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0" }
+        ]
       }
     ]
   }
