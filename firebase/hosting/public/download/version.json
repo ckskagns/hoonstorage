@@ -1,9 +1,9 @@
 {
-    "versionCode":  5,
-    "versionName":  "0.5.0",
-    "notes":  "하루 페이지에서 하루 일정을 한 번에 관리해요. 시간 표마다 장소를 넣고 누르면 지도 앱에서 바로 열려요. 사진 위젯, 화면 모드·일정 색 선택, 부드러운 달 넘김이 생겼어요.",
+    "versionCode":  6,
+    "versionName":  "0.5.1",
+    "notes":  "하루 페이지에서 공유한 장소가 사라지던 문제와 시간 표 순서가 어긋나던 문제를 고쳤어요.",
     "size":  46316980,
-    "sha256":  "e8cecee084cf64d228f46a54b818503de50bc7e9a6c1bc1b33777507bc7f75cf",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.5.0/uridul.apk",
-    "releasedAt":  "2026-10-27T19:00:55+09:00"
+    "sha256":  "9e8cb86389393eed15c1716bf4d60dfad88f14da261cec7da28b5cb6dd23c52e",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.5.1/uridul.apk",
+    "releasedAt":  "2026-10-27T19:30:38+09:00"
 }
