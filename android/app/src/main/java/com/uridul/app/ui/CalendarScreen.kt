@@ -2,7 +2,10 @@ package com.uridul.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,7 +100,7 @@ fun CalendarContent(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 MonthCalendar(
-                    month, grid, events, specials, selected, today, myUid, onSelect, onMonthChange,
+                    month, grid, events, specials, selected, today, myUid, onSelect, onAdd, onMonthChange,
                     fillHeight = true,
                     modifier = Modifier
                         .weight(1.3f)
@@ -124,7 +127,7 @@ fun CalendarContent(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
                 MonthCalendar(
-                    month, grid, events, specials, selected, today, myUid, onSelect, onMonthChange,
+                    month, grid, events, specials, selected, today, myUid, onSelect, onAdd, onMonthChange,
                     fillHeight = false,
                     modifier = m,
                 )
@@ -146,6 +149,7 @@ private fun MonthCalendar(
     today: LocalDate,
     myUid: String,
     onSelect: (LocalDate) -> Unit,
+    onAdd: (LocalDate) -> Unit,
     onMonthChange: (YearMonth) -> Unit,
     fillHeight: Boolean,
     modifier: Modifier,
@@ -198,31 +202,51 @@ private fun MonthCalendar(
                     )
                 }
             }
-            // 6주
+            // 6주 (여러 날 일정은 칸을 가로지르는 막대로 이어서 그린다)
             BoxWithConstraints(if (fillHeight) Modifier.weight(1f) else Modifier) {
                 val cellWidth: Dp = maxWidth / 7
-                // 칸이 좁으면(폰 세로) 일정 제목 대신 점으로 표시
+                // 칸이 좁으면(폰 세로) 일정 제목 대신 점·얇은 선으로 표시
                 val showLabels = cellWidth >= 48.dp
                 val rowHeight: Dp = if (fillHeight) maxHeight / 6 else (cellWidth * 1.25f).coerceIn(60.dp, 88.dp)
-                // 날짜 숫자(약 28dp) 아래에 들어가는 줄 수 (한 줄 약 16dp)
-                val maxLabels = ((rowHeight - 28.dp) / 16.dp).toInt().coerceIn(1, 4)
+                // 날짜 숫자(약 28dp) 아래에 들어가는 줄 수 (한 줄 16dp)
+                val maxLabels = ((rowHeight - CellTop) / LinePitch).toInt().coerceIn(1, 4)
                 Column {
                     grid.chunked(7).forEach { week ->
-                        Row(Modifier.fillMaxWidth().height(rowHeight)) {
-                            week.forEach { day ->
-                                DayCell(
-                                    day = day,
-                                    inMonth = YearMonth.from(day) == month,
-                                    isToday = day == today,
-                                    isSelected = day == selected,
-                                    special = specials[day]?.firstOrNull(),
-                                    events = CalendarMath.eventsOn(events, day),
-                                    myUid = myUid,
-                                    showLabels = showLabels,
-                                    maxLabels = maxLabels,
-                                    onClick = { onSelect(day) },
-                                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                                )
+                        val layout = remember(week, events) { CalendarMath.weekLayout(week, events) }
+                        Box(Modifier.fillMaxWidth().height(rowHeight)) {
+                            Row(Modifier.fillMaxSize()) {
+                                week.forEachIndexed { col, day ->
+                                    DayCell(
+                                        day = day,
+                                        inMonth = YearMonth.from(day) == month,
+                                        isToday = day == today,
+                                        isSelected = day == selected,
+                                        special = specials[day]?.firstOrNull(),
+                                        allCount = CalendarMath.eventsOn(events, day).size,
+                                        singles = CalendarMath.singleDayEventsOn(events, day),
+                                        lanes = layout.lanesUsed[col],
+                                        hiddenBars = layout.bars.count { col in it.startCol..it.endCol && it.lane >= maxLabels },
+                                        myUid = myUid,
+                                        showLabels = showLabels,
+                                        maxLabels = maxLabels,
+                                        // 한 번 누르면 선택, 선택된 날을 다시 누르거나 길게 누르면 그 날짜로 일정 추가
+                                        onClick = { if (day == selected) onAdd(day) else onSelect(day) },
+                                        onLongClick = { onSelect(day); onAdd(day) },
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    )
+                                }
+                            }
+                            layout.bars.forEach { bar ->
+                                val visible = if (showLabels) bar.lane < maxLabels else bar.lane < 3
+                                if (visible) {
+                                    EventBar(
+                                        bar = bar,
+                                        cellWidth = cellWidth,
+                                        showLabel = showLabels,
+                                        mine = bar.event.createdBy == myUid,
+                                        inMonth = YearMonth.from(week[bar.startCol]) == month,
+                                    )
+                                }
                             }
                         }
                     }
@@ -232,6 +256,62 @@ private fun MonthCalendar(
     }
 }
 
+/** 칸 위쪽 여백 + 날짜 숫자 높이 */
+private val CellTop = 28.dp
+/** 일정 한 줄 간격 (글자 칸) */
+private val LinePitch = 16.dp
+/** 좁은 칸에서 얇은 선 간격 */
+private val ThinPitch = 6.dp
+
+/** 여러 날 일정 막대: 이어지는 쪽은 모서리를 각지게 해서 다음 칸과 붙어 보이게 한다 */
+@Composable
+private fun EventBar(bar: CalendarMath.WeekBar, cellWidth: Dp, showLabel: Boolean, mine: Boolean, inMonth: Boolean) {
+    val color = if (mine) CoupleColors.mine else CoupleColors.partner
+    val alpha = if (inMonth) 1f else 0.45f
+    val startInset = if (bar.continuesLeft) 0.dp else 3.dp
+    val endInset = if (bar.continuesRight) 0.dp else 3.dp
+    val radius = if (showLabel) 4.dp else 2.dp
+    val shape = RoundedCornerShape(
+        topStart = if (bar.continuesLeft) 0.dp else radius,
+        bottomStart = if (bar.continuesLeft) 0.dp else radius,
+        topEnd = if (bar.continuesRight) 0.dp else radius,
+        bottomEnd = if (bar.continuesRight) 0.dp else radius,
+    )
+    val x = cellWidth * bar.startCol + startInset
+    val width = cellWidth * bar.span - startInset - endInset
+    if (showLabel) {
+        val density = LocalDensity.current
+        val style = MaterialTheme.typography.labelSmall.copy(
+            fontSize = with(density) { 11.dp.toSp() },
+            lineHeight = with(density) { 14.dp.toSp() },
+        )
+        Text(
+            if (bar.continuesLeft) "… ${bar.event.title}" else bar.event.title,
+            style = style,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            modifier = Modifier
+                .offset(x = x, y = CellTop + LinePitch * bar.lane + 1.dp)
+                .width(width)
+                .height(14.dp)
+                .clip(shape)
+                .background(color.copy(alpha = 0.32f * alpha))
+                .padding(horizontal = 4.dp),
+        )
+    } else {
+        Box(
+            Modifier
+                .offset(x = x, y = CellTop + ThinPitch * bar.lane + 2.dp)
+                .width(width)
+                .height(4.dp)
+                .background(color.copy(alpha = alpha), shape),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DayCell(
     day: LocalDate,
@@ -239,11 +319,19 @@ private fun DayCell(
     isToday: Boolean,
     isSelected: Boolean,
     special: SpecialDay?,
-    events: List<CalendarEvent>,
+    /** 이 날의 전체 일정 수 (여러 날 일정 포함) */
+    allCount: Int,
+    /** 하루 일정 (여러 날 일정은 막대로 따로 그림) */
+    singles: List<CalendarEvent>,
+    /** 이 날 위로 지나가는 막대 줄 수 */
+    lanes: Int,
+    /** 칸이 모자라 안 보이는 막대 수 */
+    hiddenBars: Int,
     myUid: String,
     showLabels: Boolean,
     maxLabels: Int,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -268,7 +356,8 @@ private fun DayCell(
         append("${day.monthValue}월 ${day.dayOfMonth}일")
         if (isToday) append(", 오늘")
         special?.let { append(", ${it.title}") }
-        if (events.isNotEmpty()) append(", 일정 ${events.size}개")
+        if (allCount > 0) append(", 일정 ${allCount}개")
+        if (isSelected) append(", 한 번 더 누르면 일정 추가")
     }
 
     Column(
@@ -276,7 +365,7 @@ private fun DayCell(
             .padding(1.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) scheme.primaryContainer else Color.Transparent)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .semantics { contentDescription = description }
             .padding(top = 3.dp, start = 2.dp, end = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -295,7 +384,14 @@ private fun DayCell(
                 maxLines = 1,
             )
         }
-        if (special != null) {
+        // 위로 지나가는 막대 자리는 비워 둔다
+        val barLines = if (showLabels) minOf(lanes, maxLabels) else minOf(lanes, 3)
+        if (barLines > 0) {
+            Spacer(Modifier.height(if (showLabels) LinePitch * barLines else ThinPitch * barLines + 2.dp))
+        }
+
+        var linesLeft = maxLabels - barLines
+        if (special != null && (!showLabels || linesLeft > 0)) {
             // 우리 기념일·생일은 진하게, 연인 기념일(발렌타인데이 등)은 연하게
             val personal = special.kind.personal
             Text(
@@ -311,13 +407,15 @@ private fun DayCell(
                 overflow = TextOverflow.Clip,
                 softWrap = false,
             )
+            linesLeft--
         }
-        if (events.isEmpty()) return@Column
+        if (singles.isEmpty() && hiddenBars == 0) return@Column
         val alpha = if (inMonth) 1f else 0.45f
         if (showLabels) {
-            // 기념일 표시도 한 줄을 쓴다. 칸이 모자라면 마지막 줄을 "+N" 으로 바꾼다.
-            val lines = (maxLabels - if (special != null) 1 else 0).coerceAtLeast(1)
-            val shown = if (events.size <= lines) events else events.take((lines - 1).coerceAtLeast(0))
+            // 칸이 모자라면 마지막 줄을 "+N" 으로 바꾼다 (안 보이는 막대 수도 포함)
+            val room = linesLeft.coerceAtLeast(0)
+            val fitsAll = hiddenBars == 0 && singles.size <= room
+            val shown = if (fitsAll) singles else singles.take((room - 1).coerceAtLeast(0))
             shown.forEach { e ->
                 val color = if (e.createdBy == myUid) CoupleColors.mine else CoupleColors.partner
                 Text(
@@ -336,9 +434,10 @@ private fun DayCell(
                         .padding(horizontal = 2.dp),
                 )
             }
-            if (events.size > shown.size) {
+            val hidden = singles.size - shown.size + hiddenBars
+            if (hidden > 0) {
                 Text(
-                    if (shown.isEmpty()) "일정 ${events.size}" else "+${events.size - shown.size}",
+                    "+$hidden",
                     style = smallStyle,
                     color = scheme.onSurfaceVariant,
                     maxLines = 1,
@@ -346,7 +445,7 @@ private fun DayCell(
             }
         } else {
             Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                events.take(3).forEach { e ->
+                singles.take(3).forEach { e ->
                     val color = if (e.createdBy == myUid) CoupleColors.mine else CoupleColors.partner
                     Box(Modifier.size(5.dp).background(color.copy(alpha = alpha), CircleShape))
                 }

@@ -202,14 +202,19 @@ private fun MonthContent(
             }
         }
         weeks.forEach { week ->
-            Row(GlanceModifier.fillMaxWidth().height(cellHeight)) {
-                week.forEach { day ->
+            val layout = CalendarMath.weekLayout(week, events)
+            val maxLanes = if (showTitles) lines else 3
+            Box(GlanceModifier.fillMaxWidth().height(cellHeight)) {
+            Row(GlanceModifier.fillMaxSize()) {
+                week.forEachIndexed { col, day ->
                     DayCell(
                         day = day,
                         inMonth = YearMonth.from(day) == month,
                         isToday = day == today,
                         special = specials[day]?.firstOrNull(),
-                        events = CalendarMath.eventsOn(events, day),
+                        events = CalendarMath.singleDayEventsOn(events, day),
+                        lanes = minOf(layout.lanesUsed[col], maxLanes),
+                        hiddenBars = layout.bars.count { col in it.startCol..it.endCol && it.lane >= maxLanes },
                         myUid = snapshot?.myUid,
                         lines = lines,
                         showTitles = showTitles,
@@ -217,6 +222,8 @@ private fun MonthContent(
                         modifier = GlanceModifier.defaultWeight().fillMaxHeight(),
                     )
                 }
+            }
+            BarLanes(layout, maxLanes, cellWidth, showTitles, snapshot?.myUid, month, week)
             }
         }
     }
@@ -295,6 +302,8 @@ private fun DayCell(
     isToday: Boolean,
     special: SpecialDay?,
     events: List<CalendarEvent>,
+    lanes: Int,
+    hiddenBars: Int,
     myUid: String?,
     lines: Int,
     showTitles: Boolean,
@@ -333,8 +342,10 @@ private fun DayCell(
             )
         }
 
-        var used = 0
-        if (special != null && lines >= 1) {
+        // 위로 지나가는 여러 날 일정 막대 자리
+        if (lanes > 0) Spacer(GlanceModifier.height(if (showTitles) BarPitch * lanes else ThinBarPitch * lanes + 2.dp))
+        var used = if (showTitles) lanes else 0
+        if (special != null && lines - used >= 1) {
             val personal = special.kind.personal
             Text(
                 when {
@@ -353,12 +364,12 @@ private fun DayCell(
             )
             used++
         }
-        if (events.isEmpty()) return@Column
+        if (events.isEmpty() && hiddenBars == 0) return@Column
 
         val room = lines - used
         if (showTitles && room >= 1) {
-            // 칸이 모자라면 마지막 줄을 "+N" 으로
-            val shownEvents = if (events.size <= room) events else events.take(room - 1)
+            // 칸이 모자라면 마지막 줄을 "+N" 으로 (안 보이는 막대 포함)
+            val shownEvents = if (hiddenBars == 0 && events.size <= room) events else events.take((room - 1).coerceAtLeast(0))
             shownEvents.forEach { e ->
                 val mine = myUid != null && e.createdBy == myUid
                 Text(
@@ -376,9 +387,9 @@ private fun DayCell(
                         .padding(horizontal = 2.dp),
                 )
             }
-            if (events.size > shownEvents.size) {
+            if (events.size - shownEvents.size + hiddenBars > 0) {
                 Text(
-                    "+${events.size - shownEvents.size}",
+                    "+${events.size - shownEvents.size + hiddenBars}",
                     style = TextStyle(color = WidgetColors.SubText, fontSize = 9.sp, textAlign = TextAlign.Center),
                     maxLines = 1,
                     modifier = GlanceModifier.fillMaxWidth(),
@@ -396,6 +407,76 @@ private fun DayCell(
                             .cornerRadius(3.dp)
                             .background(if (mine) WidgetColors.Mine else WidgetColors.Partner),
                     ) {}
+                }
+            }
+        }
+    }
+}
+
+/** 막대 한 줄 간격 (글자 칸 일정 한 줄과 같은 높이) */
+private val BarPitch = 12.dp
+/** 좁은 칸의 얇은 선 간격 */
+private val ThinBarPitch = 6.dp
+/** 날짜 숫자 칸 높이 */
+private val DayNumberHeight = 19.dp
+
+/**
+ * 여러 날 일정 막대: 날짜 칸 위에 줄(lane)마다 가로 막대를 겹쳐 그린다.
+ * 위젯은 위치를 자유롭게 지정할 수 없어서, 줄마다 "빈칸 → 막대 → 빈칸" 을 칸 너비만큼 이어 붙인다.
+ */
+@Composable
+private fun BarLanes(
+    layout: CalendarMath.WeekLayout,
+    maxLanes: Int,
+    cellWidth: Dp,
+    showTitles: Boolean,
+    myUid: String?,
+    month: YearMonth,
+    week: List<LocalDate>,
+) {
+    val visible = layout.bars.filter { it.lane < maxLanes }
+    if (visible.isEmpty()) return
+    val laneCount = visible.maxOf { it.lane } + 1
+    Column(GlanceModifier.fillMaxWidth().padding(top = DayNumberHeight + if (showTitles) 0.dp else 2.dp)) {
+        for (lane in 0 until laneCount) {
+            val pitch = if (showTitles) BarPitch else ThinBarPitch
+            Row(GlanceModifier.fillMaxWidth().height(pitch)) {
+                var col = 0
+                visible.filter { it.lane == lane }.sortedBy { it.startCol }.forEach { bar ->
+                    if (bar.startCol > col) Spacer(GlanceModifier.width(cellWidth * (bar.startCol - col)))
+                    val startInset = if (bar.continuesLeft) 0.dp else 2.dp
+                    val endInset = if (bar.continuesRight) 0.dp else 2.dp
+                    val mine = myUid != null && bar.event.createdBy == myUid
+                    val inMonth = YearMonth.from(week[bar.startCol]) == month
+                    Row(GlanceModifier.width(cellWidth * bar.span).height(pitch)) {
+                        if (startInset > 0.dp) Spacer(GlanceModifier.width(startInset))
+                        if (showTitles) {
+                            Text(
+                                if (bar.continuesLeft) "… ${bar.event.title}" else bar.event.title,
+                                style = TextStyle(
+                                    color = if (inMonth) WidgetColors.OnSurface else WidgetColors.Faded,
+                                    fontSize = 9.sp,
+                                ),
+                                maxLines = 1,
+                                modifier = GlanceModifier
+                                    .defaultWeight()
+                                    .height(pitch - 1.dp)
+                                    .cornerRadius(3.dp)
+                                    .background(if (mine) WidgetColors.MineBar else WidgetColors.PartnerBar)
+                                    .padding(horizontal = 3.dp),
+                            )
+                        } else {
+                            Box(
+                                GlanceModifier
+                                    .defaultWeight()
+                                    .height(4.dp)
+                                    .cornerRadius(2.dp)
+                                    .background(if (mine) WidgetColors.Mine else WidgetColors.Partner),
+                            ) {}
+                        }
+                        if (endInset > 0.dp) Spacer(GlanceModifier.width(endInset))
+                    }
+                    col = bar.endCol + 1
                 }
             }
         }

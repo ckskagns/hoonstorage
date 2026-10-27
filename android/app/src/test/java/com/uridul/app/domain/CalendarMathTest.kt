@@ -86,4 +86,30 @@ class CalendarMathTest {
         assertNull(CalendarMath.validate(draft(end = day.plusDays(CalendarEvent.MAX_SPAN_DAYS - 1))))
         assertNotNull(CalendarMath.validate(draft(end = day.plusDays(CalendarEvent.MAX_SPAN_DAYS))))
     }
+
+    @Test
+    fun weekLayoutStacksOverlappingMultiDayEvents() {
+        // 2026-10-25(일) ~ 10-31(토)
+        val week = CalendarMath.monthGrid(java.time.YearMonth.of(2026, 10)).chunked(7)[4]
+        assertEquals(LocalDate.of(2026, 10, 25), week.first())
+        val events = listOf(
+            event("trip", "2026-10-27", end = "2026-10-29"),
+            event("long", "2026-10-20", end = "2026-10-26"), // 지난주부터 이어짐
+            event("overlap", "2026-10-28", end = "2026-11-02"), // 다음 주로 이어짐
+            event("single", "2026-10-27"),
+        )
+        val layout = CalendarMath.weekLayout(week, events)
+        val byId = layout.bars.associateBy { it.event.id }
+        assertEquals(3, layout.bars.size)
+        assertEquals(0 to 1, byId.getValue("long").let { it.startCol to it.endCol })
+        assertEquals(true, byId.getValue("long").continuesLeft)
+        assertEquals(2 to 4, byId.getValue("trip").let { it.startCol to it.endCol })
+        // long(0~1) 과 trip(2~4) 은 같은 줄, overlap(3~6) 은 trip 과 겹쳐 다음 줄
+        assertEquals(0, byId.getValue("long").lane)
+        assertEquals(0, byId.getValue("trip").lane)
+        assertEquals(1, byId.getValue("overlap").lane)
+        assertEquals(true, byId.getValue("overlap").continuesRight)
+        assertEquals(listOf(1, 1, 1, 2, 2, 2, 2), layout.lanesUsed)
+        assertEquals(listOf("single"), CalendarMath.singleDayEventsOn(events, LocalDate.of(2026, 10, 27)).map { it.id })
+    }
 }

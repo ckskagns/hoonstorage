@@ -31,6 +31,7 @@ object Widgets {
         HeartWidget().updateAll(context)
         CalendarWidget().updateAll(context)
         MonthWidget.refreshAll(context)
+        PhotoWidget().updateAll(context)
     }
 
     /**
@@ -86,6 +87,8 @@ internal object WidgetColors {
     val Partner = ColorProvider(day = Color(0xFF4F6FC4), night = Color(0xFFB0C6FF))
     val MineSoft = ColorProvider(day = Color(0x33D14D72), night = Color(0x55FFB1C5))
     val PartnerSoft = ColorProvider(day = Color(0x334F6FC4), night = Color(0x55B0C6FF))
+    val MineBar = ColorProvider(day = Color(0x55D14D72), night = Color(0x77FFB1C5))
+    val PartnerBar = ColorProvider(day = Color(0x554F6FC4), night = Color(0x77B0C6FF))
     val Sunday = ColorProvider(day = Color(0xFFD32F2F), night = Color(0xFFFFB4AB))
     val Saturday = ColorProvider(day = Color(0xFF1E62C8), night = Color(0xFFA8C8FF))
     val Faded = ColorProvider(day = Color(0x6622191C), night = Color(0x66F0DEE2))

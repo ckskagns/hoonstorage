@@ -46,6 +46,55 @@ object CalendarMath {
     private val dayOrder: Comparator<CalendarEvent> =
         compareBy<CalendarEvent>({ !it.allDay }, { it.time }, { it.title }, { it.id })
 
+    /** 한 주에 걸친 여러 날 일정 막대 하나 (열 번호는 일요일 0 ~ 토요일 6) */
+    data class WeekBar(
+        val event: CalendarEvent,
+        val startCol: Int,
+        val endCol: Int,
+        val lane: Int,
+        /** 지난주부터 이어지는지 (왼쪽 모서리를 둥글게 하지 않음) */
+        val continuesLeft: Boolean,
+        /** 다음 주로 이어지는지 */
+        val continuesRight: Boolean,
+    ) {
+        val span: Int get() = endCol - startCol + 1
+    }
+
+    /**
+     * 여러 날 일정을 한 주 단위 막대로 배치한다. 겹치면 아래 줄(lane)로 내린다.
+     * [lanesUsed] 는 요일별로 막대가 차지하는 줄 수 (그 아래부터 하루 일정을 그린다).
+     */
+    data class WeekLayout(val bars: List<WeekBar>, val lanesUsed: List<Int>)
+
+    fun weekLayout(week: List<LocalDate>, events: List<CalendarEvent>): WeekLayout {
+        val first = week.first()
+        val last = week.last()
+        val multi = events
+            .filter { it.isMultiDay && !it.endDate.isBefore(first) && !it.date.isAfter(last) }
+            .sortedWith(compareBy<CalendarEvent>({ it.date }, { -ChronoUnit.DAYS.between(it.date, it.endDate) }).then(dayOrder))
+        val laneEnds = mutableListOf<Int>() // 줄마다 마지막으로 차지한 열
+        val bars = multi.map { e ->
+            val startCol = ChronoUnit.DAYS.between(first, maxOf(e.date, first)).toInt()
+            val endCol = ChronoUnit.DAYS.between(first, minOf(e.endDate, last)).toInt()
+            var lane = laneEnds.indexOfFirst { it < startCol }
+            if (lane == -1) {
+                lane = laneEnds.size
+                laneEnds += endCol
+            } else {
+                laneEnds[lane] = endCol
+            }
+            WeekBar(e, startCol, endCol, lane, e.date.isBefore(first), e.endDate.isAfter(last))
+        }
+        val lanesUsed = List(week.size) { col ->
+            (bars.filter { col in it.startCol..it.endCol }.maxOfOrNull { it.lane } ?: -1) + 1
+        }
+        return WeekLayout(bars, lanesUsed)
+    }
+
+    /** 하루 일정만 (여러 날 일정은 막대로 따로 그린다) */
+    fun singleDayEventsOn(events: List<CalendarEvent>, day: LocalDate): List<CalendarEvent> =
+        eventsOn(events, day).filter { !it.isMultiDay }
+
     /** 입력값 검사. 문제가 없으면 null, 있으면 사용자에게 보여줄 문구. */
     fun validate(draft: EventDraft): String? {
         val title = draft.title.trim()

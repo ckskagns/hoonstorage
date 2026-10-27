@@ -114,6 +114,28 @@
                 android:resource="@xml/month_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.PhotoWidgetReceiver"
+            android:exported="false"
+            android:label="@string/photo_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/photo_widget_info" />
+        </receiver>
+
+        <!-- 사진 위젯 설정 (위젯을 놓을 때·길게 눌러 설정할 때 홈 화면이 연다) -->
+        <activity
+            android:name=".PhotoWidgetConfigActivity"
+            android:exported="true"
+            android:label="@string/photo_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- 일정 알림 알람 (앱 안에서만 보냄) -->
         <receiver
             android:name=".notify.ReminderReceiver"
