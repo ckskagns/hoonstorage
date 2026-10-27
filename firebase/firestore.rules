@@ -27,7 +27,8 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && token.size() >= 32
-        && request.resource.data.keys().hasOnly(['coupleId', 'createdBy', 'createdAt', 'expiresAt'])
+        && request.resource.data.keys().hasOnly(['coupleId', 'createdBy', 'createdAt', 'expiresAt',
+                                                 'partnerName', 'partnerCharacter'])
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.expiresAt is timestamp
         && request.resource.data.expiresAt < request.time + duration.value(25, 'h')
@@ -47,25 +48,37 @@ service cloud.firestore {
         return signedIn() && request.auth.uid in resource.data.members;
       }
 
+      // 캐릭터(characters 맵)는 자기 것만 바꿀 수 있다
+      function onlyMyCharacter() {
+        return request.resource.data.get('characters', {}).diff(resource.data.get('characters', {}))
+          .affectedKeys().hasOnly([request.auth.uid]);
+      }
+
       // 아직 없는 문서는 읽어도 아무 정보가 없으므로 허용 (만들기 직후 화면 되돌아감 방지)
       allow get: if signedIn() && (resource == null || isMember());
       allow list: if false;
 
       // 커플 공간 생성: 만든 사람 혼자인 상태로만 생성 가능
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['members', 'names', 'startDate', 'countFromOne', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['members', 'names', 'startDate', 'countFromOne', 'createdAt',
+                                                 'characters', 'partnerDefaults'])
         && request.resource.data.members == [request.auth.uid]
         && request.resource.data.names.keys().hasOnly([request.auth.uid])
+        && request.resource.data.get('characters', {}).keys().hasOnly([request.auth.uid])
         && request.resource.data.startDate is string
         && request.resource.data.countFromOne is bool;
 
-      // 멤버의 일반 수정: 멤버 목록은 못 바꾸고, 이름은 자기 것만
+      // 멤버의 일반 수정: 멤버 목록은 못 바꾸고, 이름·캐릭터는 자기 것만.
+      // partnerDefaults(연결 전 상대 이름·캐릭터)는 아직 혼자일 때만 바꿀 수 있다.
       allow update: if isMember()
         && request.resource.data.members == resource.data.members
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['startDate', 'countFromOne', 'names'])
+             .hasOnly(['startDate', 'countFromOne', 'names', 'characters', 'partnerDefaults'])
         && request.resource.data.names.diff(resource.data.names).affectedKeys()
-             .hasOnly([request.auth.uid]);
+             .hasOnly([request.auth.uid])
+        && onlyMyCharacter()
+        && (!('partnerDefaults' in request.resource.data.diff(resource.data).affectedKeys())
+            || resource.data.members.size() == 1);
 
       // 초대 링크로 참여: 아직 1명인 공간에, 유효한 토큰을 같은 배치에서 소진하며 나 자신만 추가
       allow update: if signedIn()
@@ -73,9 +86,10 @@ service cloud.firestore {
         && !(request.auth.uid in resource.data.members)
         && request.resource.data.members == resource.data.members.concat([request.auth.uid])
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['members', 'names', 'joinToken'])
+             .hasOnly(['members', 'names', 'joinToken', 'characters'])
         && request.resource.data.names.diff(resource.data.names).affectedKeys()
              .hasOnly([request.auth.uid])
+        && onlyMyCharacter()
         && get(/databases/$(database)/documents/invites/$(request.resource.data.joinToken)).data.coupleId == coupleId
         && get(/databases/$(database)/documents/invites/$(request.resource.data.joinToken)).data.expiresAt > request.time
         && !existsAfter(/databases/$(database)/documents/invites/$(request.resource.data.joinToken));

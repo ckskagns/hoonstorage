@@ -9,8 +9,11 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.uridul.app.data.CalendarEvent
+import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.NAME_MAX
+import com.uridul.app.data.PartnerDefaults
 import com.uridul.app.data.UserFacingException
 import com.uridul.app.data.WidgetSnapshot
 import com.uridul.app.data.WidgetStore
@@ -167,6 +170,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             partnerName = it.couple.partnerName(it.myUid),
                             coupleId = it.couple.id,
                             myUid = it.myUid,
+                            myCharacter = it.couple.myCharacter(it.myUid).key,
+                            partnerCharacter = it.couple.partnerCharacter(it.myUid).key,
                         )
                     }
                 }
@@ -250,8 +255,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = "이미 두 사람이 연결되어 있어요."
             return@launchBusy
         }
-        val token = container.couples?.createInvite(ready.couple.id, ready.myUid) ?: return@launchBusy
+        val token = container.couples?.createInvite(ready.couple.id, ready.myUid, ready.couple.partnerDefaults)
+            ?: return@launchBusy
         onLink(InviteToken.link(BuildConfig.INVITE_HOST, token))
+    }
+
+    /**
+     * 내 이름·캐릭터 저장. 아직 상대가 연결되지 않았으면 상대 이름·캐릭터(초대 링크에 실림)도 함께 저장한다.
+     */
+    fun updateProfile(name: String, character: Character, partner: PartnerDefaults?) = launchBusy {
+        val ready = state.value as? AppState.Ready ?: return@launchBusy
+        val repo = container.couples ?: return@launchBusy
+        val myName = name.trim()
+        if (myName.isEmpty() || myName.length > NAME_MAX) {
+            throw UserFacingException("이름은 1~${NAME_MAX}자로 입력해 주세요.")
+        }
+        repo.updateMyProfile(ready.couple.id, ready.myUid, myName, character)
+        if (partner != null && !ready.couple.isPaired) {
+            val partnerName = partner.name.trim()
+            if (partnerName.isEmpty() || partnerName.length > NAME_MAX) {
+                throw UserFacingException("상대 이름은 1~${NAME_MAX}자로 입력해 주세요.")
+            }
+            repo.updatePartnerDefaults(ready.couple.id, partner.copy(name = partnerName))
+        }
+        _message.value = "프로필을 저장했어요"
     }
 
     fun updateStartDate(date: LocalDate) = launchBusy {

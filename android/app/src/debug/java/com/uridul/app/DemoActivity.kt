@@ -40,7 +40,8 @@ class DemoActivity : ComponentActivity() {
         val couple = Couple(
             id = "demo",
             members = listOf(me, partner),
-            names = mapOf(me to "빕슨", partner to "토끼"),
+            names = mapOf(me to "후이", partner to "나나"),
+            characters = mapOf(me to "dragon", partner to "bunny"),
             startDate = LocalDate.of(2026, 7, 17),
             countFromOne = true,
         )
@@ -62,7 +63,10 @@ class DemoActivity : ComponentActivity() {
             lifecycleScope.launch {
                 WidgetStore.save(
                     this@DemoActivity,
-                    WidgetSnapshot(couple.startDate, true, "빕슨", "토끼", coupleId = null, myUid = me),
+                    WidgetSnapshot(
+                        couple.startDate, true, "후이", "나나", coupleId = null, myUid = me,
+                        myCharacter = "dragon", partnerCharacter = "bunny",
+                    ),
                 )
                 WidgetStore.saveEvents(this@DemoActivity, seed)
                 Widgets.updateAll(this@DemoActivity)
@@ -99,6 +103,7 @@ class DemoActivity : ComponentActivity() {
                     onInvite = {},
                     onChangeStartDate = {},
                     onSetCountFromOne = {},
+                    onUpdateProfile = { _, _, _ -> },
                     onSignOut = {},
                 )
             }

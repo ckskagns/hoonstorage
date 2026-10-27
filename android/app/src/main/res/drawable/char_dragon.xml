@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 후이 캐릭터: 통통한 주황 아기 용 (오리지널 디자인). 작은 날개·뿔·꼬리, 크림색 배 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- 꼬리 -->
+    <path
+        android:fillColor="#FFF08A2E"
+        android:pathData="M74,74 C88,76 94,66 90,56 C88,64 82,68 72,66 Z" />
+    <!-- 날개 -->
+    <path
+        android:fillColor="#FFFFD08A"
+        android:pathData="M24,50 C10,44 8,30 14,24 C18,32 26,38 32,42 Z" />
+    <path
+        android:fillColor="#FFFFD08A"
+        android:pathData="M76,50 C90,44 92,30 86,24 C82,32 74,38 68,42 Z" />
+    <!-- 뿔 -->
+    <path
+        android:fillColor="#FFF08A2E"
+        android:pathData="M38,26 C35,18 37,12 41,13 C44,14 44,20 43,27 Z" />
+    <path
+        android:fillColor="#FFF08A2E"
+        android:pathData="M62,26 C65,18 63,12 59,13 C56,14 56,20 57,27 Z" />
+    <!-- 몸 -->
+    <path
+        android:fillColor="#FFFFA24C"
+        android:pathData="M20,58 a30,31 0 1,0 60,0 a30,31 0 1,0 -60,0 Z" />
+    <!-- 배 -->
+    <path
+        android:fillColor="#FFFFEACB"
+        android:pathData="M33,69 a17,14 0 1,0 34,0 a17,14 0 1,0 -34,0 Z" />
+    <!-- 발 -->
+    <path
+        android:fillColor="#FFF08A2E"
+        android:pathData="M31,88 a7,4 0 1,0 14,0 a7,4 0 1,0 -14,0 Z" />
+    <path
+        android:fillColor="#FFF08A2E"
+        android:pathData="M55,88 a7,4 0 1,0 14,0 a7,4 0 1,0 -14,0 Z" />
+    <!-- 볼 -->
+    <path
+        android:fillColor="#99FF7A7A"
+        android:pathData="M28,59 a4.5,3 0 1,0 9,0 a4.5,3 0 1,0 -9,0 Z" />
+    <path
+        android:fillColor="#99FF7A7A"
+        android:pathData="M63,59 a4.5,3 0 1,0 9,0 a4.5,3 0 1,0 -9,0 Z" />
+    <!-- 눈 -->
+    <path
+        android:fillColor="#FF3B2A20"
+        android:pathData="M36,51 a4,4.4 0 1,0 8,0 a4,4.4 0 1,0 -8,0 Z" />
+    <path
+        android:fillColor="#FF3B2A20"
+        android:pathData="M56,51 a4,4.4 0 1,0 8,0 a4,4.4 0 1,0 -8,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M39.2,49 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M59.2,49 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 Z" />
+    <!-- 입 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF3B2A20"
+        android:strokeLineCap="round"
+        android:strokeWidth="2"
+        android:pathData="M46,58 Q50,62 54,58" />
+</vector>

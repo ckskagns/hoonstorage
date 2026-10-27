@@ -3,6 +3,7 @@ package com.uridul.app.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.uridul.app.data.Character
 
 @Composable
 fun LoginScreen(
@@ -54,12 +56,17 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(72.dp),
-                )
+                // 아기 용 ♥ 토끼
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CharacterAvatar(Character.DRAGON, 80.dp, bob = true, phase = 0)
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    CharacterAvatar(Character.BUNNY, 80.dp, bob = true, phase = 1)
+                }
                 Text("우리둘", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
                 Text(
                     "둘만의 디데이와 일정을 함께 보는 공간",

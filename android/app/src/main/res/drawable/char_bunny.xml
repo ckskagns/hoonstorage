@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 나나 캐릭터: 하얀 토끼 (오리지널 디자인). 긴 귀, 분홍 볼, 작은 리본 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- 귀 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFE6CFD5"
+        android:strokeWidth="1.5"
+        android:pathData="M35,42 C27,24 28,6 36,5 C44,4 45,22 43,42 Z" />
+    <path
+        android:fillColor="#FFFFC4CF"
+        android:pathData="M36,38 C31,25 32,12 36.5,11.5 C40.5,11 41,24 40,38 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFE6CFD5"
+        android:strokeWidth="1.5"
+        android:pathData="M65,42 C73,24 72,6 64,5 C56,4 55,22 57,42 Z" />
+    <path
+        android:fillColor="#FFFFC4CF"
+        android:pathData="M64,38 C69,25 68,12 63.5,11.5 C59.5,11 59,24 60,38 Z" />
+    <!-- 리본 -->
+    <path
+        android:fillColor="#FFFF8FAB"
+        android:pathData="M66,40 L76,34 L76,46 Z" />
+    <path
+        android:fillColor="#FFFF8FAB"
+        android:pathData="M66,40 L56,34 L56,46 Z" />
+    <path
+        android:fillColor="#FFF0628A"
+        android:pathData="M63.5,40 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z" />
+    <!-- 얼굴·몸 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFE6CFD5"
+        android:strokeWidth="1.5"
+        android:pathData="M20,64 a30,27 0 1,0 60,0 a30,27 0 1,0 -60,0 Z" />
+    <!-- 볼 -->
+    <path
+        android:fillColor="#B3FFB3C1"
+        android:pathData="M28,70 a4.5,3 0 1,0 9,0 a4.5,3 0 1,0 -9,0 Z" />
+    <path
+        android:fillColor="#B3FFB3C1"
+        android:pathData="M63,70 a4.5,3 0 1,0 9,0 a4.5,3 0 1,0 -9,0 Z" />
+    <!-- 눈 -->
+    <path
+        android:fillColor="#FF3B2A20"
+        android:pathData="M36.5,62 a3.6,4 0 1,0 7.2,0 a3.6,4 0 1,0 -7.2,0 Z" />
+    <path
+        android:fillColor="#FF3B2A20"
+        android:pathData="M56.3,62 a3.6,4 0 1,0 7.2,0 a3.6,4 0 1,0 -7.2,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M39.3,60.2 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M59.1,60.2 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0 Z" />
+    <!-- 코·입 -->
+    <path
+        android:fillColor="#FFFF8FA3"
+        android:pathData="M47.6,67.5 Q50,70.5 52.4,67.5 Q50,66.4 47.6,67.5 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF3B2A20"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.6"
+        android:pathData="M50,69.4 Q48.6,72.6 46,71.6 M50,69.4 Q51.4,72.6 54,71.6" />
+</vector>

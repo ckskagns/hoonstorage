@@ -111,6 +111,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onInvite = { viewModel.createInviteLink { link -> shareInviteLink(context, link) } },
             onChangeStartDate = viewModel::updateStartDate,
             onSetCountFromOne = viewModel::setCountFromOne,
+            onUpdateProfile = viewModel::updateProfile,
             onSignOut = { viewModel.signOut(context) },
         )
     }

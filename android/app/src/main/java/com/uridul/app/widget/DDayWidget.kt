@@ -27,7 +27,12 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.layout.size
 import com.uridul.app.MainActivity
+import com.uridul.app.R
+import com.uridul.app.data.Character
 import com.uridul.app.data.WidgetSnapshot
 import com.uridul.app.data.WidgetStore
 import com.uridul.app.domain.DDay
@@ -70,6 +75,37 @@ private val Background = WidgetColors.Background
 private val Primary = WidgetColors.Primary
 private val OnBg = WidgetColors.OnBg
 private val SubText = WidgetColors.SubText
+
+/** [내 캐릭터] 후이 ♥ 나나 [상대 캐릭터] */
+@Composable
+private fun CharacterNames(snapshot: WidgetSnapshot, avatarDp: Int) {
+    val mine = Character.from(snapshot.myCharacter) ?: Character.DRAGON
+    val partner = Character.from(snapshot.partnerCharacter) ?: mine.other
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            ImageProvider(widgetDrawable(mine)),
+            contentDescription = null,
+            modifier = GlanceModifier.size(avatarDp.dp),
+        )
+        Spacer(GlanceModifier.width(4.dp))
+        Text(
+            "${snapshot.myName} ♥ ${snapshot.partnerName ?: "?"}",
+            style = TextStyle(color = OnBg, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.width(4.dp))
+        Image(
+            ImageProvider(widgetDrawable(partner)),
+            contentDescription = null,
+            modifier = GlanceModifier.size(avatarDp.dp),
+        )
+    }
+}
+
+internal fun widgetDrawable(c: Character): Int = when (c) {
+    Character.DRAGON -> R.drawable.char_dragon
+    Character.BUNNY -> R.drawable.char_bunny
+}
 
 @Composable
 private fun WidgetContent(snapshot: WidgetSnapshot?, today: LocalDate) {
@@ -116,7 +152,7 @@ private fun WidgetContent(snapshot: WidgetSnapshot?, today: LocalDate) {
             // 가로 넓은형
             Row(modifier, verticalAlignment = Alignment.CenterVertically) {
                 Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(names, style = TextStyle(color = OnBg, fontSize = 13.sp), maxLines = 1)
+                    CharacterNames(snapshot, 26)
                     Text(dday, style = TextStyle(color = Primary, fontSize = 36.sp, fontWeight = FontWeight.Bold), maxLines = 1)
                 }
                 Spacer(GlanceModifier.width(12.dp))
@@ -133,7 +169,7 @@ private fun WidgetContent(snapshot: WidgetSnapshot?, today: LocalDate) {
         else -> {
             // 정사각형
             Column(modifier, verticalAlignment = Alignment.CenterVertically, horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(names, style = TextStyle(color = OnBg, fontSize = 12.sp), maxLines = 1)
+                if (size.height >= 130.dp) CharacterNames(snapshot, 24) else Text(names, style = TextStyle(color = OnBg, fontSize = 12.sp), maxLines = 1)
                 Text(dday, style = TextStyle(color = Primary, fontSize = 30.sp, fontWeight = FontWeight.Bold), maxLines = 1)
                 upcoming.firstOrNull()?.let {
                     Text(

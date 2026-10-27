@@ -109,16 +109,17 @@ private fun HeroCard(couple: Couple, myUid: String, today: LocalDate, modifier: 
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 32.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
-            Text(
-                "${couple.myName(myUid)}  ♥  ${partner ?: "?"}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // 두 캐릭터가 살랑살랑 움직이고, 누르면 콩 뛴다
+            CoupleHeader(
+                myCharacter = couple.myCharacter(myUid),
+                partnerCharacter = couple.partnerCharacter(myUid),
+                myName = couple.myName(myUid),
+                partnerName = partner,
+                avatarSize = 72.dp,
             )
             Text(
                 "함께한 지",

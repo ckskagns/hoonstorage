@@ -385,6 +385,7 @@ private fun DayPanel(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    CharacterPair(couple.myCharacter(myUid), couple.partnerCharacter(myUid), size = 48.dp)
                     Text(
                         "등록된 일정이 없어요",
                         style = MaterialTheme.typography.bodyMedium,
@@ -436,15 +437,19 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Text(
-                who,
-                style = MaterialTheme.typography.labelSmall,
-                color = color,
-                maxLines = 1,
-                modifier = Modifier
-                    .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-            )
+            // 누가 등록했는지: 캐릭터 얼굴 + 이름
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CharacterAvatar(couple.characterOf(event.createdBy), 30.dp, contentDescription = "$who 등록")
+                Text(
+                    who,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
+                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            }
         }
     }
 }

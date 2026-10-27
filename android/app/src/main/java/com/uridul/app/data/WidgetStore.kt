@@ -19,6 +19,8 @@ data class WidgetSnapshot(
     val partnerName: String?,
     val coupleId: String? = null,
     val myUid: String? = null,
+    val myCharacter: String? = null,
+    val partnerCharacter: String? = null,
 )
 
 private val Context.widgetDataStore by preferencesDataStore(name = "widget_state")
@@ -30,6 +32,8 @@ object WidgetStore {
     private val PARTNER_NAME = stringPreferencesKey("partner_name")
     private val COUPLE_ID = stringPreferencesKey("couple_id")
     private val MY_UID = stringPreferencesKey("my_uid")
+    private val MY_CHAR = stringPreferencesKey("my_character")
+    private val PARTNER_CHAR = stringPreferencesKey("partner_character")
     private val EVENTS = stringPreferencesKey("upcoming_events")
 
     suspend fun save(context: Context, snapshot: WidgetSnapshot) {
@@ -40,6 +44,8 @@ object WidgetStore {
             if (snapshot.partnerName != null) it[PARTNER_NAME] = snapshot.partnerName else it.remove(PARTNER_NAME)
             if (snapshot.coupleId != null) it[COUPLE_ID] = snapshot.coupleId else it.remove(COUPLE_ID)
             if (snapshot.myUid != null) it[MY_UID] = snapshot.myUid else it.remove(MY_UID)
+            if (snapshot.myCharacter != null) it[MY_CHAR] = snapshot.myCharacter else it.remove(MY_CHAR)
+            if (snapshot.partnerCharacter != null) it[PARTNER_CHAR] = snapshot.partnerCharacter else it.remove(PARTNER_CHAR)
         }
     }
 
@@ -53,6 +59,8 @@ object WidgetStore {
             partnerName = prefs[PARTNER_NAME],
             coupleId = prefs[COUPLE_ID],
             myUid = prefs[MY_UID],
+            myCharacter = prefs[MY_CHAR],
+            partnerCharacter = prefs[PARTNER_CHAR],
         )
     }
 

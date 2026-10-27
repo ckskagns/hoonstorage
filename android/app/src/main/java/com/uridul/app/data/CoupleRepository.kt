@@ -88,6 +88,8 @@ class CoupleRepository(private val db: FirebaseFirestore) {
                 mapOf(
                     "members" to listOf(uid),
                     "names" to mapOf(uid to name),
+                    // 먼저 만든 사람은 아기 용, 초대받는 상대는 토끼가 기본
+                    "characters" to mapOf(uid to Character.DRAGON.key),
                     "startDate" to startDate.toString(),
                     "countFromOne" to true,
                     "createdAt" to FieldValue.serverTimestamp(),
@@ -99,19 +101,46 @@ class CoupleRepository(private val db: FirebaseFirestore) {
         return ref.id
     }
 
-    /** 1회용 초대 토큰을 만든다. 24시간 뒤 만료. */
-    suspend fun createInvite(coupleId: String, uid: String): String {
+    /**
+     * 1회용 초대 토큰을 만든다. 24시간 뒤 만료.
+     * 미리 정해 둔 상대 이름·캐릭터가 있으면 함께 실어 보내, 상대가 연결할 때 그대로 쓰게 한다.
+     */
+    suspend fun createInvite(coupleId: String, uid: String, partner: PartnerDefaults?): String {
         val token = InviteToken.generate()
         val expires = Date(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(24))
-        invites.document(token).set(
-            mapOf(
-                "coupleId" to coupleId,
-                "createdBy" to uid,
-                "createdAt" to FieldValue.serverTimestamp(),
-                "expiresAt" to Timestamp(expires),
-            ),
-        ).await()
+        val data = mutableMapOf<String, Any>(
+            "coupleId" to coupleId,
+            "createdBy" to uid,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "expiresAt" to Timestamp(expires),
+        )
+        if (partner != null) {
+            data["partnerName"] = partner.name
+            data["partnerCharacter"] = partner.character.key
+        }
+        invites.document(token).set(data).await()
         return token
+    }
+
+    /** 내 이름·캐릭터 바꾸기 */
+    suspend fun updateMyProfile(coupleId: String, uid: String, name: String, character: Character) {
+        db.batch()
+            .update(
+                couples.document(coupleId),
+                FieldPath.of("names", uid), name,
+                FieldPath.of("characters", uid), character.key,
+            )
+            .set(users.document(uid), mapOf("displayName" to name), SetOptions.merge())
+            .commit()
+            .await()
+    }
+
+    /** 연결 전 상대 이름·캐릭터 미리 정하기 (아직 혼자일 때만) */
+    suspend fun updatePartnerDefaults(coupleId: String, partner: PartnerDefaults) {
+        couples.document(coupleId).update(
+            "partnerDefaults",
+            mapOf("name" to partner.name, "character" to partner.character.key),
+        ).await()
     }
 
     /** 초대 토큰으로 상대의 커플 공간에 참여한다. 토큰은 같은 배치에서 삭제되어 재사용할 수 없다. */
@@ -130,17 +159,21 @@ class CoupleRepository(private val db: FirebaseFirestore) {
         }
         val coupleId = invite.getString("coupleId")
             ?: throw UserFacingException("초대 정보가 올바르지 않아요.")
+        // 초대한 사람이 미리 정해 둔 이름·캐릭터가 있으면 그대로 쓴다 (나중에 내 프로필에서 바꿀 수 있음)
+        val myName = invite.getString("partnerName")?.takeIf { it.isNotBlank() } ?: name
+        val myCharacter = Character.from(invite.getString("partnerCharacter")) ?: Character.BUNNY
 
         try {
             db.batch()
                 .update(
                     couples.document(coupleId),
                     FieldPath.of("members"), FieldValue.arrayUnion(uid),
-                    FieldPath.of("names", uid), name,
+                    FieldPath.of("names", uid), myName,
                     FieldPath.of("joinToken"), token,
+                    FieldPath.of("characters", uid), myCharacter.key,
                 )
                 .delete(inviteRef)
-                .set(users.document(uid), mapOf("coupleId" to coupleId, "displayName" to name), SetOptions.merge())
+                .set(users.document(uid), mapOf("coupleId" to coupleId, "displayName" to myName), SetOptions.merge())
                 .commit()
                 .await()
         } catch (e: FirebaseFirestoreException) {
@@ -163,12 +196,19 @@ class CoupleRepository(private val db: FirebaseFirestore) {
     private fun DocumentSnapshot.toCouple(): Couple? {
         if (!exists()) return null
         val start = getString("startDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        val partner = (get("partnerDefaults") as? Map<String, Any?>)?.let { m ->
+            val n = m["name"] as? String
+            val c = Character.from(m["character"] as? String)
+            if (n.isNullOrBlank() || c == null) null else PartnerDefaults(n, c)
+        }
         return Couple(
             id = id,
             members = (get("members") as? List<String>).orEmpty(),
             names = (get("names") as? Map<String, String>).orEmpty(),
             startDate = start,
             countFromOne = getBoolean("countFromOne") ?: true,
+            characters = (get("characters") as? Map<String, String>).orEmpty(),
+            partnerDefaults = partner,
         )
     }
 }

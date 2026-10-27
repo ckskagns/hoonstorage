@@ -41,9 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import com.uridul.app.OpenRequest
+import androidx.compose.ui.unit.dp
 import com.uridul.app.data.CalendarEvent
+import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.PartnerDefaults
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -74,8 +77,10 @@ fun ReadyScreen(
     onInvite: () -> Unit,
     onChangeStartDate: (LocalDate) -> Unit,
     onSetCountFromOne: (Boolean) -> Unit,
+    onUpdateProfile: (String, Character, PartnerDefaults?) -> Unit,
     onSignOut: () -> Unit,
 ) {
+    var editingProfile by remember { mutableStateOf(false) }
     var tabKey by rememberSaveable { mutableStateOf(Tab.Home.key) }
     val tab = Tab.entries.firstOrNull { it.key == tabKey } ?: Tab.Home
     var selectedText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
@@ -115,6 +120,13 @@ fun ReadyScreen(
                             Icon(Icons.Filled.MoreVert, contentDescription = "메뉴")
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("내 프로필 (이름·캐릭터)") },
+                                leadingIcon = {
+                                    CharacterAvatar(couple.myCharacter(myUid), 24.dp)
+                                },
+                                onClick = { menuOpen = false; editingProfile = true },
+                            )
                             DropdownMenuItem(
                                 text = { Text("시작일 변경") },
                                 onClick = { menuOpen = false; picking = true },
@@ -218,6 +230,17 @@ fun ReadyScreen(
                 onDelete = (target as? EditorTarget.Existing)?.let { { onDeleteEvent(it.event.id) } },
             )
         }
+    }
+
+    if (editingProfile) {
+        ProfileDialog(
+            myName = couple.myName(myUid),
+            myCharacter = couple.myCharacter(myUid),
+            partnerDefaults = couple.partnerDefaults,
+            isPaired = couple.isPaired,
+            onDismiss = { editingProfile = false },
+            onSave = onUpdateProfile,
+        )
     }
 
     if (picking) {
