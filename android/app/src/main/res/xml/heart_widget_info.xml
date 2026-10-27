@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 하트 위젯 (기본 2×2, 2×1·3×1 로 줄여도 하트+숫자 가로 배치). 홈 화면 + 잠금 화면(keyguard / 굿락 LockStar) -->
+<!--
+  하트 위젯: 기본 4×2 (가로 4칸 × 세로 2칸).
+  minWidth/minHeight 는 칸 수를 쓰지 않는 홈 화면 앱에서 기본 크기로 쓰인다 (4칸=250dp, 2칸=110dp).
+  minResize 는 작게 둬서 2×1 등으로 줄여도 하트+숫자 가로 배치가 유지된다.
+  홈 화면 + 잠금 화면(keyguard / 굿락 LockStar)
+-->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/heart_widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewLayout="@layout/widget_preview_heart"
-    android:minWidth="57dp"
-    android:minHeight="57dp"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
     android:minResizeWidth="57dp"
-    android:minResizeHeight="57dp"
-    android:targetCellWidth="2"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="4"
     android:targetCellHeight="2"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="21600000"
