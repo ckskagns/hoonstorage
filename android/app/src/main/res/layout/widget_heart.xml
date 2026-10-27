@@ -1,60 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   하트 위젯 본문 (홈 화면 · 잠금 화면 공용).
-  [콩닥이는 미니 하트 두 개] [103일]
-                             [26.07.17]
-  배경 없이 흰 글자 + 그림자라서 어떤 배경화면 위에서도 읽힌다.
-  하트 애니메이션은 ProgressBar 의 indeterminateDrawable(프레임 애니메이션)로 재생한다.
-  (위젯은 일반 애니메이션을 못 돌리지만 ProgressBar 의 진행 표시는 움직인다)
+  ( [겹친 하트 두 개] 103일    )   ← 옅은 반투명 알약 바탕
+  (                26.07.17 )   ← 날짜는 숫자 시작점에 맞춤 (왼쪽 여백은 코드에서 하트 폭만큼)
+  - 하트와 숫자는 한 줄로 묶어 세로 가운데를 맞춘다.
+  - 흰 글자 + 진한 그림자 + 반투명 바탕이라 밝은 배경화면에서도 또렷하다.
+  - 하트 애니메이션은 ProgressBar 의 indeterminateDrawable(프레임 애니메이션)로 재생한다.
+    (위젯은 일반 애니메이션을 못 돌리지만 ProgressBar 의 진행 표시는 움직인다)
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/heart_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="horizontal"
     android:padding="4dp">
 
-    <ProgressBar
-        android:id="@+id/heart_anim"
-        android:layout_width="38dp"
-        android:layout_height="24dp"
-        android:importantForAccessibility="no"
-        android:indeterminate="true"
-        android:indeterminateDrawable="@drawable/heart_beat_anim"
-        android:indeterminateOnly="true" />
-
     <LinearLayout
+        android:id="@+id/heart_pill"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:gravity="start|center_vertical"
-        android:orientation="vertical">
+        android:layout_gravity="center"
+        android:background="@drawable/heart_pill_bg"
+        android:orientation="vertical"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
 
-        <TextView
-            android:id="@+id/heart_days"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:shadowColor="#99000000"
-            android:shadowDy="1"
-            android:shadowRadius="4"
-            android:textColor="#FFFFFFFF"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ProgressBar
+                android:id="@+id/heart_anim"
+                android:layout_width="30dp"
+                android:layout_height="24dp"
+                android:importantForAccessibility="no"
+                android:indeterminate="true"
+                android:indeterminateDrawable="@drawable/heart_beat_anim"
+                android:indeterminateOnly="true" />
+
+            <TextView
+                android:id="@+id/heart_days"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:shadowColor="#CC000000"
+                android:shadowDy="1"
+                android:shadowRadius="6"
+                android:textColor="#FFFFFFFF"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/heart_since"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="36dp"
             android:layout_marginTop="2dp"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:shadowColor="#99000000"
+            android:shadowColor="#CC000000"
             android:shadowDy="1"
-            android:shadowRadius="3"
-            android:textColor="#E6FFFFFF"
-            android:textSize="11sp" />
+            android:shadowRadius="5"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
     </LinearLayout>
-</LinearLayout>
+</FrameLayout>

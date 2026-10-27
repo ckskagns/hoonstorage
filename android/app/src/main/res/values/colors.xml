@@ -10,4 +10,6 @@
     <!-- 하트 위젯: 빨강 -->
     <color name="heart_red">#FFE53935</color>
     <color name="heart_red_light">#FFFF5A5F</color>
+    <!-- 겹친 하트 경계선 (앞 하트 테두리) -->
+    <color name="heart_outline">#FFFFFFFF</color>
 </resources>

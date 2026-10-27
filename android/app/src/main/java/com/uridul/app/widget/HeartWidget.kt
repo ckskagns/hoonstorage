@@ -27,12 +27,13 @@ import java.time.format.DateTimeFormatter
 /**
  * "사귄 날" 하트 위젯. 홈 화면 + 잠금 화면(굿락 LockStar).
  *
- *   [♥♥] 103일
- *        26.07.17
+ *   ( [♥♥] 103일    )
+ *   (      26.07.17 )
  *
- * - 빨간 미니 하트 두 개가 번갈아 콩닥인다 (위젯 호스트가 애니메이션을 막으면 멈춘 하트로 보인다).
+ * - 겹친 빨간 미니 하트 두 개가 번갈아 콩닥이고, 뛰는 하트가 앞으로 나온다
+ *   (위젯 호스트가 애니메이션을 막으면 멈춘 하트로 보인다).
  * - 하트 높이는 디데이 숫자 글자 크기와 같고, 숫자 왼쪽에 가로로 나란히 선다.
- * - 배경 없이 흰 글자 + 그림자라 잠금 화면 배경화면 위에서도 읽힌다.
+ * - 흰 글자 + 진한 그림자 + 옅은 반투명 알약 바탕이라 밝은 배경화면에서도 또렷하다.
  *
  * 하트 애니메이션은 Glance 로 만들 수 없어서 일반 위젯 레이아웃(RemoteViews)을 그대로 넣는다.
  */
@@ -62,8 +63,23 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
 
 private val ShortDate: DateTimeFormatter = DateTimeFormatter.ofPattern("yy.MM.dd")
 
-/** 하트(가로:세로 = 38:24) 너비 비율 */
-private const val HEART_ASPECT = 38f / 24f
+/** 겹친 하트 두 개(가로:세로 = 30:24) 너비 비율 */
+private const val HEART_ASPECT = 30f / 24f
+
+/**
+ * 하트 그림 높이 = 글자 크기 × 이 값.
+ * 그림 안의 하트는 여백 때문에 칸의 약 60%만 차지해서, 숫자 높이와 비슷해지도록 키운다.
+ */
+private const val HEART_SCALE = 1.3f
+
+/** 하트 그림 너비 (글자 크기 1em 대비) */
+private const val HEART_WIDTH_EM = HEART_ASPECT * HEART_SCALE
+
+/** 가로 여백: 바깥 패딩 4×2 + 반투명 바탕 안쪽 10+12 + 하트와 글자 사이 6 */
+private const val ROW_PADDING_DP = 36f
+
+/** 세로 여백: 바깥 패딩 4×2 + 반투명 바탕 안쪽 6×2 */
+private const val COLUMN_PADDING_DP = 20f
 
 /** 위젯 크기에 맞춘 글자·하트 크기 (dp) */
 internal data class HeartLayout(val textDp: Float, val showSince: Boolean)
@@ -80,15 +96,15 @@ internal fun textWidthEm(text: String): Float = text.sumOf { c ->
     }
 }.toFloat()
 
-/** 하트 + 간격 + 글자를 합친 가로 폭(dp). 패딩 8 + 하트와 글자 사이 6 포함 */
+/** 하트 + 간격 + 글자 + 여백을 합친 가로 폭(dp) */
 internal fun heartRowWidthDp(text: String, textDp: Float): Float =
-    14f + textDp * (textWidthEm(text) + HEART_ASPECT)
+    ROW_PADDING_DP + textDp * (textWidthEm(text) + HEART_WIDTH_EM)
 
 internal fun heartLayout(widthDp: Float, heightDp: Float, daysText: String): HeartLayout {
-    val byWidth = (widthDp * 0.92f - 14f) / (textWidthEm(daysText) + HEART_ASPECT)
-    val byHeight = (heightDp - 8f) * 0.62f
+    val byWidth = (widthDp * 0.94f - ROW_PADDING_DP) / (textWidthEm(daysText) + HEART_WIDTH_EM)
+    val byHeight = (heightDp - COLUMN_PADDING_DP) / HEART_SCALE * 0.9f
     val text = minOf(byWidth, byHeight).coerceIn(12f, 64f)
-    val showSince = heightDp - 8f >= text * 1.15f + 16f && text >= 18f
+    val showSince = heightDp - COLUMN_PADDING_DP >= text * HEART_SCALE + 16f && text >= 14f
     return HeartLayout(text, showSince)
 }
 
@@ -110,9 +126,16 @@ private fun heartRemoteViews(
         setTextViewTextSize(R.id.heart_since, TypedValue.COMPLEX_UNIT_DIP, (layout.textDp * 0.36f).coerceIn(10f, 16f))
         setViewVisibility(R.id.heart_since, if (layout.showSince) View.VISIBLE else View.GONE)
 
-        // 하트 높이 = 숫자 글자 크기
-        setViewLayoutHeight(R.id.heart_anim, layout.textDp, TypedValue.COMPLEX_UNIT_DIP)
-        setViewLayoutWidth(R.id.heart_anim, layout.textDp * HEART_ASPECT, TypedValue.COMPLEX_UNIT_DIP)
+        // 보이는 하트 크기 ≈ 숫자 글자 높이
+        setViewLayoutHeight(R.id.heart_anim, layout.textDp * HEART_SCALE, TypedValue.COMPLEX_UNIT_DIP)
+        setViewLayoutWidth(R.id.heart_anim, layout.textDp * HEART_WIDTH_EM, TypedValue.COMPLEX_UNIT_DIP)
+        // 날짜를 숫자 시작점(하트 폭 + 간격 6dp)에 맞춘다
+        setViewLayoutMargin(
+            R.id.heart_since,
+            RemoteViews.MARGIN_START,
+            layout.textDp * HEART_WIDTH_EM + 6f,
+            TypedValue.COMPLEX_UNIT_DIP,
+        )
 
         setContentDescription(
             R.id.heart_root,

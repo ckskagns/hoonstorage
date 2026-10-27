@@ -16,7 +16,7 @@ class HeartLayoutTest {
             for (text in listOf("7일", "103일", "1000일", "D-12")) {
                 val layout = heartLayout(w, h, text)
                 assertTrue("$text @ ${w}x$h 너비 초과", estimatedWidth(text, layout.textDp) <= w + 1f || layout.textDp == 12f)
-                assertTrue("$text @ ${w}x$h 높이 초과", layout.textDp <= h)
+                assertTrue("$text @ ${w}x$h 높이 초과", layout.textDp * 1.3f + 20f <= h || layout.textDp == 12f)
             }
         }
     }

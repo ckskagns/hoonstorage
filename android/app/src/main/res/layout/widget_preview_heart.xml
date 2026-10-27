@@ -9,7 +9,7 @@
     android:padding="8dp">
 
     <ImageView
-        android:layout_width="44dp"
+        android:layout_width="35dp"
         android:layout_height="28dp"
         android:contentDescription="@null"
         android:src="@drawable/heart_beat_0" />
