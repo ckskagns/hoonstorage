@@ -299,6 +299,7 @@ private fun DayCell(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
+                softWrap = false,
             )
         }
         if (events.isEmpty()) return@Column
@@ -315,6 +316,8 @@ private fun DayCell(
                     color = scheme.onSurface.copy(alpha = alpha),
                     maxLines = 1,
                     overflow = TextOverflow.Clip,
+                    // 띄어쓰기에서 줄바꿈되어 "Fold test2" 가 "Fold" 로만 보이던 문제 방지
+                    softWrap = false,
                     modifier = Modifier
                         .padding(top = 1.dp)
                         .fillMaxWidth()

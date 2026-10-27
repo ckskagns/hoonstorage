@@ -63,12 +63,29 @@ fun EventEditorDialog(
     var picker by rememberSaveable { mutableStateOf<String?>(null) } // "start" | "end" | "time"
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+
     val start = LocalDate.parse(date)
     val end = LocalDate.parse(endDate)
     val localTime = time?.let(LocalTime::parse)
 
+    val save: () -> Unit = {
+        val draft = EventDraft(initial.id, title, start, end, localTime, memo)
+        if (onSave(draft)) onDismiss()
+    }
+    // 뒤로 가기·취소: 바꾼 내용이 있으면 한 번 더 묻는다 (키보드 내리려다 내용이 날아가는 것 방지)
+    val requestClose: () -> Unit = {
+        val changed = title != initial.title || date != initial.date.toString() ||
+            endDate != initial.endDate.toString() || time != initial.time?.toString() || memo != initial.memo
+        if (changed) {
+            confirmDiscard = true
+        } else {
+            onDismiss()
+        }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = requestClose,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
@@ -91,17 +108,29 @@ fun EventEditorDialog(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp),
             ) {
+                Column {
+                    // 머리글: 키보드가 올라와도 항상 보이도록 저장 버튼을 위에 둔다
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (initial.id == null) "일정 추가" else "일정 수정",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Button(onClick = save) { Text("저장") }
+                    }
                 Column(
                     Modifier
+                        .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
+                        .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        if (initial.id == null) "일정 추가" else "일정 수정",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it.take(CalendarEvent.TITLE_MAX) },
@@ -149,17 +178,27 @@ fun EventEditorDialog(
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onDismiss) { Text("취소") }
-                        Button(
-                            onClick = {
-                                val draft = EventDraft(initial.id, title, start, end, localTime, memo)
-                                if (onSave(draft)) onDismiss()
-                            },
-                        ) { Text("저장") }
+                        TextButton(onClick = requestClose) { Text("취소") }
                     }
+                }
                 }
             }
         }
+    }
+
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("작성 중인 내용을 버릴까요?") },
+            text = { Text("저장하지 않은 내용은 사라져요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    onDismiss()
+                }) { Text("버리기", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("계속 쓰기") } },
+        )
     }
 
     when (picker) {

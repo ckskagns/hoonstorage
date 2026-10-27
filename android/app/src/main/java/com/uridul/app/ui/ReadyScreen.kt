@@ -16,6 +16,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -154,11 +155,18 @@ fun ReadyScreen(
             },
             floatingActionButton = {
                 if (tab == Tab.Calendar) {
-                    ExtendedFloatingActionButton(
-                        onClick = { editing = EditorTarget.New(selected) },
-                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                        text = { Text("일정 추가") },
-                    )
+                    if (wide) {
+                        ExtendedFloatingActionButton(
+                            onClick = { editing = EditorTarget.New(selected) },
+                            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                            text = { Text("일정 추가") },
+                        )
+                    } else {
+                        // 좁은 화면(폰·폴드 커버)에서는 달력을 덜 가리도록 둥근 + 버튼만
+                        FloatingActionButton(onClick = { editing = EditorTarget.New(selected) }) {
+                            Icon(Icons.Filled.Add, contentDescription = "일정 추가")
+                        }
+                    }
                 }
             },
             snackbarHost = { SnackbarHost(snackbar) },
