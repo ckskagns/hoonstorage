@@ -4,4 +4,5 @@
     <color name="widget_preview_bg">#FF4A1F30</color>
     <color name="widget_preview_primary">#FFFFB1C5</color>
     <color name="widget_preview_text">#FFFFD9E2</color>
+    <color name="widget_preview_surface">#FF261D20</color>
 </resources>

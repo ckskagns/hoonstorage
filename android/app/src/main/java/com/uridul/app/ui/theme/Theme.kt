@@ -55,6 +55,19 @@ private val DarkColors = darkColorScheme(
     outlineVariant = Color(0xFF514347),
 )
 
+/** 일정 색: 내가 등록한 일정은 분홍, 상대가 등록한 일정은 파랑 */
+object CoupleColors {
+    val mine: Color
+        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFFFB1C5) else Color(0xFFD14D72)
+    val partner: Color
+        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFB0C6FF) else Color(0xFF4F6FC4)
+    /** 일요일·공휴일 빨강 / 토요일 파랑 */
+    val sunday: Color
+        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFFFB4AB) else Color(0xFFD32F2F)
+    val saturday: Color
+        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFA8C8FF) else Color(0xFF1E62C8)
+}
+
 @Composable
 fun UridulTheme(content: @Composable () -> Unit) {
     MaterialTheme(

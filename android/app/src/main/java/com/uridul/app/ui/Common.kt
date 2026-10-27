@@ -53,12 +53,16 @@ fun rememberToday(): LocalDate {
     return today
 }
 
+val KoreanTime: DateTimeFormatter = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
+val KoreanMonthDay: DateTimeFormatter = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StartDatePickerDialog(
     initial: LocalDate,
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
+    title: String = "사귀기 시작한 날",
 ) {
     val state = rememberDatePickerState(
         initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
@@ -78,7 +82,7 @@ fun StartDatePickerDialog(
     ) {
         DatePicker(
             state = state,
-            title = { Text("사귀기 시작한 날", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
+            title = { Text(title, modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
         )
     }
 }

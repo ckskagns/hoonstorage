@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 일정 위젯 미리보기 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_surface_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="💕 우리 일정"
+        android:textColor="@color/widget_preview_primary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="오늘   19:00  저녁 데이트"
+        android:textColor="@color/widget_preview_text"
+        android:textSize="13sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="토요일  종일   여행"
+        android:textColor="@color/widget_preview_text"
+        android:textSize="13sp" />
+</LinearLayout>

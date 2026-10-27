@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,7 +58,7 @@ class WidgetRefreshReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
-                DDayWidget().updateAll(appContext)
+                Widgets.updateAll(appContext)
             } finally {
                 MidnightScheduler.schedule(appContext)
                 pending.finish()

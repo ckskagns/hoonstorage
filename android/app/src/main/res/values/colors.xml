@@ -6,4 +6,5 @@
     <color name="widget_preview_bg">#FFFFD9E2</color>
     <color name="widget_preview_primary">#FFC03A62</color>
     <color name="widget_preview_text">#FF3E001D</color>
+    <color name="widget_preview_surface">#FFFFF8F8</color>
 </resources>

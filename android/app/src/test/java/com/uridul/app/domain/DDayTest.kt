@@ -7,6 +7,26 @@ import java.time.LocalDate
 
 class DDayTest {
 
+    @Test
+    fun milestonesBetweenFindsHundredsAndAnniversaries() {
+        // 2026-07-17 시작, 첫날 = 1일 → 100일 = 10-24, 200일 = 2027-02-01, 1주년 = 2027-07-17
+        val start = LocalDate.of(2026, 7, 17)
+        val oct = DDay.milestonesBetween(start, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), true)
+        assertEquals(mapOf(LocalDate.of(2026, 10, 24) to "100일"), oct)
+
+        val year = DDay.milestonesBetween(start, LocalDate.of(2027, 1, 1), LocalDate.of(2027, 12, 31), true)
+        assertEquals("200일", year[LocalDate.of(2027, 2, 1)])
+        assertEquals("1주년", year[LocalDate.of(2027, 7, 17)])
+        assertEquals("300일", year[LocalDate.of(2027, 5, 12)])
+    }
+
+    @Test
+    fun milestonesBetweenWithoutCountFromOne() {
+        val start = LocalDate.of(2026, 1, 1)
+        val m = DDay.milestonesBetween(start, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30), false)
+        assertEquals(mapOf(LocalDate.of(2026, 4, 11) to "100일"), m)
+    }
+
     private val start = LocalDate.of(2025, 1, 1)
 
     @Test

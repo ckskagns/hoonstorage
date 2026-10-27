@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.uridul.app.data.AuthRepository
 import com.uridul.app.data.CoupleRepository
+import com.uridul.app.data.EventRepository
 import com.uridul.app.widget.MidnightScheduler
 
 class UridulApp : Application() {
@@ -30,5 +31,9 @@ class AppContainer(context: Context) {
 
     val couples: CoupleRepository? by lazy {
         if (firebaseReady) CoupleRepository(FirebaseFirestore.getInstance()) else null
+    }
+
+    val events: EventRepository? by lazy {
+        if (firebaseReady) EventRepository(FirebaseFirestore.getInstance()) else null
     }
 }

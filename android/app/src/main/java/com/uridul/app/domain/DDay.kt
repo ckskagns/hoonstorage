@@ -38,6 +38,36 @@ object DDay {
     /** 남은 일수 표기: "D-12", 당일은 "D-Day". */
     fun daysLeftText(daysLeft: Long): String = if (daysLeft == 0L) "D-Day" else "D-$daysLeft"
 
+    /** 기간 안에 있는 기념일(100일 단위 + 주년). 달력에 하트로 표시할 때 쓴다. */
+    fun milestonesBetween(
+        start: LocalDate,
+        from: LocalDate,
+        to: LocalDate,
+        countFromOne: Boolean,
+    ): Map<LocalDate, String> {
+        if (to.isBefore(from)) return emptyMap()
+        val offset = if (countFromOne) 1L else 0L
+        val result = sortedMapOf<LocalDate, String>()
+
+        val fromDay = ChronoUnit.DAYS.between(start, from) + offset
+        val toDay = ChronoUnit.DAYS.between(start, to) + offset
+        var k = maxOf(1L, Math.floorDiv(fromDay + 99, 100))
+        while (k * 100 <= toDay) {
+            val date = start.plusDays(k * 100 - offset)
+            result[date] = "${k * 100}일"
+            k++
+        }
+
+        var y = maxOf(1L, ChronoUnit.YEARS.between(start, from))
+        while (true) {
+            val date = start.plusYears(y)
+            if (date.isAfter(to)) break
+            if (!date.isBefore(from)) result[date] = "${y}주년"
+            y++
+        }
+        return result
+    }
+
     /**
      * 오늘(포함) 이후 다가오는 기념일. 100일 단위 기념일과 매년 주년을 합쳐 날짜순으로 돌려준다.
      */

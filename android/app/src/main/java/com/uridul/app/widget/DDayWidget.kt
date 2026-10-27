@@ -2,7 +2,6 @@ package com.uridul.app.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -17,7 +16,6 @@ import androidx.glance.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -68,10 +66,10 @@ class DDayWidgetReceiver : GlanceAppWidgetReceiver() {
     }
 }
 
-private val Background = ColorProvider(day = Color(0xFFFFD9E2), night = Color(0xFF4A1F30))
-private val Primary = ColorProvider(day = Color(0xFFC03A62), night = Color(0xFFFFB1C5))
-private val OnBg = ColorProvider(day = Color(0xFF3E001D), night = Color(0xFFFFD9E2))
-private val SubText = ColorProvider(day = Color(0xFF74565F), night = Color(0xFFE3BDC6))
+private val Background = WidgetColors.Background
+private val Primary = WidgetColors.Primary
+private val OnBg = WidgetColors.OnBg
+private val SubText = WidgetColors.SubText
 
 @Composable
 private fun WidgetContent(snapshot: WidgetSnapshot?, today: LocalDate) {

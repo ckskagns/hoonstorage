@@ -8,27 +8,42 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
+import com.uridul.app.data.EventDraft
 import com.uridul.app.data.UserFacingException
 import com.uridul.app.data.WidgetSnapshot
 import com.uridul.app.data.WidgetStore
+import com.uridul.app.domain.CalendarMath
 import com.uridul.app.domain.InviteToken
-import com.uridul.app.widget.DDayWidget
+import com.uridul.app.widget.CalendarWidget
+import com.uridul.app.widget.Widgets
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
+
+/** 위젯에서 앱을 열 때 이동할 곳 */
+data class OpenRequest(
+    val tab: String,
+    val date: LocalDate? = null,
+    val addEvent: Boolean = false,
+)
 
 sealed interface AppState {
     data object NotConfigured : AppState
@@ -79,6 +94,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 연결된 커플 공간 ID (Ready 일 때만) */
+    private val readyCoupleId: Flow<String?> =
+        state.map { (it as? AppState.Ready)?.couple?.id }.distinctUntilChanged()
+
+    // ── 캘린더 ──────────────────────────────────────────────
+
+    private val _visibleMonth = MutableStateFlow(YearMonth.now())
+    /** 캘린더 화면에 보이는 달 */
+    val visibleMonth: StateFlow<YearMonth> = _visibleMonth.asStateFlow()
+
+    /** 보이는 달(앞뒤 달 포함)의 일정 */
+    val monthEvents: StateFlow<List<CalendarEvent>> = run {
+        val repo = container.events
+        if (repo == null) {
+            MutableStateFlow(emptyList())
+        } else {
+            combine(readyCoupleId, _visibleMonth) { id, month -> id to month }
+                .flatMapLatest { (id, month) ->
+                    if (id == null) flowOf(emptyList()) else repo.observeRange(id, CalendarMath.queryRange(month))
+                }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }
+    }
+
+    private val _openRequest = MutableStateFlow<OpenRequest?>(null)
+    /** 위젯을 눌러서 열린 경우 이동할 화면 */
+    val openRequest: StateFlow<OpenRequest?> = _openRequest.asStateFlow()
+
+    fun onOpenRequest(request: OpenRequest) {
+        _openRequest.value = request
+        request.date?.let { _visibleMonth.value = YearMonth.from(it) }
+    }
+
+    fun consumeOpenRequest() {
+        _openRequest.value = null
+    }
+
+    fun showMonth(month: YearMonth) {
+        _visibleMonth.value = month
+    }
+
+    fun saveEvent(draft: EventDraft): Boolean {
+        CalendarMath.validate(draft)?.let {
+            _message.value = it
+            return false
+        }
+        val ready = state.value as? AppState.Ready ?: return false
+        val repo = container.events ?: return false
+        repo.save(ready.couple.id, ready.myUid, draft) { e -> _message.value = e.toUserMessage() ?: "저장하지 못했어요." }
+        return true
+    }
+
+    fun deleteEvent(eventId: String) {
+        val ready = state.value as? AppState.Ready ?: return
+        container.events?.delete(ready.couple.id, eventId) { e ->
+            _message.value = e.toUserMessage() ?: "삭제하지 못했어요."
+        }
+    }
+
     init {
         // 커플 정보가 바뀔 때마다 위젯용 데이터를 저장하고 위젯을 다시 그린다
         viewModelScope.launch {
@@ -91,6 +165,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             countFromOne = it.couple.countFromOne,
                             myName = it.couple.myName(it.myUid),
                             partnerName = it.couple.partnerName(it.myUid),
+                            coupleId = it.couple.id,
+                            myUid = it.myUid,
                         )
                     }
                 }
@@ -98,8 +174,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 .collect { snapshot ->
                     val context = getApplication<Application>()
                     if (snapshot != null) WidgetStore.save(context, snapshot) else WidgetStore.clear(context)
-                    DDayWidget().updateAll(context)
+                    Widgets.updateAll(context)
                 }
+        }
+        // 다가오는 일정이 바뀌면 일정 위젯을 다시 그린다 (상대가 추가한 일정 포함)
+        container.events?.let { repo ->
+            viewModelScope.launch {
+                readyCoupleId
+                    .flatMapLatest { id ->
+                        if (id == null) flowOf(null) else repo.observeUpcoming(id, LocalDate.now())
+                    }
+                    .filterNotNull()
+                    .distinctUntilChanged()
+                    .collect { events ->
+                        val context = getApplication<Application>()
+                        WidgetStore.saveEvents(context, events)
+                        CalendarWidget().updateAll(context)
+                    }
+            }
         }
         // 이미 연결된 상태에서 초대 링크를 열면 안내만 하고 버린다
         viewModelScope.launch {

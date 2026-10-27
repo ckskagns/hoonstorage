@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 하트 2×2 위젯. 홈 화면 + 잠금 화면(keyguard, 기기가 지원하는 경우) -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/heart_widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/widget_preview_heart"
+    android:minWidth="57dp"
+    android:minHeight="57dp"
+    android:minResizeWidth="57dp"
+    android:minResizeHeight="57dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="21600000"
+    android:widgetCategory="home_screen|keyguard" />

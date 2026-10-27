@@ -3,4 +3,8 @@
     <string name="app_name">우리둘</string>
     <string name="widget_name">우리둘 디데이</string>
     <string name="widget_description">함께한 날과 다가오는 기념일을 보여줘요</string>
+    <string name="heart_widget_name">우리둘 하트</string>
+    <string name="heart_widget_description">하트 안에 사귄 날을 보여줘요. 잠금 화면에도 둘 수 있어요</string>
+    <string name="calendar_widget_name">우리둘 일정</string>
+    <string name="calendar_widget_description">둘이 함께 등록한 다가오는 일정을 보여줘요</string>
 </resources>

@@ -11,29 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -45,62 +30,20 @@ import com.uridul.app.data.Couple
 import com.uridul.app.domain.DDay
 import java.time.LocalDate
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** 홈 탭: 디데이 + 다가오는 기념일 */
 @Composable
-fun HomeScreen(
+fun HomeContent(
     couple: Couple,
     myUid: String,
     busy: Boolean,
-    snackbar: SnackbarHostState,
     onInvite: () -> Unit,
-    onChangeStartDate: (LocalDate) -> Unit,
-    onSetCountFromOne: (Boolean) -> Unit,
-    onSignOut: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val today = rememberToday()
-    var menuOpen by remember { mutableStateOf(false) }
-    var picking by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("우리둘", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "메뉴")
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("시작일 변경") },
-                            onClick = { menuOpen = false; picking = true },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("사귄 날을 1일로 계산") },
-                            trailingIcon = { Checkbox(checked = couple.countFromOne, onCheckedChange = null) },
-                            onClick = { menuOpen = false; onSetCountFromOne(!couple.countFromOne) },
-                        )
-                        if (!couple.isPaired) {
-                            DropdownMenuItem(
-                                text = { Text("초대 링크 보내기") },
-                                onClick = { menuOpen = false; onInvite() },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("로그아웃") },
-                            onClick = { menuOpen = false; onSignOut() },
-                        )
-                    }
-                },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        BoxWithConstraints(
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        // 폭에 따라 1단/2단
+        run {
             val twoPane = maxWidth >= TwoPaneMinWidth
             val milestones = remember(couple, today, twoPane) {
                 DDay.upcoming(couple.startDate, today, couple.countFromOne, limit = if (twoPane) 6 else 4)
@@ -150,17 +93,6 @@ fun HomeScreen(
                 }
             }
         }
-    }
-
-    if (picking) {
-        StartDatePickerDialog(
-            initial = couple.startDate,
-            onDismiss = { picking = false },
-            onConfirm = {
-                picking = false
-                onChangeStartDate(it)
-            },
-        )
     }
 }
 
