@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  하트 위젯 본문 (홈 화면 · 잠금 화면 공용).
+  [콩닥이는 미니 하트 두 개] [103일]
+                             [26.07.17]
+  배경 없이 흰 글자 + 그림자라서 어떤 배경화면 위에서도 읽힌다.
+  하트 애니메이션은 ProgressBar 의 indeterminateDrawable(프레임 애니메이션)로 재생한다.
+  (위젯은 일반 애니메이션을 못 돌리지만 ProgressBar 의 진행 표시는 움직인다)
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/heart_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:padding="4dp">
+
+    <ProgressBar
+        android:id="@+id/heart_anim"
+        android:layout_width="38dp"
+        android:layout_height="24dp"
+        android:importantForAccessibility="no"
+        android:indeterminate="true"
+        android:indeterminateDrawable="@drawable/heart_beat_anim"
+        android:indeterminateOnly="true" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:gravity="start|center_vertical"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/heart_days"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:shadowColor="#99000000"
+            android:shadowDy="1"
+            android:shadowRadius="4"
+            android:textColor="#FFFFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/heart_since"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:shadowColor="#99000000"
+            android:shadowDy="1"
+            android:shadowRadius="3"
+            android:textColor="#E6FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

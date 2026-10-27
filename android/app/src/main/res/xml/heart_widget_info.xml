@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 하트 2×2 위젯. 홈 화면 + 잠금 화면(keyguard, 기기가 지원하는 경우) -->
+<!-- 하트 위젯 (기본 2×2, 2×1·3×1 로 줄여도 하트+숫자 가로 배치). 홈 화면 + 잠금 화면(keyguard / 굿락 LockStar) -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/heart_widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"

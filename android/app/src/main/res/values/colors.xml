@@ -7,4 +7,7 @@
     <color name="widget_preview_primary">#FFC03A62</color>
     <color name="widget_preview_text">#FF3E001D</color>
     <color name="widget_preview_surface">#FFFFF8F8</color>
+    <!-- 하트 위젯: 빨강 -->
+    <color name="heart_red">#FFE53935</color>
+    <color name="heart_red_light">#FFFF5A5F</color>
 </resources>

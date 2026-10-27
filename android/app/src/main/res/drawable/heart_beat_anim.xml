@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 미니 하트 두 개가 번갈아 콩닥이는 애니메이션. 위젯의 ProgressBar 에 넣어 재생한다. -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/heart_beat_0" android:duration="380" />
+    <item android:drawable="@drawable/heart_beat_1" android:duration="90" />
+    <item android:drawable="@drawable/heart_beat_2" android:duration="110" />
+    <item android:drawable="@drawable/heart_beat_3" android:duration="90" />
+    <item android:drawable="@drawable/heart_beat_4" android:duration="90" />
+    <item android:drawable="@drawable/heart_beat_5" android:duration="110" />
+    <item android:drawable="@drawable/heart_beat_6" android:duration="90" />
+</animation-list>
