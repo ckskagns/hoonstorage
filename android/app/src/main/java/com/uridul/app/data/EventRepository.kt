@@ -70,6 +70,9 @@ class EventRepository(private val db: FirebaseFirestore) {
             "allDay" to (draft.time == null),
             "time" to draft.time?.format(TimeFormat),
             "memo" to draft.memo.trim(),
+            "place" to draft.place?.let { p ->
+                mapOf("name" to p.name.trim().take(Place.NAME_MAX), "url" to p.url, "app" to p.app?.key)
+            },
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
@@ -124,6 +127,10 @@ class EventRepository(private val db: FirebaseFirestore) {
             time = if (getBoolean("allDay") == true) null else time,
             memo = getString("memo").orEmpty(),
             createdBy = getString("createdBy").orEmpty(),
+            place = (get("place") as? Map<*, *>)?.let { m ->
+                val name = (m["name"] as? String)?.takeIf { it.isNotBlank() } ?: return@let null
+                Place(name, m["url"] as? String, MapApp.from(m["app"] as? String))
+            },
         )
     }
 

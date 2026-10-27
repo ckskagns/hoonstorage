@@ -109,7 +109,10 @@ object WidgetStore {
                     .put("date", e.date.toString())
                     .put("endDate", e.endDate.toString())
                     .put("time", e.time?.toString() ?: JSONObject.NULL)
-                    .put("createdBy", e.createdBy),
+                    .put("createdBy", e.createdBy)
+                    .put("placeName", e.place?.name ?: JSONObject.NULL)
+                    .put("placeUrl", e.place?.url ?: JSONObject.NULL)
+                    .put("placeApp", e.place?.app?.key ?: JSONObject.NULL),
             )
         }
         return json.toString()
@@ -130,6 +133,11 @@ object WidgetStore {
                         time = if (o.isNull("time")) null else LocalTime.parse(o.getString("time")),
                         memo = "",
                         createdBy = o.optString("createdBy"),
+                        place = if (o.isNull("placeName") || !o.has("placeName")) null else Place(
+                            o.getString("placeName"),
+                            if (o.isNull("placeUrl")) null else o.optString("placeUrl"),
+                            MapApp.from(if (o.isNull("placeApp")) null else o.optString("placeApp")),
+                        ),
                     )
                 }.getOrNull()
             }

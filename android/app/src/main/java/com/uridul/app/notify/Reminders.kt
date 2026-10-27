@@ -57,6 +57,7 @@ object Reminders {
     private const val EXTRA_TITLE = "event_title"
     private const val EXTRA_TIME = "event_time"
     private const val EXTRA_DATE = "event_date"
+    private const val EXTRA_PLACE = "event_place"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -117,7 +118,7 @@ object Reminders {
 
         val lines = buildList {
             specials.forEach { add("${it.emoji} 오늘은 ${it.title}" + if (it.kind.personal) "이에요" else "") }
-            todayEvents.forEach { add("${timeText(it)}  ${it.title}") }
+            todayEvents.forEach { add("${timeText(it)}  ${it.title}" + (it.place?.let { p -> "  📍${p.name}" } ?: "")) }
             tomorrow.forEach { add("${it.emoji} 내일은 ${it.title}이에요") }
         }
         if (lines.isNotEmpty()) {
@@ -160,7 +161,7 @@ object Reminders {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: return
         val time = intent.getStringExtra(EXTRA_TIME).orEmpty()
         val date = intent.getStringExtra(EXTRA_DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now()
-        notify(context, id.hashCode(), "${LEAD_MINUTES}분 뒤 일정이 있어요 ⏰", listOf("$time  $title"), date)
+        notify(context, id.hashCode(), "${LEAD_MINUTES}분 뒤 일정이 있어요 ⏰", listOf("$time  $title" + (intent.getStringExtra(EXTRA_PLACE)?.let { "  📍$it" } ?: "")), date)
     }
 
     private fun timeText(e: CalendarEvent): String = e.time?.format(KoreanTime) ?: "종일"
@@ -210,6 +211,7 @@ object Reminders {
                 .putExtra(EXTRA_TITLE, event.title)
                 .putExtra(EXTRA_TIME, event.time?.format(KoreanTime).orEmpty())
                 .putExtra(EXTRA_DATE, event.date.toString())
+                .putExtra(EXTRA_PLACE, event.place?.name)
         }
         return PendingIntent.getBroadcast(
             context,

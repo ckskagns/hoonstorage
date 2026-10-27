@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,6 +96,15 @@ fun ReadyScreen(
     fun select(day: LocalDate) {
         selectedText = day.toString()
         if (YearMonth.from(day) != month) onMonthChange(YearMonth.from(day))
+    }
+
+    // 지도 앱에서 "공유 → 우리둘" 로 장소를 받은 경우: 입력 창이 없으면 그 장소로 새 일정 입력 창을 연다
+    val sharedPlace by PlaceInbox.place.collectAsState()
+    LaunchedEffect(sharedPlace) {
+        if (sharedPlace != null && editing == null) {
+            tabKey = Tab.Calendar.key
+            editing = EditorTarget.New(selected)
+        }
     }
 
     // 위젯에서 열린 경우: 해당 탭/날짜로 이동, 필요하면 일정 추가 창 열기
@@ -231,7 +241,7 @@ fun ReadyScreen(
     editing?.let { target ->
         val draft = when (target) {
             is EditorTarget.New -> EventDraft(title = "", date = target.date, endDate = target.date, time = null, memo = "")
-            is EditorTarget.Existing -> with(target.event) { EventDraft(id, title, date, endDate, time, memo) }
+            is EditorTarget.Existing -> with(target.event) { EventDraft(id, title, date, endDate, time, memo, place) }
         }
         // 대상이 바뀌면 입력 상태를 새로 만든다
         androidx.compose.runtime.key(target) {
@@ -240,6 +250,8 @@ fun ReadyScreen(
                 onDismiss = { editing = null },
                 onSave = onSaveEvent,
                 onDelete = (target as? EditorTarget.Existing)?.let { { onDeleteEvent(it.event.id) } },
+                incomingPlace = sharedPlace,
+                onIncomingPlaceConsumed = PlaceInbox::consume,
             )
         }
     }

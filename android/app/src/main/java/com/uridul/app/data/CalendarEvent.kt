@@ -16,6 +16,8 @@ data class CalendarEvent(
     val time: LocalTime?,
     val memo: String,
     val createdBy: String,
+    /** 장소 (선택) */
+    val place: Place? = null,
 ) {
     val allDay: Boolean get() = time == null
     val isMultiDay: Boolean get() = endDate.isAfter(date)
@@ -38,4 +40,5 @@ data class EventDraft(
     val endDate: LocalDate,
     val time: LocalTime?,
     val memo: String,
+    val place: Place? = null,
 )

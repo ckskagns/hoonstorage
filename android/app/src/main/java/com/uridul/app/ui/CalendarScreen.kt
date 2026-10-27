@@ -526,6 +526,24 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
             Column(Modifier.weight(1f)) {
                 Text(event.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(whenText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                event.place?.let { place ->
+                    // 누르면 저장된 지도 앱에서 그 장소를 바로 연다 (API 없이 링크로)
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    Text(
+                        "📍 ${place.name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { MapLinks.open(context, place) }
+                            .semantics { contentDescription = "${place.name}, ${(place.app ?: com.uridul.app.data.MapApp.NAVER).label}에서 열기" }
+                            .padding(vertical = 2.dp),
+                    )
+                }
                 if (event.memo.isNotBlank()) {
                     Text(
                         event.memo,

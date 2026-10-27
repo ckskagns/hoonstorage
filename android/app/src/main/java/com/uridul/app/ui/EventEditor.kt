@@ -41,6 +41,19 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.MapApp
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import com.uridul.app.data.Place
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -54,12 +67,29 @@ fun EventEditorDialog(
     onDismiss: () -> Unit,
     onSave: (EventDraft) -> Boolean,
     onDelete: (() -> Unit)?,
+    /** 지도 앱에서 "공유 → 우리둘" 로 받은 장소 (받으면 장소 칸을 채운다) */
+    incomingPlace: Place? = null,
+    onIncomingPlaceConsumed: () -> Unit = {},
 ) {
     var title by rememberSaveable { mutableStateOf(initial.title) }
     var date by rememberSaveable { mutableStateOf(initial.date.toString()) }
     var endDate by rememberSaveable { mutableStateOf(initial.endDate.toString()) }
     var time by rememberSaveable { mutableStateOf(initial.time?.toString()) }
     var memo by rememberSaveable { mutableStateOf(initial.memo) }
+    var placeName by rememberSaveable { mutableStateOf(initial.place?.name.orEmpty()) }
+    var placeUrl by rememberSaveable { mutableStateOf(initial.place?.url) }
+    var placeApp by rememberSaveable { mutableStateOf(initial.place?.app?.key) }
+    var choosingMap by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val place: Place? = placeName.trim().takeIf { it.isNotEmpty() }?.let { Place(it, placeUrl, MapApp.from(placeApp)) }
+    // 지도 앱에서 공유받은 장소가 오면 장소 칸을 채운다
+    LaunchedEffect(incomingPlace) {
+        val p = incomingPlace ?: return@LaunchedEffect
+        placeName = p.name
+        placeUrl = p.url
+        placeApp = p.app?.key
+        onIncomingPlaceConsumed()
+    }
     var picker by rememberSaveable { mutableStateOf<String?>(null) } // "start" | "end" | "time"
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
@@ -70,13 +100,14 @@ fun EventEditorDialog(
     val localTime = time?.let(LocalTime::parse)
 
     val save: () -> Unit = {
-        val draft = EventDraft(initial.id, title, start, end, localTime, memo)
+        val draft = EventDraft(initial.id, title, start, end, localTime, memo, place)
         if (onSave(draft)) onDismiss()
     }
     // 뒤로 가기·취소: 바꾼 내용이 있으면 한 번 더 묻는다 (키보드 내리려다 내용이 날아가는 것 방지)
     val requestClose: () -> Unit = {
         val changed = title != initial.title || date != initial.date.toString() ||
-            endDate != initial.endDate.toString() || time != initial.time?.toString() || memo != initial.memo
+            endDate != initial.endDate.toString() || time != initial.time?.toString() || memo != initial.memo ||
+            place != initial.place
         if (changed) {
             confirmDiscard = true
         } else {
@@ -158,6 +189,41 @@ fun EventEditorDialog(
                         LabeledButton("시간", localTime.format(KoreanTime)) { picker = "time" }
                     }
 
+                    // 장소 (선택): 직접 쓰거나, 지도 앱에서 찾아 "공유 → 우리둘" 로 채운다
+                    OutlinedTextField(
+                        value = placeName,
+                        onValueChange = {
+                            placeName = it.take(Place.NAME_MAX)
+                            if (it.isBlank()) {
+                                placeUrl = null
+                                placeApp = null
+                            }
+                        },
+                        label = { Text("장소 (선택)") },
+                        placeholder = { Text("예) 선릉감자탕") },
+                        leadingIcon = { Text("📍") },
+                        trailingIcon = if (placeName.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { placeName = ""; placeUrl = null; placeApp = null }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "장소 지우기")
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                        supportingText = placeUrl?.let { { Text("${MapApp.from(placeApp)?.label ?: "지도"} 장소 링크가 연결됐어요") } },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { choosingMap = true }) { Text("지도에서 찾기") }
+                        if (place != null) {
+                            TextButton(onClick = { MapLinks.open(context, place) }) {
+                                Text("${(place.app ?: MapApp.NAVER).label}에서 보기")
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = memo,
                         onValueChange = { memo = it.take(CalendarEvent.MEMO_MAX) },
@@ -184,6 +250,16 @@ fun EventEditorDialog(
                 }
             }
         }
+    }
+
+    if (choosingMap) {
+        MapChooserDialog(
+            onDismiss = { choosingMap = false },
+            onChoose = { app ->
+                choosingMap = false
+                MapLinks.startSearch(context, app, placeName.ifBlank { title }.trim())
+            },
+        )
     }
 
     if (confirmDiscard) {
@@ -277,6 +353,41 @@ private fun TimePickerDialog(
         confirmButton = {
             TextButton(onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) }) { Text("확인") }
         },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
+}
+
+/** 어느 지도 앱에서 장소를 찾을지 (기본값: 네이버 지도) */
+@Composable
+private fun MapChooserDialog(onDismiss: () -> Unit, onChoose: (MapApp) -> Unit) {
+    var selected by rememberSaveable { mutableStateOf(MapApp.NAVER.key) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("어느 지도에서 찾을까요?") },
+        text = {
+            Column {
+                MapApp.entries.forEach { app ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = selected == app.key, onClick = { selected = app.key })
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected == app.key, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(if (app == MapApp.NAVER) "${app.label} (기본)" else app.label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "지도 앱에서 장소를 고른 뒤 공유 → 우리둘 을 누르면 장소가 채워져요",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onChoose(MapApp.from(selected) ?: MapApp.NAVER) }) { Text("찾기") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )
 }

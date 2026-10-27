@@ -14,6 +14,25 @@
     <!-- 일정 알림 (아침 9시, 일정 30분 전). 처음 한 번 사용자에게 허용을 묻는다 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- 지도 앱 연동: 설치 여부 확인과 장소 열기 (안드로이드 11+ 다른 앱 보기 제한) -->
+    <queries>
+        <package android:name="com.nhn.android.nmap" />
+        <package android:name="net.daum.android.map" />
+        <package android:name="com.google.android.apps.maps" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="nmap" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="kakaomap" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+    </queries>
+
     <application
         android:name=".UridulApp"
         android:icon="@mipmap/ic_launcher"
@@ -52,6 +71,22 @@
                 <data
                     android:scheme="uridul"
                     android:host="invite" />
+            </intent-filter>
+        </activity>
+
+        <!-- 지도 앱의 "공유 → 우리둘": 장소 이름·링크를 받아 일정 장소로 -->
+        <activity
+            android:name=".ShareReceiverActivity"
+            android:taskAffinity=""
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:label="@string/share_place_label"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

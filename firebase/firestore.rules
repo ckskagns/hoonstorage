@@ -107,9 +107,19 @@ service cloud.firestore {
           return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
         }
 
+        // 장소 (선택): 이름 + 지도 앱 링크 + 어느 지도 앱인지. API 없이 링크만 저장한다.
+        function validPlace(p) {
+          return p is map
+            && p.keys().hasOnly(['name', 'url', 'app'])
+            && p.name is string && p.name.size() > 0 && p.name.size() <= 100
+            && (!('url' in p) || p.url == null || (p.url is string && p.url.size() <= 500 && p.url.matches('^https?://.*')))
+            && (!('app' in p) || p.app == null || p.app in ['naver', 'kakao', 'google']);
+        }
+
         function validEvent(d) {
-          return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo',
+          return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo', 'place',
                                    'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+            && (!('place' in d) || d.place == null || validPlace(d.place))
             && d.title is string && d.title.size() > 0 && d.title.size() <= 100
             && isDay(d.date) && isDay(d.endDate) && d.endDate >= d.date
             && d.allDay is bool

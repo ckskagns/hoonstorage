@@ -73,6 +73,8 @@ object MainExtras {
     const val TAB = "open_tab"
     const val DATE = "open_date"
     const val ADD_EVENT = "add_event"
+    /** 지도 앱에서 장소를 공유받아 돌아온 경우 */
+    const val PLACE_SHARED = "place_shared"
 }
 
 internal object WidgetColors {
