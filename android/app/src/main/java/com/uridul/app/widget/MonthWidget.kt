@@ -375,7 +375,7 @@ private fun DayCell(
                 Text(
                     e.title,
                     style = TextStyle(
-                        color = if (inMonth) WidgetColors.OnFill else WidgetColors.Faded,
+                        color = if (inMonth) WidgetColors.OnFill else WidgetColors.OnFillFaded,
                         fontSize = 9.sp,
                     ),
                     maxLines = 1,
@@ -454,7 +454,7 @@ private fun BarLanes(
                             Text(
                                 if (bar.continuesLeft) "… ${bar.event.title}" else bar.event.title,
                                 style = TextStyle(
-                                    color = if (inMonth) WidgetColors.OnFill else WidgetColors.Faded,
+                                    color = if (inMonth) WidgetColors.OnFill else WidgetColors.OnFillFaded,
                                     fontSize = 9.sp,
                                 ),
                                 maxLines = 1,

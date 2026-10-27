@@ -163,7 +163,8 @@ fun DayTimelinePage(
     // 편집 중인 일정은 저장 전에도 표에 바로 보이게 (미리보기)
     val previewEvents = remember(dayEvents, edit) {
         val e = edit ?: return@remember dayEvents
-        val preview = e.draft.toPreview(e.original?.let { o -> dayEvents.firstOrNull { it.id == o.id }?.createdBy } ?: myUid)
+        // 하루 종일로 바꾸면 시간표에서 빠지고 위 칸으로 (저장할 모양 그대로 미리보기)
+        val preview = e.finalDraft().toPreview(e.original?.let { o -> dayEvents.firstOrNull { it.id == o.id }?.createdBy } ?: myUid)
         dayEvents.filter { it.id != preview.id } + preview
     }
     val allDay = remember(previewEvents, date) { DayTimeline.allDayEvents(previewEvents, date) }
@@ -258,10 +259,13 @@ fun DayTimelinePage(
                                         setEdit(null)
                                     }
                                 },
-                                onFindPlace = { choosingMap = true },
+                                // 장소를 찾을 표를 기억해 두고 지도 고르기 (공유받은 장소가 그 표에 들어간다)
+                                onFindPlace = { slot -> setEdit(e.copy(slot = slot)); choosingMap = true },
                                 onOpenPlace = { MapLinks.open(context, it) },
                                 onDelete = { confirmDelete = true },
                                 onMore = { onOpenFullEditor(e.finalDraft()); setEdit(null) },
+                                // 편집 칸은 화면의 절반 남짓까지만 (위의 시간표가 보이도록)
+                                maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.55f).dp,
                             )
                         }
                     }
@@ -492,8 +496,17 @@ private fun TimelineBlock(
     }
 }
 
-/** 아래 편집 칸 */
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * 아래 편집 칸: 하루 종일 / 타임라인 별로 관리
+ *  - 하루 종일 ON: 시간은 쓰지 않고 장소 하나만 고른다
+ *  - 하루 종일 OFF: [+ 일정 추가] 를 누를 때마다 시간 표가 하나씩 생긴다
+ *      ┌──────────────┬──────────┐
+ *      │ 시작 [시간 ▾] │          │
+ *      ├──────────────┤  장소    │  ← 두 줄을 합친 칸, 가운데, 하나만
+ *      │ 끝   [시간 ▾] │          │
+ *      └──────────────┴──────────┘
+ *    표 밑에 [+ 일정 추가] 버튼이 다시 생긴다
+ */
 @Composable
 private fun EditPanel(
     edit: SlotEdit,
@@ -501,14 +514,15 @@ private fun EditPanel(
     onChange: (SlotEdit) -> Unit,
     onClose: () -> Unit,
     onSave: () -> Unit,
-    onFindPlace: () -> Unit,
+    onFindPlace: (slot: Int) -> Unit,
     onOpenPlace: (Place) -> Unit,
     onDelete: () -> Unit,
     onMore: () -> Unit,
+    maxHeight: Dp,
 ) {
     val d = edit.draft
+    val allDay = edit.slot < 0
     val multiDay = d.endDate.isAfter(d.date)
-    val slot = d.timeline.getOrNull(edit.slot)
     Surface(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -518,9 +532,9 @@ private fun EditPanel(
     ) {
         Column(
             Modifier
-                .heightIn(max = 460.dp)
+                .heightIn(max = maxHeight)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // 손잡이 + 머리글
@@ -545,61 +559,42 @@ private fun EditPanel(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("하루 종일", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                Switch(checked = edit.slot < 0, onCheckedChange = { onChange(edit.toggleAllDay(it)) })
+                Switch(checked = allDay, onCheckedChange = { onChange(edit.toggleAllDay(it)) })
             }
 
-            if (slot == null) {
-                // 하루 종일: 장소 하나
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("장소", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    PlaceTag(d.place, onFind = onFindPlace, onOpen = onOpenPlace, onRemove = { onChange(edit.copy(draft = d.copy(place = null))) })
-                }
-            } else {
-                // 이 일정의 시간대들 (여러 개면 골라서 고친다)
-                if (d.timeline.size > 1) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        d.timeline.forEachIndexed { i, s ->
-                            FilterChip(
-                                selected = i == edit.slot,
-                                onClick = { onChange(edit.copy(slot = i)) },
-                                label = { Text(s.start.format(KoreanTime) + (s.title.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""), maxLines = 1) },
-                            )
-                        }
-                    }
-                }
-                TimeStepper(if (multiDay) "시작 (첫날)" else "시작", slot.start) { onChange(edit.moveStart(it)) }
-                TimeStepper(if (multiDay) "끝 (마지막 날)" else "끝", slot.end ?: slot.start.plusMinutes(60)) { onChange(edit.setEnd(it)) }
-                // 길이 빠르게 고르기
-                if (!multiDay) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(30 to "30분", 60 to "1시간", 90 to "1시간 30분", 120 to "2시간", 180 to "3시간").forEach { (m, label) ->
-                            val current = slot.end?.let { java.time.Duration.between(slot.start, it).toMinutes().toInt() }
-                            FilterChip(
-                                selected = current == m,
-                                onClick = { onChange(edit.setEnd(clampTime(slot.start.toSecondOfDay() / 60 + m))) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = slot.title,
-                    onValueChange = { text -> onChange(edit.updateSlot { it.copy(title = text.take(TimeSlot.TITLE_MAX)) }) },
-                    label = { Text("이 시간에 할 일 (선택)") },
-                    placeholder = { Text("예) 저녁식사") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+            if (allDay) {
+                // 하루 종일: 시간 없이 장소 하나
+                SlotTable(
+                    startLabel = "시작", endLabel = "끝",
+                    start = null, end = null, enabled = false,
+                    place = d.place,
+                    onStart = {}, onEnd = {},
+                    onFindPlace = { onFindPlace(-1) },
+                    onOpenPlace = onOpenPlace,
+                    onRemovePlace = { onChange(edit.copy(draft = d.copy(place = null))) },
+                    onRemoveTable = null,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("장소", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    PlaceTag(slot.place, onFind = onFindPlace, onOpen = onOpenPlace, onRemove = { onChange(edit.updateSlot { it.copy(place = null) }) })
+            } else {
+                d.timeline.forEachIndexed { i, slot ->
+                    SlotTable(
+                        startLabel = if (multiDay) "시작(첫날)" else "시작",
+                        endLabel = if (multiDay) "끝(마지막 날)" else "끝",
+                        start = slot.start,
+                        end = slot.end ?: slot.start.plusMinutes(60),
+                        enabled = true,
+                        place = slot.place,
+                        onStart = { t -> onChange(edit.copy(slot = i).moveStart(t)) },
+                        onEnd = { t -> onChange(edit.copy(slot = i).setEnd(t)) },
+                        onFindPlace = { onFindPlace(i) },
+                        onOpenPlace = onOpenPlace,
+                        onRemovePlace = { onChange(edit.copy(slot = i).updateSlot { it.copy(place = null) }) },
+                        onRemoveTable = if (d.timeline.size > 1) ({ onChange(edit.copy(slot = i).removeSlot()) }) else null,
+                    )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!multiDay && d.timeline.size < TimeSlot.MAX_SLOTS) {
-                        OutlinedButton(onClick = { onChange(edit.addSlot()) }) { Text("+ 이 일정에 시간대 추가") }
-                    }
-                    if (d.timeline.size > 1) {
-                        TextButton(onClick = { onChange(edit.removeSlot()) }) { Text("이 시간대 지우기", color = MaterialTheme.colorScheme.error) }
+                // 표 밑에 다시 [+ 일정 추가] (여러 날 일정은 시작~끝 하나만)
+                if (!multiDay && d.timeline.size < TimeSlot.MAX_SLOTS) {
+                    OutlinedButton(onClick = { onChange(edit.addSlot()) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("+ 일정 추가")
                     }
                 }
             }
@@ -615,40 +610,140 @@ private fun EditPanel(
     }
 }
 
-/** 시간 고르기: [-1시간] [-15분] 오후 6:30 [+15분] [+1시간] (창 없이 이 자리에서) */
+/**
+ * 시간 표 하나 (테두리 선만): 왼쪽 두 줄 = 시작·끝 시간 고르기(같은 너비), 오른쪽 = 두 줄을 합친 장소 칸(가운데, 하나만)
+ */
 @Composable
-private fun TimeStepper(label: String, time: LocalTime, onChange: (LocalTime) -> Unit) {
-    val minute = time.toSecondOfDay() / 60
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(92.dp))
-        StepButton("−1시간") { onChange(clampTime(minute - 60)) }
-        StepButton("−15") { onChange(clampTime(minute - 15)) }
-        Text(
-            time.format(KoreanTime),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        StepButton("+15") { onChange(clampTime(minute + 15)) }
-        StepButton("+1시간") { onChange(clampTime(minute + 60)) }
+private fun SlotTable(
+    startLabel: String,
+    endLabel: String,
+    start: LocalTime?,
+    end: LocalTime?,
+    enabled: Boolean,
+    place: Place?,
+    onStart: (LocalTime) -> Unit,
+    onEnd: (LocalTime) -> Unit,
+    onFindPlace: () -> Unit,
+    onOpenPlace: (Place) -> Unit,
+    onRemovePlace: () -> Unit,
+    onRemoveTable: (() -> Unit)?,
+) {
+    val line = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+    val shape = RoundedCornerShape(14.dp)
+    Box {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
+                .border(1.dp, line, shape)
+                .clip(shape),
+        ) {
+            // 시작 / 끝 (같은 너비의 시간 고르기 칸)
+            Column(Modifier.weight(1.15f)) {
+                TimeCell(startLabel, start, enabled, onStart)
+                Box(Modifier.fillMaxWidth().height(1.dp).background(line))
+                TimeCell(endLabel, end, enabled, onEnd)
+            }
+            Box(Modifier.width(1.dp).fillMaxHeight().background(line))
+            // 장소: 두 줄을 합친 칸, 가운데 정렬, 하나만
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("장소", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    PlaceTag(place = place, onFind = onFindPlace, onOpen = onOpenPlace, onRemove = onRemovePlace)
+                }
+            }
+        }
+        if (onRemoveTable != null) {
+            // 표 지우기 (오른쪽 위 작은 ✕)
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .border(1.dp, line, CircleShape)
+                    .clickable(onClick = onRemoveTable)
+                    .semantics { contentDescription = "이 시간 표 지우기" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+            }
+        }
     }
 }
 
+/** 시간 고르기 칸: [라벨  오후 7:00 ▾] → 누르면 30분 단위 목록(선택 상자) */
 @Composable
-private fun StepButton(text: String, onClick: () -> Unit) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier
-            .padding(horizontal = 2.dp)
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-    )
+private fun TimeCell(label: String, time: LocalTime?, enabled: Boolean, onPick: (LocalTime) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val options = remember(time) { timeOptions(time) }
+    val alpha = if (enabled) 1f else 0.38f
+    Box(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled) { open = true }
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .semantics { contentDescription = "$label ${time?.format(KoreanTime) ?: "없음"}, 눌러서 바꾸기" },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                modifier = Modifier.width(56.dp),
+                maxLines = 1,
+            )
+            Text(
+                time?.format(KoreanTime) ?: "--:--",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
+            Text("▾", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha))
+        }
+        val itemHeight = with(LocalDensity.current) { 48.dp.toPx() }
+        val selectedIndex = time?.let { options.indexOf(it) }?.coerceAtLeast(0) ?: 0
+        val menuScroll = rememberScrollState((selectedIndex * itemHeight - itemHeight * 2).toInt().coerceAtLeast(0))
+        androidx.compose.material3.DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            scrollState = menuScroll,
+            modifier = Modifier.heightIn(max = 300.dp),
+        ) {
+            options.forEach { t ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = {
+                        Text(
+                            t.format(KoreanTime),
+                            fontWeight = if (t == time) FontWeight.Bold else FontWeight.Normal,
+                            color = if (t == time) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onPick(t)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** 선택 상자 목록: 0시~23시 30분 단위 + 23:59, 지금 값이 목록에 없으면(예: 20:20) 끼워 넣는다 */
+private fun timeOptions(current: LocalTime?): List<LocalTime> {
+    val base = (0 until 48).map { LocalTime.of(it / 2, (it % 2) * 30) } + LocalTime.of(23, 59)
+    return if (current == null || current in base) base else (base + current).sorted()
 }
 
 // ───────── 편집 상태 ─────────

@@ -95,6 +95,8 @@ internal object WidgetColors {
     val PartnerBar get() = PartnerSoft
     /** 파스텔 막대 위 글자 (화이트·다크 모두 진한 색) */
     val OnFill = ColorProvider(day = Color(com.uridul.app.data.ON_EVENT_FILL), night = Color(com.uridul.app.data.ON_EVENT_FILL))
+    /** 다른 달 날짜의 막대 글자 (반투명 진한 색) */
+    val OnFillFaded = ColorProvider(day = Color(0x993A2A30), night = Color(0x993A2A30))
     val Sunday = ColorProvider(day = Color(0xFFD32F2F), night = Color(0xFFFFB4AB))
     val Saturday = ColorProvider(day = Color(0xFF1E62C8), night = Color(0xFFA8C8FF))
     val Faded = ColorProvider(day = Color(0x6622191C), night = Color(0x66F0DEE2))
