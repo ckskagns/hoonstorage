@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 하트 위젯 미리보기: 미니 하트 두 개 + 디데이 숫자 -->
+<!-- 하트 위젯 미리보기: 겹친 미니 하트 두 개 + 디데이 숫자 (배경 투명) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_preview_bg"
     android:gravity="center"
     android:orientation="horizontal"
     android:padding="8dp">

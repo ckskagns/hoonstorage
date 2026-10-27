@@ -27,13 +27,13 @@ import java.time.format.DateTimeFormatter
 /**
  * "사귄 날" 하트 위젯. 홈 화면 + 잠금 화면(굿락 LockStar).
  *
- *   ( [♥♥] 103일    )
- *   (      26.07.17 )
+ *   [♥♥] 103일
+ *        26.07.17
  *
  * - 겹친 빨간 미니 하트 두 개가 번갈아 콩닥이고, 뛰는 하트가 앞으로 나온다
  *   (위젯 호스트가 애니메이션을 막으면 멈춘 하트로 보인다).
  * - 하트 높이는 디데이 숫자 글자 크기와 같고, 숫자 왼쪽에 가로로 나란히 선다.
- * - 흰 글자 + 진한 그림자 + 옅은 반투명 알약 바탕이라 밝은 배경화면에서도 또렷하다.
+ * - 배경은 투명(하트와 글자만). 흰 글자 + 진한 그림자라 밝은 배경화면에서도 읽힌다.
  *
  * 하트 애니메이션은 Glance 로 만들 수 없어서 일반 위젯 레이아웃(RemoteViews)을 그대로 넣는다.
  */
@@ -75,11 +75,11 @@ private const val HEART_SCALE = 1.3f
 /** 하트 그림 너비 (글자 크기 1em 대비) */
 private const val HEART_WIDTH_EM = HEART_ASPECT * HEART_SCALE
 
-/** 가로 여백: 바깥 패딩 4×2 + 반투명 바탕 안쪽 10+12 + 하트와 글자 사이 6 */
-private const val ROW_PADDING_DP = 36f
+/** 가로 여백: 바깥 패딩 4×2 + 하트와 글자 사이 6 */
+private const val ROW_PADDING_DP = 14f
 
-/** 세로 여백: 바깥 패딩 4×2 + 반투명 바탕 안쪽 6×2 */
-private const val COLUMN_PADDING_DP = 20f
+/** 세로 여백: 바깥 패딩 4×2 */
+private const val COLUMN_PADDING_DP = 8f
 
 /** 위젯 크기에 맞춘 글자·하트 크기 (dp) */
 internal data class HeartLayout(val textDp: Float, val showSince: Boolean)
