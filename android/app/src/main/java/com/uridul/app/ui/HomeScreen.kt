@@ -27,7 +27,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.uridul.app.data.Couple
+import com.uridul.app.data.birthdays
 import com.uridul.app.domain.DDay
+import com.uridul.app.domain.SpecialDay
+import com.uridul.app.domain.SpecialDays
 import java.time.LocalDate
 
 /** 홈 탭: 디데이 + 다가오는 기념일 */
@@ -46,7 +49,11 @@ fun HomeContent(
         run {
             val twoPane = maxWidth >= TwoPaneMinWidth
             val milestones = remember(couple, today, twoPane) {
-                DDay.upcoming(couple.startDate, today, couple.countFromOne, limit = if (twoPane) 6 else 4)
+                SpecialDays.upcoming(
+                    couple.startDate, couple.countFromOne, couple.birthdays(), today,
+                    personalLimit = if (twoPane) 5 else 4,
+                    coupleDayLimit = 2,
+                )
             }
 
             if (twoPane) {
@@ -71,7 +78,7 @@ fun HomeContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (!couple.isPaired) InviteBanner(busy, onInvite)
-                        MilestoneCard(milestones, Modifier.fillMaxWidth())
+                        MilestoneCard(milestones, today, Modifier.fillMaxWidth())
                     }
                 }
             } else {
@@ -89,7 +96,7 @@ fun HomeContent(
                         .widthIn(max = 560.dp)
                     HeroCard(couple, myUid, today, m)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
-                    MilestoneCard(milestones, m)
+                    MilestoneCard(milestones, today, m)
                 }
             }
         }
@@ -169,7 +176,7 @@ private fun InviteBanner(busy: Boolean, onInvite: () -> Unit) {
 }
 
 @Composable
-private fun MilestoneCard(milestones: List<DDay.Milestone>, modifier: Modifier) {
+private fun MilestoneCard(milestones: List<SpecialDay>, today: LocalDate, modifier: Modifier) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -189,19 +196,25 @@ private fun MilestoneCard(milestones: List<DDay.Milestone>, modifier: Modifier) 
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(m.emoji, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(end = 12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(m.label, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            m.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (m.kind.personal) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Text(
                             m.date.format(KoreanDate),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    val left = SpecialDays.daysLeft(today, m)
                     Text(
-                        if (m.daysLeft == 0L) "오늘 🎉" else DDay.daysLeftText(m.daysLeft),
+                        if (left == 0L) "오늘 🎉" else DDay.daysLeftText(left),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (m.kind.personal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

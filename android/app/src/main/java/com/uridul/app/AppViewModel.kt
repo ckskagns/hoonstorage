@@ -21,6 +21,9 @@ import com.uridul.app.data.WidgetStore
 import com.uridul.app.domain.CalendarMath
 import com.uridul.app.domain.InviteToken
 import com.uridul.app.widget.CalendarWidget
+import com.uridul.app.widget.MonthWidget
+import com.uridul.app.notify.Reminders
+import com.uridul.app.data.birthdays
 import com.uridul.app.widget.Widgets
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.CancellationException
@@ -166,6 +169,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── 일정 알림 ─────────────────────────────────────────
+
+    private val _notifyEnabled = MutableStateFlow(Reminders.isEnabled(app))
+    val notifyEnabled: StateFlow<Boolean> = _notifyEnabled.asStateFlow()
+
+    fun setNotifyEnabled(enabled: Boolean) {
+        val context = getApplication<Application>()
+        Reminders.setEnabled(context, enabled)
+        _notifyEnabled.value = enabled
+        _message.value = if (!enabled) {
+            "일정 알림을 껐어요"
+        } else if (!Reminders.hasPermission(context)) {
+            "폰 설정에서 우리둘 알림을 허용해야 알림이 와요"
+        } else {
+            "일정 당일 아침 9시와 일정 30분 전에 알려드릴게요"
+        }
+    }
+
     // ── 앱 업데이트 (링크 설치용) ─────────────────────────────
 
     private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -241,6 +262,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             myUid = it.myUid,
                             myCharacter = it.couple.myCharacter(it.myUid).key,
                             partnerCharacter = it.couple.partnerCharacter(it.myUid).key,
+                            birthdays = it.couple.birthdays(),
                         )
                     }
                 }
@@ -264,6 +286,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val context = getApplication<Application>()
                         WidgetStore.saveEvents(context, events)
                         CalendarWidget().updateAll(context)
+                        MonthWidget.refreshAll(context)
+                        // 오늘 시간 일정의 30분 전 알림을 다시 맞춘다 (추가·수정·삭제 반영)
+                        Reminders.scheduleTimed(context, CalendarMath.eventsOn(events, LocalDate.now()))
                     }
             }
         }

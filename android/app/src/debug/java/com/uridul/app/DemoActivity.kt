@@ -16,6 +16,8 @@ import com.uridul.app.data.Couple
 import com.uridul.app.data.WidgetSnapshot
 import com.uridul.app.data.WidgetStore
 import com.uridul.app.widget.Widgets
+import com.uridul.app.notify.Reminders
+import com.uridul.app.data.birthdays
 import kotlinx.coroutines.launch
 import com.uridul.app.domain.CalendarMath
 import com.uridul.app.ui.ReadyScreen
@@ -33,6 +35,15 @@ class DemoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 알림 점검: 저장된 실제 커플 정보로 아침 알림을 지금 바로 보낸다
+        //   adb shell am start -n com.uridul.app/.DemoActivity --ez reminderNow true
+        if (intent.getBooleanExtra("reminderNow", false)) {
+            lifecycleScope.launch {
+                Reminders.runDaily(applicationContext, force = true)
+                finish()
+            }
+            return
+        }
         val startTab = intent.getStringExtra("tab") ?: "home"
         val today = LocalDate.now()
         val me = "me"
@@ -66,6 +77,7 @@ class DemoActivity : ComponentActivity() {
                     WidgetSnapshot(
                         couple.startDate, true, "후이", "나나", coupleId = null, myUid = me,
                         myCharacter = "dragon", partnerCharacter = "bunny",
+                        birthdays = couple.birthdays(),
                     ),
                 )
                 WidgetStore.saveEvents(this@DemoActivity, seed)

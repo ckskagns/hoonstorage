@@ -1,8 +1,11 @@
 package com.uridul.app
 
+import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -14,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.uridul.app.domain.InviteToken
+import com.uridul.app.notify.Reminders
 import com.uridul.app.ui.LoadingScreen
 import com.uridul.app.ui.LoginScreen
 import com.uridul.app.ui.NotConfiguredScreen
@@ -73,6 +77,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val monthEvents by viewModel.monthEvents.collectAsStateWithLifecycle()
     val openRequest by viewModel.openRequest.collectAsStateWithLifecycle()
     val update by viewModel.update.collectAsStateWithLifecycle()
+    val notifyEnabled by viewModel.notifyEnabled.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumeAfterPermission() }
@@ -89,6 +94,15 @@ private fun UridulRoot(viewModel: AppViewModel) {
         val text = message ?: return@LaunchedEffect
         snackbar.showSnackbar(text)
         viewModel.consumeMessage()
+    }
+
+    // 커플 공간에 들어오면 처음 한 번만 알림 허용을 묻는다 (거절하면 다시 묻지 않음, 메뉴에서 다시 켤 수 있음)
+    val askNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(state is AppState.Ready) {
+        if (state is AppState.Ready && !Reminders.hasPermission(context) && !Reminders.wasPermissionAsked(context)) {
+            Reminders.markPermissionAsked(context)
+            askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     when (val s = state) {
@@ -126,6 +140,11 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onSetCountFromOne = viewModel::setCountFromOne,
             onUpdateProfile = viewModel::updateProfile,
             onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
+            notifyEnabled = notifyEnabled,
+            onSetNotify = { enabled ->
+                viewModel.setNotifyEnabled(enabled)
+                if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+            },
             onSignOut = { viewModel.signOut(context) },
         )
     }

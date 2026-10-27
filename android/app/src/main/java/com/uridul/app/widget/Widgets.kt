@@ -13,7 +13,9 @@ import com.uridul.app.data.EventRepository
 import com.uridul.app.data.WidgetSnapshot
 import com.uridul.app.data.WidgetStore
 import kotlinx.coroutines.withTimeoutOrNull
+import com.uridul.app.domain.CalendarMath
 import java.time.LocalDate
+import java.time.YearMonth
 
 /** 위젯 공통: 색상, 앱 열기 파라미터, 전체 갱신 */
 object Widgets {
@@ -28,6 +30,7 @@ object Widgets {
         DDayWidget().updateAll(context)
         HeartWidget().updateAll(context)
         CalendarWidget().updateAll(context)
+        MonthWidget.refreshAll(context)
     }
 
     /**
@@ -44,6 +47,22 @@ object Widgets {
             }.getOrNull()
         } ?: return null
         WidgetStore.saveEvents(context, events)
+        return events
+    }
+
+    /**
+     * 한 달 달력 위젯: 그 달(앞뒤 달 포함) 일정을 서버에서 받아와 저장한다. 실패하면 null.
+     */
+    suspend fun fetchMonthEvents(context: Context, snapshot: WidgetSnapshot?, month: YearMonth): List<CalendarEvent>? {
+        val coupleId = snapshot?.coupleId ?: return null
+        if (FirebaseApp.getApps(context).isEmpty()) return null
+        if (FirebaseAuth.getInstance().currentUser == null) return null
+        val events = withTimeoutOrNull(6_000) {
+            runCatching {
+                EventRepository(FirebaseFirestore.getInstance()).fetchRange(coupleId, CalendarMath.queryRange(month))
+            }.getOrNull()
+        } ?: return null
+        WidgetStore.saveMonthEvents(context, month, events)
         return events
     }
 }
@@ -65,4 +84,9 @@ internal object WidgetColors {
     val SubText = ColorProvider(day = Color(0xFF74565F), night = Color(0xFFE3BDC6))
     val Mine = ColorProvider(day = Color(0xFFD14D72), night = Color(0xFFFFB1C5))
     val Partner = ColorProvider(day = Color(0xFF4F6FC4), night = Color(0xFFB0C6FF))
+    val MineSoft = ColorProvider(day = Color(0x33D14D72), night = Color(0x55FFB1C5))
+    val PartnerSoft = ColorProvider(day = Color(0x334F6FC4), night = Color(0x55B0C6FF))
+    val Sunday = ColorProvider(day = Color(0xFFD32F2F), night = Color(0xFFFFB4AB))
+    val Saturday = ColorProvider(day = Color(0xFF1E62C8), night = Color(0xFFA8C8FF))
+    val Faded = ColorProvider(day = Color(0x6622191C), night = Color(0x66F0DEE2))
 }

@@ -80,6 +80,8 @@ fun ReadyScreen(
     onUpdateProfile: (String, Character, PartnerDefaults?) -> Unit,
     onSignOut: () -> Unit,
     onCheckUpdate: () -> Unit = {},
+    notifyEnabled: Boolean = true,
+    onSetNotify: (Boolean) -> Unit = {},
 ) {
     var editingProfile by remember { mutableStateOf(false) }
     var tabKey by rememberSaveable { mutableStateOf(Tab.Home.key) }
@@ -144,6 +146,11 @@ fun ReadyScreen(
                                 )
                             }
                             HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("일정 알림 (당일 아침·30분 전)") },
+                                trailingIcon = { Checkbox(checked = notifyEnabled, onCheckedChange = null) },
+                                onClick = { menuOpen = false; onSetNotify(!notifyEnabled) },
+                            )
                             DropdownMenuItem(
                                 text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
                                 onClick = { menuOpen = false; onCheckUpdate() },

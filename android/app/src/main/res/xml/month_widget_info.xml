@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 한 달 달력 위젯. 기본 4×4, 3×3 까지 줄일 수 있다. 1시간마다 서버에서 상대가 추가한 일정도 받아온다. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/month_widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/widget_preview_month"
+    android:minWidth="250dp"
+    android:minHeight="250dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="180dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="4"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="3600000"
+    android:widgetCategory="home_screen" />

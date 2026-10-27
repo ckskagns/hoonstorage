@@ -9,6 +9,7 @@ import com.uridul.app.data.AppUpdater
 import com.uridul.app.data.AuthRepository
 import com.uridul.app.data.CoupleRepository
 import com.uridul.app.data.EventRepository
+import com.uridul.app.notify.Reminders
 import com.uridul.app.widget.MidnightScheduler
 
 class UridulApp : Application() {
@@ -19,6 +20,8 @@ class UridulApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         MidnightScheduler.schedule(this)
+        Reminders.ensureChannel(this)
+        Reminders.scheduleDaily(this)
     }
 }
 

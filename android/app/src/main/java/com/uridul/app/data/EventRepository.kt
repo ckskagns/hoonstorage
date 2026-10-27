@@ -44,6 +44,14 @@ class EventRepository(private val db: FirebaseFirestore) {
     suspend fun fetchUpcoming(coupleId: String, today: LocalDate, limit: Long = 40): List<CalendarEvent> =
         upcomingQuery(coupleId, today, limit).get().await().documents.mapNotNull { it.toEvent() }
 
+    /** 달력 범위의 일정을 한 번 받아온다 (한 달 달력 위젯·알림용). */
+    suspend fun fetchRange(coupleId: String, range: ClosedRange<LocalDate>): List<CalendarEvent> =
+        events(coupleId)
+            .whereGreaterThanOrEqualTo("date", range.start.toString())
+            .whereLessThanOrEqualTo("date", range.endInclusive.toString())
+            .orderBy("date")
+            .get().await().documents.mapNotNull { it.toEvent() }
+
     private fun upcomingQuery(coupleId: String, today: LocalDate, limit: Long) =
         events(coupleId)
             .whereGreaterThanOrEqualTo("endDate", today.toString())

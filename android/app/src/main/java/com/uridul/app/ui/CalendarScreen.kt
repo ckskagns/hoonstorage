@@ -51,7 +51,10 @@ import androidx.compose.ui.unit.dp
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
 import com.uridul.app.domain.CalendarMath
-import com.uridul.app.domain.DDay
+import com.uridul.app.data.birthdays
+import com.uridul.app.domain.SpecialDay
+import com.uridul.app.domain.SpecialDays
+import com.uridul.app.domain.SpecialKind
 import com.uridul.app.ui.theme.CoupleColors
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -78,8 +81,9 @@ fun CalendarContent(
 ) {
     val today = rememberToday()
     val grid = remember(month) { CalendarMath.monthGrid(month) }
-    val milestones = remember(couple.startDate, couple.countFromOne, grid) {
-        DDay.milestonesBetween(couple.startDate, grid.first(), grid.last(), couple.countFromOne)
+    val birthdays = remember(couple) { couple.birthdays() }
+    val specials = remember(couple.startDate, couple.countFromOne, birthdays, grid) {
+        SpecialDays.between(couple.startDate, couple.countFromOne, birthdays, grid.first(), grid.last())
     }
     val selectedEvents = remember(events, selected) { CalendarMath.eventsOn(events, selected) }
 
@@ -93,14 +97,14 @@ fun CalendarContent(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 MonthCalendar(
-                    month, grid, events, milestones, selected, today, myUid, onSelect, onMonthChange,
+                    month, grid, events, specials, selected, today, myUid, onSelect, onMonthChange,
                     fillHeight = true,
                     modifier = Modifier
                         .weight(1.3f)
                         .fillMaxHeight(),
                 )
                 DayPanel(
-                    selected, selectedEvents, milestones[selected], couple, myUid, onAdd, onEdit,
+                    selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, onEdit,
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -120,11 +124,11 @@ fun CalendarContent(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
                 MonthCalendar(
-                    month, grid, events, milestones, selected, today, myUid, onSelect, onMonthChange,
+                    month, grid, events, specials, selected, today, myUid, onSelect, onMonthChange,
                     fillHeight = false,
                     modifier = m,
                 )
-                DayPanel(selected, selectedEvents, milestones[selected], couple, myUid, onAdd, onEdit, m)
+                DayPanel(selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, onEdit, m)
                 // 아래 버튼(일정 추가)에 마지막 일정이 가려지지 않게
                 Spacer(Modifier.height(72.dp))
             }
@@ -137,7 +141,7 @@ private fun MonthCalendar(
     month: YearMonth,
     grid: List<LocalDate>,
     events: List<CalendarEvent>,
-    milestones: Map<LocalDate, String>,
+    specials: Map<LocalDate, List<SpecialDay>>,
     selected: LocalDate,
     today: LocalDate,
     myUid: String,
@@ -211,7 +215,7 @@ private fun MonthCalendar(
                                     inMonth = YearMonth.from(day) == month,
                                     isToday = day == today,
                                     isSelected = day == selected,
-                                    milestone = milestones[day],
+                                    special = specials[day]?.firstOrNull(),
                                     events = CalendarMath.eventsOn(events, day),
                                     myUid = myUid,
                                     showLabels = showLabels,
@@ -234,7 +238,7 @@ private fun DayCell(
     inMonth: Boolean,
     isToday: Boolean,
     isSelected: Boolean,
-    milestone: String?,
+    special: SpecialDay?,
     events: List<CalendarEvent>,
     myUid: String,
     showLabels: Boolean,
@@ -263,7 +267,7 @@ private fun DayCell(
     val description = buildString {
         append("${day.monthValue}월 ${day.dayOfMonth}일")
         if (isToday) append(", 오늘")
-        milestone?.let { append(", $it") }
+        special?.let { append(", ${it.title}") }
         if (events.isNotEmpty()) append(", 일정 ${events.size}개")
     }
 
@@ -291,12 +295,18 @@ private fun DayCell(
                 maxLines = 1,
             )
         }
-        if (milestone != null) {
+        if (special != null) {
+            // 우리 기념일·생일은 진하게, 연인 기념일(발렌타인데이 등)은 연하게
+            val personal = special.kind.personal
             Text(
-                if (showLabels) "♥$milestone" else "♥",
+                when {
+                    !showLabels -> special.emoji
+                    special.kind == SpecialKind.MILESTONE -> "♥${special.title}"
+                    else -> "${special.emoji}${special.title}"
+                },
                 style = smallStyle,
-                color = scheme.primary,
-                fontWeight = FontWeight.Bold,
+                color = if (personal) scheme.primary else scheme.onSurfaceVariant.copy(alpha = if (inMonth) 1f else 0.5f),
+                fontWeight = if (personal) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
                 softWrap = false,
@@ -306,7 +316,7 @@ private fun DayCell(
         val alpha = if (inMonth) 1f else 0.45f
         if (showLabels) {
             // 기념일 표시도 한 줄을 쓴다. 칸이 모자라면 마지막 줄을 "+N" 으로 바꾼다.
-            val lines = (maxLabels - if (milestone != null) 1 else 0).coerceAtLeast(1)
+            val lines = (maxLabels - if (special != null) 1 else 0).coerceAtLeast(1)
             val shown = if (events.size <= lines) events else events.take((lines - 1).coerceAtLeast(0))
             shown.forEach { e ->
                 val color = if (e.createdBy == myUid) CoupleColors.mine else CoupleColors.partner
@@ -349,7 +359,7 @@ private fun DayCell(
 private fun DayPanel(
     day: LocalDate,
     events: List<CalendarEvent>,
-    milestone: String?,
+    specials: List<SpecialDay>,
     couple: Couple,
     myUid: String,
     onAdd: (LocalDate) -> Unit,
@@ -357,22 +367,13 @@ private fun DayPanel(
     modifier: Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-            Text(
-                day.format(KoreanMonthDay),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            if (milestone != null) {
-                Text(
-                    "💕 $milestone",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
+        Text(
+            day.format(KoreanMonthDay),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        specials.forEach { SpecialDayCard(it) }
         if (events.isEmpty()) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -449,6 +450,38 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                         .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
                         .padding(horizontal = 6.dp, vertical = 1.dp),
                 )
+            }
+        }
+    }
+}
+
+/** 선택한 날의 기념일 한 줄: 우리 기념일·생일은 분홍 바탕, 연인 기념일은 연한 바탕 */
+@Composable
+private fun SpecialDayCard(special: SpecialDay) {
+    val personal = special.kind.personal
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (personal) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(special.emoji, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    special.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (personal) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                )
+                if (special.note.isNotBlank()) {
+                    Text(
+                        special.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

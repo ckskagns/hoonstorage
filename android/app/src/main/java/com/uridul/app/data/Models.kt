@@ -1,6 +1,8 @@
 package com.uridul.app.data
 
+import com.uridul.app.domain.Birthday
 import java.time.LocalDate
+import java.time.MonthDay
 
 /** 커플 캐릭터. 오리지널 디자인(통통한 주황 아기 용 / 하얀 토끼). */
 enum class Character(val key: String, val label: String) {
@@ -51,3 +53,20 @@ class UserFacingException(message: String) : Exception(message)
 
 /** 이름 길이 제한 */
 const val NAME_MAX = 10
+
+/**
+ * 두 사람 생일 (고정): 커플 공간을 만든 사람(후이) 5월 13일, 초대로 들어온 사람(나나) 10월 18일.
+ * 이름은 프로필 이름을 따라간다.
+ */
+object FixedBirthdays {
+    val CREATOR: MonthDay = MonthDay.of(5, 13)
+    val PARTNER: MonthDay = MonthDay.of(10, 18)
+}
+
+fun Couple.birthdays(): List<Birthday> {
+    val creator = members.firstOrNull()
+    val joined = members.getOrNull(1)
+    val creatorName = creator?.let { names[it] } ?: "후이"
+    val partnerName = joined?.let { names[it] } ?: partnerDefaults?.name ?: "나나"
+    return listOf(Birthday(creatorName, FixedBirthdays.CREATOR), Birthday(partnerName, FixedBirthdays.PARTNER))
+}

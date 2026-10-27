@@ -61,6 +61,8 @@ class WidgetRefreshReceiver : BroadcastReceiver() {
                 Widgets.updateAll(appContext)
             } finally {
                 MidnightScheduler.schedule(appContext)
+                // 재부팅·시간 변경·앱 업데이트 뒤에도 아침 알림이 이어지도록 다시 예약
+                com.uridul.app.notify.Reminders.scheduleDaily(appContext)
                 pending.finish()
             }
         }

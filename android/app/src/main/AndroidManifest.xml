@@ -11,6 +11,8 @@
         android:maxSdkVersion="32" />
     <!-- 링크로 설치한 앱의 자체 업데이트: 새 버전 APK 설치 화면 열기 (사용자가 직접 허용해야 동작) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 일정 알림 (아침 9시, 일정 30분 전). 처음 한 번 사용자에게 허용을 묻는다 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".UridulApp"
@@ -99,6 +101,23 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/calendar_widget_info" />
         </receiver>
+
+        <receiver
+            android:name=".widget.MonthWidgetReceiver"
+            android:exported="false"
+            android:label="@string/month_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/month_widget_info" />
+        </receiver>
+
+        <!-- 일정 알림 알람 (앱 안에서만 보냄) -->
+        <receiver
+            android:name=".notify.ReminderReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".widget.WidgetRefreshReceiver"
