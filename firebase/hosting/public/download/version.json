@@ -1,9 +1,9 @@
 {
-    "versionCode":  4,
-    "versionName":  "0.4.0",
-    "notes":  "한 달 달력 위젯이 생겼어요. 일정 당일 아침 9시와 30분 전에 알림이 와요. 생일과 발렌타인데이·크리스마스 같은 연인 기념일도 달력에 표시돼요.",
-    "size":  45673595,
-    "sha256":  "f4f8c4b1f8e5b028e3841335e2e6385b8dc8db45550838ca49e6c0c6b219d022",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.4.0/uridul.apk",
-    "releasedAt":  "2026-10-27T13:40:58+09:00"
+    "versionCode":  5,
+    "versionName":  "0.5.0",
+    "notes":  "하루 페이지에서 하루 일정을 한 번에 관리해요. 시간 표마다 장소를 넣고 누르면 지도 앱에서 바로 열려요. 사진 위젯, 화면 모드·일정 색 선택, 부드러운 달 넘김이 생겼어요.",
+    "size":  46316980,
+    "sha256":  "e8cecee084cf64d228f46a54b818503de50bc7e9a6c1bc1b33777507bc7f75cf",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.5.0/uridul.apk",
+    "releasedAt":  "2026-10-27T19:00:55+09:00"
 }
