@@ -350,7 +350,11 @@ fun ReadyScreen(
     if (pickingTheme) {
         ThemeModeDialog(
             current = uiSettings.theme,
-            onPick = { mode -> AppSettings.update(appContext) { it.copy(theme = mode) } },
+            onPick = { mode ->
+                AppSettings.update(appContext) { it.copy(theme = mode) }
+                // 위젯도 같은 화면 모드로 다시 그린다
+                onColorsChanged()
+            },
             onDismiss = { pickingTheme = false },
         )
     }

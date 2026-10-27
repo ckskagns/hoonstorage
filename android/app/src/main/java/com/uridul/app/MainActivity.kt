@@ -151,7 +151,6 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
             notifyEnabled = notifyEnabled,
             onAttachPlace = viewModel::attachPlace,
-            onColorsChanged = viewModel::refreshWidgets,
             onSetNotify = { enabled ->
                 viewModel.setNotifyEnabled(enabled)
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)

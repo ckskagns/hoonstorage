@@ -103,7 +103,7 @@ class MonthWidget : GlanceAppWidget() {
             }
 
             val shown = if (loaded.month == month) loaded.events else emptyList()
-            MonthContent(loaded.snapshot, month, offset, shown, today)
+            WidgetSettingsScope { MonthContent(loaded.snapshot, month, offset, shown, today) }
         }
     }
 

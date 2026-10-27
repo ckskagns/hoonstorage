@@ -52,7 +52,7 @@ class DDayWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = WidgetStore.load(context)
         val today = LocalDate.now()
-        provideContent { WidgetContent(snapshot, today) }
+        provideContent { WidgetSettingsScope { WidgetContent(snapshot, today) } }
     }
 
     companion object {

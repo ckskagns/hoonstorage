@@ -56,7 +56,7 @@ class CalendarWidget : GlanceAppWidget() {
         val events = Widgets.fetchUpcomingEvents(context, snapshot) ?: WidgetStore.loadEvents(context)
         val today = LocalDate.now()
         val upcoming = CalendarMath.upcoming(events, today, limit = 20)
-        provideContent { CalendarContent(snapshot, upcoming, today) }
+        provideContent { WidgetSettingsScope { CalendarContent(snapshot, upcoming, today) } }
     }
 
     companion object {

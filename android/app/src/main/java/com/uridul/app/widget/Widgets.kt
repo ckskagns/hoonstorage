@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.updateAll
+import androidx.compose.runtime.collectAsState
 import androidx.glance.color.ColorProvider
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -77,27 +78,54 @@ object MainExtras {
     const val PLACE_SHARED = "place_shared"
 }
 
+/**
+ * 위젯 색: 앱 메뉴의 "화면 모드"와 "일정 색"을 그대로 따른다.
+ *  - 폰 설정 따라가기: 폰이 다크면 다크 색, 아니면 화이트 색 (홈 화면이 알아서 고른다)
+ *  - 화이트 모드 / 다크 모드: 폰 설정과 상관없이 그 색으로 고정
+ */
 internal object WidgetColors {
-    val Background = ColorProvider(day = Color(0xFFFFD9E2), night = Color(0xFF4A1F30))
-    val Surface = ColorProvider(day = Color(0xFFFFF8F8), night = Color(0xFF261D20))
-    val Primary = ColorProvider(day = Color(0xFFC03A62), night = Color(0xFFFFB1C5))
-    val OnPrimary = ColorProvider(day = Color(0xFFFFFFFF), night = Color(0xFF5E1133))
-    val OnBg = ColorProvider(day = Color(0xFF3E001D), night = Color(0xFFFFD9E2))
-    val OnSurface = ColorProvider(day = Color(0xFF22191C), night = Color(0xFFF0DEE2))
-    val SubText = ColorProvider(day = Color(0xFF74565F), night = Color(0xFFE3BDC6))
-    // 일정 색: 앱 메뉴 "일정 색" 에서 고른 색 (기본 내 일정 연핑크 / 상대 일정 하늘)
     private val ui get() = com.uridul.app.data.AppSettings.state.value
-    val Mine get() = ColorProvider(day = Color(ui.mine.strong), night = Color(ui.mine.strong))
-    val Partner get() = ColorProvider(day = Color(ui.partner.strong), night = Color(ui.partner.strong))
-    val MineSoft get() = ColorProvider(day = Color(ui.mine.fill), night = Color(ui.mine.fill))
-    val PartnerSoft get() = ColorProvider(day = Color(ui.partner.fill), night = Color(ui.partner.fill))
+
+    /** 화면 모드에 맞는 색 (화이트 색, 다크 색) */
+    private fun themed(day: Color, night: Color): androidx.glance.unit.ColorProvider = when (ui.theme) {
+        com.uridul.app.data.ThemeMode.SYSTEM -> ColorProvider(day = day, night = night)
+        com.uridul.app.data.ThemeMode.LIGHT -> androidx.glance.unit.ColorProvider(day)
+        com.uridul.app.data.ThemeMode.DARK -> androidx.glance.unit.ColorProvider(night)
+    }
+
+    /** 어느 모드에서나 같은 색 */
+    private fun fixed(c: Color): androidx.glance.unit.ColorProvider = androidx.glance.unit.ColorProvider(c)
+
+    val Background get() = themed(Color(0xFFFFD9E2), Color(0xFF4A1F30))
+    val Surface get() = themed(Color(0xFFFFF8F8), Color(0xFF261D20))
+    val Primary get() = themed(Color(0xFFC03A62), Color(0xFFFFB1C5))
+    val OnPrimary get() = themed(Color(0xFFFFFFFF), Color(0xFF5E1133))
+    val OnBg get() = themed(Color(0xFF3E001D), Color(0xFFFFD9E2))
+    val OnSurface get() = themed(Color(0xFF22191C), Color(0xFFF0DEE2))
+    val SubText get() = themed(Color(0xFF74565F), Color(0xFFE3BDC6))
+    val Sunday get() = themed(Color(0xFFD32F2F), Color(0xFFFFB4AB))
+    val Saturday get() = themed(Color(0xFF1E62C8), Color(0xFFA8C8FF))
+    val Faded get() = themed(Color(0x6622191C), Color(0x66F0DEE2))
+
+    // 일정 색: 앱 메뉴 "일정 색" 에서 고른 색 (기본 내 일정 연핑크 / 상대 일정 하늘) — 달력 막대와 똑같이
+    val Mine get() = fixed(Color(ui.mine.strong))
+    val Partner get() = fixed(Color(ui.partner.strong))
+    val MineSoft get() = fixed(Color(ui.mine.fill))
+    val PartnerSoft get() = fixed(Color(ui.partner.fill))
     val MineBar get() = MineSoft
     val PartnerBar get() = PartnerSoft
     /** 파스텔 막대 위 글자 (화이트·다크 모두 진한 색) */
-    val OnFill = ColorProvider(day = Color(com.uridul.app.data.ON_EVENT_FILL), night = Color(com.uridul.app.data.ON_EVENT_FILL))
+    val OnFill get() = fixed(Color(com.uridul.app.data.ON_EVENT_FILL))
     /** 다른 달 날짜의 막대 글자 (반투명 진한 색) */
-    val OnFillFaded = ColorProvider(day = Color(0x993A2A30), night = Color(0x993A2A30))
-    val Sunday = ColorProvider(day = Color(0xFFD32F2F), night = Color(0xFFFFB4AB))
-    val Saturday = ColorProvider(day = Color(0xFF1E62C8), night = Color(0xFFA8C8FF))
-    val Faded = ColorProvider(day = Color(0x6622191C), night = Color(0x66F0DEE2))
+    val OnFillFaded get() = fixed(Color(0x993A2A30))
+}
+
+/**
+ * 위젯 내용 감싸기: 앱에서 화면 모드·일정 색을 바꾸면 떠 있는 위젯도 처음부터 다시 그린다.
+ * (색은 설정에서 바로 읽으므로, 설정이 바뀔 때 화면 전체를 새로 그려야 바뀐 색이 보인다)
+ */
+@androidx.compose.runtime.Composable
+internal fun WidgetSettingsScope(content: @androidx.compose.runtime.Composable () -> Unit) {
+    val ui = com.uridul.app.data.AppSettings.state.collectAsState().value
+    androidx.compose.runtime.key(ui) { content() }
 }

@@ -61,7 +61,7 @@ class PhotoWidget : GlanceAppWidget() {
         val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrDefault(-1)
         val snapshot = WidgetStore.load(context)
         val photo = if (appWidgetId != -1) PhotoStore.loadForWidget(context, appWidgetId) else null
-        provideContent { PhotoContent(context, appWidgetId, snapshot, photo, LocalDate.now()) }
+        provideContent { WidgetSettingsScope { PhotoContent(context, appWidgetId, snapshot, photo, LocalDate.now()) } }
     }
 }
 
