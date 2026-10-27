@@ -20,6 +20,8 @@ class UridulApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         MidnightScheduler.schedule(this)
+        // 화면 모드·일정 색 설정을 미리 읽어 둔다 (첫 화면부터 고른 모드로)
+        com.uridul.app.data.AppSettings.load(this)
         Reminders.ensureChannel(this)
         Reminders.scheduleDaily(this)
     }

@@ -13,6 +13,8 @@ import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.Place
+import com.uridul.app.data.toDraft
 import com.uridul.app.data.NAME_MAX
 import com.uridul.app.data.PartnerDefaults
 import com.uridul.app.data.UserFacingException
@@ -34,6 +36,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
@@ -69,7 +72,7 @@ sealed interface AppState {
     data class Ready(val couple: Couple, val myUid: String) : AppState
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val container = (app as UridulApp).container
@@ -160,6 +163,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val repo = container.events ?: return false
         repo.save(ready.couple.id, ready.myUid, draft) { e -> _message.value = e.toUserMessage() ?: "저장하지 못했어요." }
         return true
+    }
+
+    /** 일정 색 등 화면 설정이 바뀌면 위젯을 다시 그린다 */
+    fun refreshWidgets() {
+        viewModelScope.launch { Widgets.updateAll(getApplication()) }
+    }
+
+    /** 일정 카드에서 찾은 장소를 그 일정(시간대)에 바로 저장 */
+    fun attachPlace(eventId: String, slot: Int, place: Place) {
+        val event = monthEvents.value.firstOrNull { it.id == eventId } ?: run {
+            _message.value = "일정을 찾지 못했어요. 다시 시도해 주세요."
+            return
+        }
+        val draft = event.toDraft()
+        val updated = if (slot < 0 || draft.time == null) {
+            draft.copy(place = place)
+        } else {
+            draft.copy(timeline = draft.timeline.mapIndexed { i, s -> if (i == slot) s.copy(place = place) else s })
+        }
+        if (saveEvent(updated)) _message.value = "📍 ${place.name} 을(를) 등록했어요"
     }
 
     fun deleteEvent(eventId: String) {
@@ -282,6 +305,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     .filterNotNull()
                     .distinctUntilChanged()
+                    // 저장 직후(내 폰) → 서버 확인 순으로 연달아 오는 변경을 한 번으로 묶어 위젯을 덜 그린다
+                    .debounce(400)
                     .collect { events ->
                         val context = getApplication<Application>()
                         WidgetStore.saveEvents(context, events)

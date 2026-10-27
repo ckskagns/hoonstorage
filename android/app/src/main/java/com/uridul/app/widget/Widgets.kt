@@ -85,12 +85,16 @@ internal object WidgetColors {
     val OnBg = ColorProvider(day = Color(0xFF3E001D), night = Color(0xFFFFD9E2))
     val OnSurface = ColorProvider(day = Color(0xFF22191C), night = Color(0xFFF0DEE2))
     val SubText = ColorProvider(day = Color(0xFF74565F), night = Color(0xFFE3BDC6))
-    val Mine = ColorProvider(day = Color(0xFFD14D72), night = Color(0xFFFFB1C5))
-    val Partner = ColorProvider(day = Color(0xFF4F6FC4), night = Color(0xFFB0C6FF))
-    val MineSoft = ColorProvider(day = Color(0x33D14D72), night = Color(0x55FFB1C5))
-    val PartnerSoft = ColorProvider(day = Color(0x334F6FC4), night = Color(0x55B0C6FF))
-    val MineBar = ColorProvider(day = Color(0x55D14D72), night = Color(0x77FFB1C5))
-    val PartnerBar = ColorProvider(day = Color(0x554F6FC4), night = Color(0x77B0C6FF))
+    // 일정 색: 앱 메뉴 "일정 색" 에서 고른 색 (기본 내 일정 연핑크 / 상대 일정 하늘)
+    private val ui get() = com.uridul.app.data.AppSettings.state.value
+    val Mine get() = ColorProvider(day = Color(ui.mine.strong), night = Color(ui.mine.strong))
+    val Partner get() = ColorProvider(day = Color(ui.partner.strong), night = Color(ui.partner.strong))
+    val MineSoft get() = ColorProvider(day = Color(ui.mine.fill), night = Color(ui.mine.fill))
+    val PartnerSoft get() = ColorProvider(day = Color(ui.partner.fill), night = Color(ui.partner.fill))
+    val MineBar get() = MineSoft
+    val PartnerBar get() = PartnerSoft
+    /** 파스텔 막대 위 글자 (화이트·다크 모두 진한 색) */
+    val OnFill = ColorProvider(day = Color(com.uridul.app.data.ON_EVENT_FILL), night = Color(com.uridul.app.data.ON_EVENT_FILL))
     val Sunday = ColorProvider(day = Color(0xFFD32F2F), night = Color(0xFFFFB4AB))
     val Saturday = ColorProvider(day = Color(0xFF1E62C8), night = Color(0xFFA8C8FF))
     val Faded = ColorProvider(day = Color(0x6622191C), night = Color(0x66F0DEE2))

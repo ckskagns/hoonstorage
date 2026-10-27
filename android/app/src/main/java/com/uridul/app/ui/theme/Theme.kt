@@ -1,10 +1,21 @@
 package com.uridul.app.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.uridul.app.data.AppSettings
+import com.uridul.app.data.ON_EVENT_FILL
+import com.uridul.app.data.ThemeMode
+import com.uridul.app.data.UiSettings
 import androidx.compose.ui.graphics.Color
 
 private val LightColors = lightColorScheme(
@@ -55,23 +66,63 @@ private val DarkColors = darkColorScheme(
     outlineVariant = Color(0xFF514347),
 )
 
-/** 일정 색: 내가 등록한 일정은 분홍, 상대가 등록한 일정은 파랑 */
+/** 지금 다크 모드인지 (앱 설정의 화면 모드 반영) */
+val LocalDarkTheme = staticCompositionLocalOf { false }
+
+/** 지금 쓰는 일정 색 설정 */
+val LocalUiSettings = staticCompositionLocalOf { UiSettings() }
+
+/**
+ * 일정 색: 내 일정 / 상대 일정 (메뉴의 "일정 색"에서 고름, 기본 연핑크 / 하늘).
+ *  - mine·partner: 진한 색 (왼쪽 선·점·이름)
+ *  - mineFill·partnerFill: 파스텔 바탕 (달력 막대·칸), 그 위 글자는 onFill
+ */
 object CoupleColors {
     val mine: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFFFB1C5) else Color(0xFFD14D72)
+        @Composable get() = Color(LocalUiSettings.current.mine.strong)
     val partner: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFB0C6FF) else Color(0xFF4F6FC4)
+        @Composable get() = Color(LocalUiSettings.current.partner.strong)
+    val mineFill: Color
+        @Composable get() = Color(LocalUiSettings.current.mine.fill)
+    val partnerFill: Color
+        @Composable get() = Color(LocalUiSettings.current.partner.fill)
+    val onFill: Color = Color(ON_EVENT_FILL)
     /** 일요일·공휴일 빨강 / 토요일 파랑 */
     val sunday: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFFFB4AB) else Color(0xFFD32F2F)
+        @Composable get() = if (LocalDarkTheme.current) Color(0xFFFFB4AB) else Color(0xFFD32F2F)
     val saturday: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color(0xFFA8C8FF) else Color(0xFF1E62C8)
+        @Composable get() = if (LocalDarkTheme.current) Color(0xFFA8C8FF) else Color(0xFF1E62C8)
+}
+
+/** 둥글둥글한 모서리: 카드·창·버튼을 기본보다 더 동글게 해서 부드럽고 귀여운 느낌 */
+private val SoftShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(26.dp),
+    extraLarge = RoundedCornerShape(32.dp),
+)
+
+/** 앱 설정의 화면 모드에 따라 다크 모드인지 */
+@Composable
+fun isAppInDarkTheme(): Boolean {
+    val settings by AppSettings.state.collectAsState()
+    return when (settings.theme) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
 }
 
 @Composable
 fun UridulTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
-        content = content,
-    )
+    val settings by AppSettings.state.collectAsState()
+    val dark = isAppInDarkTheme()
+    CompositionLocalProvider(LocalDarkTheme provides dark, LocalUiSettings provides settings) {
+        MaterialTheme(
+            colorScheme = if (dark) DarkColors else LightColors,
+            shapes = SoftShapes,
+            content = content,
+        )
+    }
 }

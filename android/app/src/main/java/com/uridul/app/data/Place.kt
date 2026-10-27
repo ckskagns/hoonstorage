@@ -67,3 +67,51 @@ object PlaceShare {
         }
     }
 }
+
+/**
+ * 장소 링크 → 지도 앱이 바로 그 장소를 여는 주소.
+ *  - 네이버 지도: 장소 번호로 nmap://place?id=… (네이버 지도 앱은 웹 링크를 직접 열지 못한다)
+ *  - 카카오맵: 장소 번호로 kakaomap://place?id=…
+ *  - 구글 지도: google.com/maps 주소 그대로 (구글 지도 앱이 연다)
+ * 짧은 링크(naver.me, kko.to, maps.app.goo.gl)는 먼저 [resolveRedirects] 로 실제 주소를 알아낸 뒤 쓴다.
+ */
+object PlaceLinks {
+    private val naverId = Regex("""(?:/entry/place/|/place/|place\.naver\.com/[a-z]+/)(\d{5,})""")
+    private val kakaoId = Regex("""place\.map\.kakao\.com/(?:m/)?(\d{3,})""")
+
+    fun isShortLink(url: String): Boolean {
+        val u = url.lowercase()
+        return u.contains("://naver.me/") || u.contains("://kko.to/") || u.contains("://maps.app.goo.gl/") || u.contains("://goo.gl/maps")
+    }
+
+    /** 지도 앱에서 바로 여는 주소. 못 만들면 null (이름으로 검색) */
+    fun appUri(app: MapApp, url: String, packageName: String): String? = when (app) {
+        MapApp.NAVER -> naverId.find(url)?.groupValues?.get(1)?.let { "nmap://place?id=$it&appname=$packageName" }
+        MapApp.KAKAO -> kakaoId.find(url)?.groupValues?.get(1)?.let { "kakaomap://place?id=$it" }
+        MapApp.GOOGLE -> url.takeIf { Regex("""google\.[a-z.]+/maps""").containsMatchIn(it) }
+    }
+
+    /** 짧은 링크를 따라가 실제 주소를 알아낸다 (최대 5번, 3초). 실패하면 원래 주소 */
+    fun resolveRedirects(url: String): String {
+        var current = url
+        repeat(5) {
+            val conn = runCatching { java.net.URL(current).openConnection() as java.net.HttpURLConnection }.getOrNull() ?: return current
+            try {
+                conn.instanceFollowRedirects = false
+                conn.connectTimeout = 3_000
+                conn.readTimeout = 3_000
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
+                val code = conn.responseCode
+                val location = conn.getHeaderField("Location")
+                if (code !in 300..399 || location.isNullOrBlank()) return current
+                current = java.net.URL(java.net.URL(current), location).toString()
+            } catch (e: Exception) {
+                return current
+            } finally {
+                conn.disconnect()
+            }
+        }
+        return current
+    }
+}

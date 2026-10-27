@@ -112,4 +112,19 @@ class CalendarMathTest {
         assertEquals(listOf(1, 1, 1, 2, 2, 2, 2), layout.lanesUsed)
         assertEquals(listOf("single"), CalendarMath.singleDayEventsOn(events, LocalDate.of(2026, 10, 27)).map { it.id })
     }
+
+    @Test
+    fun validateTimeline() {
+        val day = LocalDate.of(2026, 10, 27)
+        fun slot(a: String, b: String?) = com.uridul.app.data.TimeSlot(LocalTime.parse(a), b?.let(LocalTime::parse))
+        fun draft(end: LocalDate, vararg slots: com.uridul.app.data.TimeSlot) =
+            EventDraft(title = "데이트", date = day, endDate = end, time = slots.firstOrNull()?.start, memo = "", timeline = slots.toList())
+
+        assertNull(CalendarMath.validate(draft(day, slot("18:30", "20:00"), slot("20:30", "22:00"))))
+        // 끝이 시작보다 빠르면 안 됨
+        assertNotNull(CalendarMath.validate(draft(day, slot("18:30", "18:00"))))
+        // 여러 날 일정은 시간대 하나만 (끝 시각은 마지막 날이라 시작보다 빨라도 됨)
+        assertNull(CalendarMath.validate(draft(day.plusDays(2), slot("16:00", "09:00"))))
+        assertNotNull(CalendarMath.validate(draft(day.plusDays(1), slot("16:00", "17:00"), slot("18:00", "19:00"))))
+    }
 }

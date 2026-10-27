@@ -2,9 +2,17 @@ package com.uridul.app.ui
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import com.uridul.app.data.AppSettings
+import com.uridul.app.ui.theme.CoupleColors
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -37,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.uridul.app.data.birthdays
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,6 +56,8 @@ import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.Place
+import com.uridul.app.data.toDraft
 import com.uridul.app.data.PartnerDefaults
 import java.time.LocalDate
 import java.time.YearMonth
@@ -82,9 +93,16 @@ fun ReadyScreen(
     onSignOut: () -> Unit,
     onCheckUpdate: () -> Unit = {},
     notifyEnabled: Boolean = true,
+    onAttachPlace: (eventId: String, slot: Int, place: Place) -> Unit = { _, _, _ -> },
+    /** 일정 색을 바꾸면 위젯도 다시 그린다 */
+    onColorsChanged: () -> Unit = {},
     onSetNotify: (Boolean) -> Unit = {},
 ) {
     var editingProfile by remember { mutableStateOf(false) }
+    var pickingTheme by remember { mutableStateOf(false) }
+    var pickingColors by remember { mutableStateOf(false) }
+    val uiSettings by AppSettings.state.collectAsState()
+    val appContext = androidx.compose.ui.platform.LocalContext.current
     var tabKey by rememberSaveable { mutableStateOf(Tab.Home.key) }
     val tab = Tab.entries.firstOrNull { it.key == tabKey } ?: Tab.Home
     var selectedText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
@@ -92,27 +110,42 @@ fun ReadyScreen(
     var editing by remember { mutableStateOf<EditorTarget?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var picking by remember { mutableStateOf(false) }
+    /** 하루 페이지: "날짜|열어 둘 일정 ID|new" (폴드 접고 펴기에도 유지) */
+    var dayPageText by rememberSaveable { mutableStateOf("") }
+    val dayPage = remember(dayPageText) { DayPageTarget.parse(dayPageText) }
+    fun openDay(date: LocalDate, focus: String? = null, new: Boolean = false) {
+        tabKey = Tab.Calendar.key
+        dayPageText = DayPageTarget(date, focus, new).encode()
+    }
 
     fun select(day: LocalDate) {
         selectedText = day.toString()
         if (YearMonth.from(day) != month) onMonthChange(YearMonth.from(day))
     }
 
-    // 지도 앱에서 "공유 → 우리둘" 로 장소를 받은 경우: 입력 창이 없으면 그 장소로 새 일정 입력 창을 연다
+    // 지도 앱에서 "공유 → 우리둘" 로 장소를 받은 경우: 하루 페이지·입력 창이 열려 있으면 그쪽이 가져가고,
+    // 아니면 카드에서 시작한 일정에 저장하거나 그 장소로 새 일정을 연다
     val sharedPlace by PlaceInbox.place.collectAsState()
     LaunchedEffect(sharedPlace) {
-        if (sharedPlace != null && editing == null) {
-            tabKey = Tab.Calendar.key
-            editing = EditorTarget.New(selected)
+        val place = sharedPlace ?: return@LaunchedEffect
+        if (editing != null || dayPage != null) return@LaunchedEffect
+        tabKey = Tab.Calendar.key
+        val target = PlaceInbox.eventTarget
+        if (target != null) {
+            // 일정 카드의 [장소 찾기] 에서 시작했으면 그 일정·시간대에 바로 저장
+            onAttachPlace(target.eventId, target.slot, place)
+            PlaceInbox.consume()
+        } else {
+            openDay(selected, new = true)
         }
     }
 
-    // 위젯에서 열린 경우: 해당 탭/날짜로 이동, 필요하면 일정 추가 창 열기
+    // 위젯에서 열린 경우: 해당 탭/날짜로 이동, 필요하면 그 날 하루 페이지에서 새 일정
     LaunchedEffect(openRequest) {
         val request = openRequest ?: return@LaunchedEffect
         tabKey = if (request.tab == Tab.Calendar.key) Tab.Calendar.key else Tab.Home.key
         request.date?.let { selectedText = it.toString() }
-        if (request.addEvent) editing = EditorTarget.New(request.date ?: selected)
+        if (request.addEvent) openDay(request.date ?: selected, new = true)
         onOpenRequestHandled()
     }
 
@@ -162,6 +195,20 @@ fun ReadyScreen(
                                 onClick = { menuOpen = false; onSetNotify(!notifyEnabled) },
                             )
                             DropdownMenuItem(
+                                text = { Text("화면 모드 (${uiSettings.theme.label})") },
+                                onClick = { menuOpen = false; pickingTheme = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("일정 색") },
+                                trailingIcon = {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Box(Modifier.size(14.dp).background(CoupleColors.mineFill, CircleShape))
+                                        Box(Modifier.size(14.dp).background(CoupleColors.partnerFill, CircleShape))
+                                    }
+                                },
+                                onClick = { menuOpen = false; pickingColors = true },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
                                 onClick = { menuOpen = false; onCheckUpdate() },
                             )
@@ -191,13 +238,13 @@ fun ReadyScreen(
                 if (tab == Tab.Calendar) {
                     if (wide) {
                         ExtendedFloatingActionButton(
-                            onClick = { editing = EditorTarget.New(selected) },
+                            onClick = { openDay(selected, new = true) },
                             icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                             text = { Text("일정 추가") },
                         )
                     } else {
                         // 좁은 화면(폰·폴드 커버)에서는 달력을 덜 가리도록 둥근 + 버튼만
-                        FloatingActionButton(onClick = { editing = EditorTarget.New(selected) }) {
+                        FloatingActionButton(onClick = { openDay(selected, new = true) }) {
                             Icon(Icons.Filled.Add, contentDescription = "일정 추가")
                         }
                     }
@@ -218,8 +265,20 @@ fun ReadyScreen(
                         }
                     }
                 }
-                val content = Modifier.weight(1f).fillMaxHeight()
-                when (tab) {
+                // 탭을 바꾸면 살짝 밀리며 부드럽게 바뀐다
+                androidx.compose.animation.AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                            androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(260)) { w -> if (forward) w / 8 else -w / 8 }) togetherWith
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160))
+                    },
+                    label = "tab",
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                ) { shownTab ->
+                val content = Modifier.fillMaxSize()
+                when (shownTab) {
                     Tab.Home -> HomeContent(couple, myUid, busy, onInvite, content)
                     Tab.Calendar -> CalendarContent(
                         couple = couple,
@@ -229,19 +288,47 @@ fun ReadyScreen(
                         selected = selected,
                         onSelect = ::select,
                         onMonthChange = onMonthChange,
-                        onAdd = { editing = EditorTarget.New(it) },
-                        onEdit = { editing = EditorTarget.Existing(it) },
+                        // 날짜를 다시 누르거나 길게 누르면 / 일정 카드를 누르면 → 하루 페이지
+                        onAdd = { openDay(it, new = true) },
+                        onEdit = { e -> openDay(if (e.occursOn(selected)) selected else e.date, focus = e.id) },
                         modifier = content,
                     )
                 }
+                }
             }
+        }
+    }
+
+    // 하루 페이지 (하루 일정을 한 페이지에서 모두 관리)
+    dayPage?.let { page ->
+        val daySpecials = remember(couple, page.date) {
+            com.uridul.app.domain.SpecialDays.on(couple.startDate, couple.countFromOne, couple.birthdays(), page.date)
+        }
+        androidx.compose.runtime.key(dayPageText) {
+            DayTimelinePage(
+                date = page.date,
+                events = monthEvents,
+                couple = couple,
+                myUid = myUid,
+                specials = daySpecials,
+                focusEventId = page.focus,
+                startNew = page.new,
+                onClose = { dayPageText = "" },
+                onSave = onSaveEvent,
+                onDelete = onDeleteEvent,
+                onOpenFullEditor = { draft -> editing = EditorTarget.FromDraft(draft) },
+                incomingPlace = if (editing == null) sharedPlace else null,
+                onIncomingPlaceConsumed = PlaceInbox::consume,
+                onAttachPlace = onAttachPlace,
+            )
         }
     }
 
     editing?.let { target ->
         val draft = when (target) {
             is EditorTarget.New -> EventDraft(title = "", date = target.date, endDate = target.date, time = null, memo = "")
-            is EditorTarget.Existing -> with(target.event) { EventDraft(id, title, date, endDate, time, memo, place) }
+            is EditorTarget.Existing -> target.event.toDraft()
+            is EditorTarget.FromDraft -> target.draft
         }
         // 대상이 바뀌면 입력 상태를 새로 만든다
         androidx.compose.runtime.key(target) {
@@ -249,11 +336,39 @@ fun ReadyScreen(
                 initial = draft,
                 onDismiss = { editing = null },
                 onSave = onSaveEvent,
-                onDelete = (target as? EditorTarget.Existing)?.let { { onDeleteEvent(it.event.id) } },
+                onDelete = when (target) {
+                    is EditorTarget.Existing -> ({ onDeleteEvent(target.event.id) })
+                    is EditorTarget.FromDraft -> target.draft.id?.let { id -> { onDeleteEvent(id) } }
+                    else -> null
+                },
                 incomingPlace = sharedPlace,
                 onIncomingPlaceConsumed = PlaceInbox::consume,
             )
         }
+    }
+
+    if (pickingTheme) {
+        ThemeModeDialog(
+            current = uiSettings.theme,
+            onPick = { mode -> AppSettings.update(appContext) { it.copy(theme = mode) } },
+            onDismiss = { pickingTheme = false },
+        )
+    }
+    if (pickingColors) {
+        EventColorDialog(
+            settings = uiSettings,
+            myName = couple.myName(myUid),
+            partnerName = couple.partnerName(myUid) ?: "상대",
+            onPickMine = { c ->
+                AppSettings.update(appContext) { it.copy(mine = c) }
+                onColorsChanged()
+            },
+            onPickPartner = { c ->
+                AppSettings.update(appContext) { it.copy(partner = c) }
+                onColorsChanged()
+            },
+            onDismiss = { pickingColors = false },
+        )
     }
 
     if (editingProfile) {
@@ -282,4 +397,20 @@ fun ReadyScreen(
 private sealed interface EditorTarget {
     data class New(val date: LocalDate) : EditorTarget
     data class Existing(val event: CalendarEvent) : EditorTarget
+    /** 하루 페이지의 "날짜·메모 자세히" 에서 넘어온 입력값 */
+    data class FromDraft(val draft: EventDraft) : EditorTarget
+}
+
+/** 하루 페이지 대상: 날짜 + 열어 둘 일정 + 새 일정으로 시작할지 */
+private data class DayPageTarget(val date: LocalDate, val focus: String?, val new: Boolean) {
+    fun encode() = "$date|${focus.orEmpty()}|$new"
+
+    companion object {
+        fun parse(text: String): DayPageTarget? {
+            val parts = text.split("|")
+            if (parts.size != 3) return null
+            val date = runCatching { LocalDate.parse(parts[0]) }.getOrNull() ?: return null
+            return DayPageTarget(date, parts[1].ifEmpty { null }, parts[2] == "true")
+        }
+    }
 }

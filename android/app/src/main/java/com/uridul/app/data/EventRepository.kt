@@ -70,8 +70,15 @@ class EventRepository(private val db: FirebaseFirestore) {
             "allDay" to (draft.time == null),
             "time" to draft.time?.format(TimeFormat),
             "memo" to draft.memo.trim(),
-            "place" to draft.place?.let { p ->
-                mapOf("name" to p.name.trim().take(Place.NAME_MAX), "url" to p.url, "app" to p.app?.key)
+            // 하루 종일 일정은 일정 하나에 장소 하나, 시간 일정은 시간대마다 장소
+            "place" to if (draft.time == null) placeMap(draft.place) else null,
+            "timeline" to if (draft.time == null) null else draft.timeline.take(TimeSlot.MAX_SLOTS).map { s ->
+                mapOf(
+                    "start" to s.start.format(TimeFormat),
+                    "end" to s.end?.format(TimeFormat),
+                    "title" to s.title.trim().take(TimeSlot.TITLE_MAX),
+                    "place" to placeMap(s.place),
+                )
             },
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
@@ -127,11 +134,28 @@ class EventRepository(private val db: FirebaseFirestore) {
             time = if (getBoolean("allDay") == true) null else time,
             memo = getString("memo").orEmpty(),
             createdBy = getString("createdBy").orEmpty(),
-            place = (get("place") as? Map<*, *>)?.let { m ->
-                val name = (m["name"] as? String)?.takeIf { it.isNotBlank() } ?: return@let null
-                Place(name, m["url"] as? String, MapApp.from(m["app"] as? String))
+            place = parsePlace(get("place")),
+            timeline = (get("timeline") as? List<*>).orEmpty().mapNotNull { item ->
+                val m = item as? Map<*, *> ?: return@mapNotNull null
+                val start = (m["start"] as? String)?.let { runCatching { LocalTime.parse(it, TimeFormat) }.getOrNull() }
+                    ?: return@mapNotNull null
+                TimeSlot(
+                    start = start,
+                    end = (m["end"] as? String)?.let { runCatching { LocalTime.parse(it, TimeFormat) }.getOrNull() },
+                    title = (m["title"] as? String).orEmpty(),
+                    place = parsePlace(m["place"]),
+                )
             },
         )
+    }
+
+    private fun placeMap(p: Place?): Map<String, Any?>? =
+        p?.let { mapOf("name" to it.name.trim().take(Place.NAME_MAX), "url" to it.url, "app" to it.app?.key) }
+
+    private fun parsePlace(v: Any?): Place? {
+        val m = v as? Map<*, *> ?: return null
+        val name = (m["name"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+        return Place(name, m["url"] as? String, MapApp.from(m["app"] as? String))
     }
 
     companion object {

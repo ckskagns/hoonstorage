@@ -117,9 +117,11 @@ service cloud.firestore {
         }
 
         function validEvent(d) {
-          return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo', 'place',
+          return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo', 'place', 'timeline',
                                    'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
             && (!('place' in d) || d.place == null || validPlace(d.place))
+            // 타임라인: 시간대 목록 (시작·끝·내용·장소), 하루 최대 12개
+            && (!('timeline' in d) || d.timeline == null || (d.timeline is list && d.timeline.size() <= 12))
             && d.title is string && d.title.size() > 0 && d.title.size() <= 100
             && isDay(d.date) && isDay(d.endDate) && d.endDate >= d.date
             && d.allDay is bool

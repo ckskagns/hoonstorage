@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.uridul.app.MainActivity
 import com.uridul.app.R
 import com.uridul.app.data.CalendarEvent
+import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.WidgetStore
 import com.uridul.app.domain.CalendarMath
 import com.uridul.app.domain.SpecialDays
@@ -118,7 +119,16 @@ object Reminders {
 
         val lines = buildList {
             specials.forEach { add("${it.emoji} 오늘은 ${it.title}" + if (it.kind.personal) "이에요" else "") }
-            todayEvents.forEach { add("${timeText(it)}  ${it.title}" + (it.place?.let { p -> "  📍${p.name}" } ?: "")) }
+            todayEvents.forEach { e ->
+                if (e.allDay) {
+                    add("종일  ${e.title}" + (e.place?.let { p -> "  📍${p.name}" } ?: ""))
+                } else {
+                    e.slots.forEach { s ->
+                        val what = s.title.takeIf { it.isNotBlank() }?.let { "${e.title} · $it" } ?: e.title
+                        add("${s.start.format(KoreanTime)}  $what" + (s.place?.let { p -> "  📍${p.name}" } ?: ""))
+                    }
+                }
+            }
             tomorrow.forEach { add("${it.emoji} 내일은 ${it.title}이에요") }
         }
         if (lines.isNotEmpty()) {
@@ -139,11 +149,15 @@ object Reminders {
         val now = LocalDateTime.now()
         val today = now.toLocalDate()
         val ids = mutableSetOf<String>()
+        // 시간대마다 30분 전 (여러 날 일정은 첫날 시작 시각만)
         todayEvents.filter { it.time != null && it.date == today }.forEach { e ->
-            val at = today.atTime(e.time!!).minusMinutes(LEAD_MINUTES)
-            if (!at.isAfter(now)) return@forEach
-            setAlarm(context, at, eventIntent(context, e))
-            ids += e.id
+            e.slots.forEachIndexed { i, slot ->
+                val at = today.atTime(slot.start).minusMinutes(LEAD_MINUTES)
+                if (!at.isAfter(now)) return@forEachIndexed
+                val key = "${e.id}#$i"
+                setAlarm(context, at, eventIntent(context, key, e, slot))
+                ids += key
+            }
         }
         prefs(context).edit().putStringSet(KEY_SCHEDULED, ids).apply()
     }
@@ -201,17 +215,18 @@ object Reminders {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun eventIntent(context: Context, id: String, event: CalendarEvent? = null): PendingIntent {
+    private fun eventIntent(context: Context, id: String, event: CalendarEvent? = null, slot: TimeSlot? = null): PendingIntent {
         val intent = Intent(context, ReminderReceiver::class.java)
             .setAction(ACTION_EVENT)
             // 일정마다 다른 알람이 되도록 data 로 구분한다
             .setData(android.net.Uri.parse("uridul-reminder://event/$id"))
         if (event != null) {
-            intent.putExtra(EXTRA_ID, event.id)
-                .putExtra(EXTRA_TITLE, event.title)
-                .putExtra(EXTRA_TIME, event.time?.format(KoreanTime).orEmpty())
+            val title = slot?.title?.takeIf { it.isNotBlank() }?.let { "${event.title} · $it" } ?: event.title
+            intent.putExtra(EXTRA_ID, id)
+                .putExtra(EXTRA_TITLE, title)
+                .putExtra(EXTRA_TIME, (slot?.start ?: event.time)?.format(KoreanTime).orEmpty())
                 .putExtra(EXTRA_DATE, event.date.toString())
-                .putExtra(EXTRA_PLACE, event.place?.name)
+                .putExtra(EXTRA_PLACE, slot?.place?.name ?: event.place?.name)
         }
         return PendingIntent.getBroadcast(
             context,
@@ -221,7 +236,6 @@ object Reminders {
         )
     }
 
-    private fun eventIntent(context: Context, event: CalendarEvent): PendingIntent = eventIntent(context, event.id, event)
 
     private fun setAlarm(context: Context, at: LocalDateTime, pending: PendingIntent) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return

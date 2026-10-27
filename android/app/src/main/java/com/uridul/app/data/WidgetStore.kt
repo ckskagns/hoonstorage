@@ -112,7 +112,20 @@ object WidgetStore {
                     .put("createdBy", e.createdBy)
                     .put("placeName", e.place?.name ?: JSONObject.NULL)
                     .put("placeUrl", e.place?.url ?: JSONObject.NULL)
-                    .put("placeApp", e.place?.app?.key ?: JSONObject.NULL),
+                    .put("placeApp", e.place?.app?.key ?: JSONObject.NULL)
+                    .put("timeline", JSONArray().also { arr ->
+                        e.timeline.forEach { s ->
+                            arr.put(
+                                JSONObject()
+                                    .put("start", s.start.toString())
+                                    .put("end", s.end?.toString() ?: JSONObject.NULL)
+                                    .put("title", s.title)
+                                    .put("placeName", s.place?.name ?: JSONObject.NULL)
+                                    .put("placeUrl", s.place?.url ?: JSONObject.NULL)
+                                    .put("placeApp", s.place?.app?.key ?: JSONObject.NULL),
+                            )
+                        }
+                    }),
             )
         }
         return json.toString()
@@ -138,6 +151,23 @@ object WidgetStore {
                             if (o.isNull("placeUrl")) null else o.optString("placeUrl"),
                             MapApp.from(if (o.isNull("placeApp")) null else o.optString("placeApp")),
                         ),
+                        timeline = o.optJSONArray("timeline")?.let { arr ->
+                            (0 until arr.length()).mapNotNull { j ->
+                                val s = arr.getJSONObject(j)
+                                runCatching {
+                                    TimeSlot(
+                                        start = LocalTime.parse(s.getString("start")),
+                                        end = if (s.isNull("end")) null else LocalTime.parse(s.getString("end")),
+                                        title = s.optString("title"),
+                                        place = if (s.isNull("placeName")) null else Place(
+                                            s.getString("placeName"),
+                                            if (s.isNull("placeUrl")) null else s.optString("placeUrl"),
+                                            MapApp.from(if (s.isNull("placeApp")) null else s.optString("placeApp")),
+                                        ),
+                                    )
+                                }.getOrNull()
+                            }
+                        }.orEmpty(),
                     )
                 }.getOrNull()
             }

@@ -3,6 +3,20 @@ package com.uridul.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.launch
+import java.time.temporal.ChronoUnit
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.offset
@@ -38,10 +52,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -85,9 +104,10 @@ fun CalendarContent(
     val today = rememberToday()
     val grid = remember(month) { CalendarMath.monthGrid(month) }
     val birthdays = remember(couple) { couple.birthdays() }
-    val specials = remember(couple.startDate, couple.countFromOne, birthdays, grid) {
-        SpecialDays.between(couple.startDate, couple.countFromOne, birthdays, grid.first(), grid.last())
+    val specialsFor: (List<LocalDate>) -> Map<LocalDate, List<SpecialDay>> = remember(couple.startDate, couple.countFromOne, birthdays) {
+        { g -> SpecialDays.between(couple.startDate, couple.countFromOne, birthdays, g.first(), g.last()) }
     }
+    val specials = remember(specialsFor, grid) { specialsFor(grid) }
     val selectedEvents = remember(events, selected) { CalendarMath.eventsOn(events, selected) }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -100,7 +120,7 @@ fun CalendarContent(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 MonthCalendar(
-                    month, grid, events, specials, selected, today, myUid, onSelect, onAdd, onMonthChange,
+                    month, events, specialsFor, selected, today, myUid, onSelect, onAdd, onMonthChange,
                     fillHeight = true,
                     modifier = Modifier
                         .weight(1.3f)
@@ -127,7 +147,7 @@ fun CalendarContent(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
                 MonthCalendar(
-                    month, grid, events, specials, selected, today, myUid, onSelect, onAdd, onMonthChange,
+                    month, events, specialsFor, selected, today, myUid, onSelect, onAdd, onMonthChange,
                     fillHeight = false,
                     modifier = m,
                 )
@@ -139,12 +159,18 @@ fun CalendarContent(
     }
 }
 
+/** 달 넘기기 페이지: 이번 달을 가운데에 두고 앞뒤로 100년씩 */
+private const val PAGE_CENTER = 1200
+private const val PAGE_COUNT = 2401
+
+/**
+ * 한 달 달력. 좌우로 밀면 손가락을 따라 다음/이전 달이 부드럽게 넘어온다 (화살표도 같은 애니메이션).
+ */
 @Composable
 private fun MonthCalendar(
     month: YearMonth,
-    grid: List<LocalDate>,
     events: List<CalendarEvent>,
-    specials: Map<LocalDate, List<SpecialDay>>,
+    specialsFor: (List<LocalDate>) -> Map<LocalDate, List<SpecialDay>>,
     selected: LocalDate,
     today: LocalDate,
     myUid: String,
@@ -154,35 +180,59 @@ private fun MonthCalendar(
     fillHeight: Boolean,
     modifier: Modifier,
 ) {
-    val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
+    val base = remember { YearMonth.now() }
+    fun pageOf(m: YearMonth) = PAGE_CENTER + ChronoUnit.MONTHS.between(base, m).toInt()
+    fun monthOf(page: Int): YearMonth = base.plusMonths((page - PAGE_CENTER).toLong())
+    val pagerState = rememberPagerState(initialPage = pageOf(month)) { PAGE_COUNT }
+    val scope = rememberCoroutineScope()
+    val latestMonth by rememberUpdatedState(month)
+    val latestOnMonthChange by rememberUpdatedState(onMonthChange)
+
+    // 밖에서 달이 바뀌면(오늘 버튼·위젯·다른 달 날짜 누르기) 그 달로 넘긴다 (멀면 바로, 가까우면 슬라이드)
+    LaunchedEffect(month) {
+        val target = pageOf(month)
+        if (pagerState.currentPage != target && !pagerState.isScrollInProgress) {
+            if (abs(pagerState.currentPage - target) > 3) pagerState.scrollToPage(target) else pagerState.animateScrollToPage(target)
+        }
+    }
+    // 넘기기가 끝나면 그 달 일정을 불러온다
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            val m = monthOf(page)
+            if (m != latestMonth) latestOnMonthChange(m)
+        }
+    }
+    val shownMonth = monthOf(pagerState.currentPage)
+
     Card(
-        modifier = modifier.pointerInput(month) {
-            // 좌우로 밀어서 달 넘기기
-            var total = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { total = 0f },
-                onDragEnd = {
-                    if (abs(total) > swipeThreshold) onMonthChange(if (total < 0) month.plusMonths(1) else month.minusMonths(1))
-                },
-                onHorizontalDrag = { _, amount -> total += amount },
-            )
-        },
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
             // 머리글: < 2026년 10월 >
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { onMonthChange(month.minusMonths(1)) }) {
+                IconButton(onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달")
                 }
-                Text(
-                    "${month.year}년 ${month.monthValue}월",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
+                AnimatedContent(
+                    targetState = shownMonth,
+                    transitionSpec = {
+                        val forward = targetState > initialState
+                        (slideInHorizontally { w -> if (forward) w / 3 else -w / 3 } + fadeIn()) togetherWith
+                            (slideOutHorizontally { w -> if (forward) -w / 3 else w / 3 } + fadeOut())
+                    },
+                    label = "month-title",
                     modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { onMonthChange(month.plusMonths(1)) }) {
+                ) { m ->
+                    Text(
+                        "${m.year}년 ${m.monthValue}월",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                IconButton(onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달")
                 }
             }
@@ -202,17 +252,49 @@ private fun MonthCalendar(
                     )
                 }
             }
-            // 6주 (여러 날 일정은 칸을 가로지르는 막대로 이어서 그린다)
-            BoxWithConstraints(if (fillHeight) Modifier.weight(1f) else Modifier) {
+            HorizontalPager(
+                state = pagerState,
+                beyondViewportPageCount = 1,
+                verticalAlignment = Alignment.Top,
+                modifier = if (fillHeight) Modifier.weight(1f) else Modifier,
+            ) { page ->
+                val pageMonth = monthOf(page)
+                val grid = remember(pageMonth) { CalendarMath.monthGrid(pageMonth) }
+                val specials = remember(grid, specialsFor) { specialsFor(grid) }
+                MonthGrid(pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, fillHeight)
+            }
+        }
+    }
+}
+
+/** 한 달 6주 칸 (여러 날 일정은 칸을 가로지르는 막대로 이어서 그린다) */
+@Composable
+private fun MonthGrid(
+    month: YearMonth,
+    grid: List<LocalDate>,
+    events: List<CalendarEvent>,
+    specials: Map<LocalDate, List<SpecialDay>>,
+    selected: LocalDate,
+    today: LocalDate,
+    myUid: String,
+    onSelect: (LocalDate) -> Unit,
+    onAdd: (LocalDate) -> Unit,
+    fillHeight: Boolean,
+) {
+            BoxWithConstraints(if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
                 val cellWidth: Dp = maxWidth / 7
                 // 칸이 좁으면(폰 세로) 일정 제목 대신 점·얇은 선으로 표시
                 val showLabels = cellWidth >= 48.dp
                 val rowHeight: Dp = if (fillHeight) maxHeight / 6 else (cellWidth * 1.25f).coerceIn(60.dp, 88.dp)
                 // 날짜 숫자(약 28dp) 아래에 들어가는 줄 수 (한 줄 16dp)
                 val maxLabels = ((rowHeight - CellTop) / LinePitch).toInt().coerceIn(1, 4)
+                // 칸마다 전체 일정을 다시 거르지 않도록 한 달치를 한 번에 계산해 둔다
+                val weeks = remember(grid) { grid.chunked(7) }
+                val dayEvents = remember(events, grid) { grid.associateWith { CalendarMath.eventsOn(events, it) } }
+                val layouts = remember(events, weeks) { weeks.map { CalendarMath.weekLayout(it, events) } }
                 Column {
-                    grid.chunked(7).forEach { week ->
-                        val layout = remember(week, events) { CalendarMath.weekLayout(week, events) }
+                    weeks.forEachIndexed { w, week ->
+                        val layout = layouts[w]
                         Box(Modifier.fillMaxWidth().height(rowHeight)) {
                             Row(Modifier.fillMaxSize()) {
                                 week.forEachIndexed { col, day ->
@@ -222,8 +304,8 @@ private fun MonthCalendar(
                                         isToday = day == today,
                                         isSelected = day == selected,
                                         special = specials[day]?.firstOrNull(),
-                                        allCount = CalendarMath.eventsOn(events, day).size,
-                                        singles = CalendarMath.singleDayEventsOn(events, day),
+                                        allCount = dayEvents[day]?.size ?: 0,
+                                        singles = dayEvents[day].orEmpty().filter { !it.isMultiDay },
                                         lanes = layout.lanesUsed[col],
                                         hiddenBars = layout.bars.count { col in it.startCol..it.endCol && it.lane >= maxLabels },
                                         myUid = myUid,
@@ -252,8 +334,6 @@ private fun MonthCalendar(
                     }
                 }
             }
-        }
-    }
 }
 
 /** 칸 위쪽 여백 + 날짜 숫자 높이 */
@@ -267,6 +347,8 @@ private val ThinPitch = 6.dp
 @Composable
 private fun EventBar(bar: CalendarMath.WeekBar, cellWidth: Dp, showLabel: Boolean, mine: Boolean, inMonth: Boolean) {
     val color = if (mine) CoupleColors.mine else CoupleColors.partner
+    // 막대는 파스텔 바탕 + 진한 글자 (기본 연핑크, 메뉴에서 색 변경)
+    val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
     val alpha = if (inMonth) 1f else 0.45f
     val startInset = if (bar.continuesLeft) 0.dp else 3.dp
     val endInset = if (bar.continuesRight) 0.dp else 3.dp
@@ -288,7 +370,7 @@ private fun EventBar(bar: CalendarMath.WeekBar, cellWidth: Dp, showLabel: Boolea
         Text(
             if (bar.continuesLeft) "… ${bar.event.title}" else bar.event.title,
             style = style,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            color = CoupleColors.onFill.copy(alpha = alpha),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             softWrap = false,
@@ -297,7 +379,7 @@ private fun EventBar(bar: CalendarMath.WeekBar, cellWidth: Dp, showLabel: Boolea
                 .width(width)
                 .height(14.dp)
                 .clip(shape)
-                .background(color.copy(alpha = 0.32f * alpha))
+                .background(fill.copy(alpha = alpha))
                 .padding(horizontal = 4.dp),
         )
     } else {
@@ -360,11 +442,18 @@ private fun DayCell(
         if (isSelected) append(", 한 번 더 누르면 일정 추가")
     }
 
+    // 선택한 날: 바탕색이 부드럽게 물들고 날짜 숫자가 통통 튄다
+    val selectedBg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isSelected) scheme.primaryContainer else Color.Transparent,
+        animationSpec = androidx.compose.animation.core.tween(220),
+        label = "day-bg",
+    )
+    val numberScale = bounceScale(isSelected, selectedScale = 1.15f)
     Column(
         modifier
             .padding(1.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) scheme.primaryContainer else Color.Transparent)
+            .clip(RoundedCornerShape(10.dp))
+            .background(selectedBg)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .semantics { contentDescription = description }
             .padding(top = 3.dp, start = 2.dp, end = 2.dp),
@@ -373,6 +462,10 @@ private fun DayCell(
         Box(
             Modifier
                 .size(24.dp)
+                .graphicsLayer {
+                    scaleX = numberScale
+                    scaleY = numberScale
+                }
                 .then(if (isToday) Modifier.background(scheme.primary, CircleShape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
@@ -417,11 +510,11 @@ private fun DayCell(
             val fitsAll = hiddenBars == 0 && singles.size <= room
             val shown = if (fitsAll) singles else singles.take((room - 1).coerceAtLeast(0))
             shown.forEach { e ->
-                val color = if (e.createdBy == myUid) CoupleColors.mine else CoupleColors.partner
+                val fill = if (e.createdBy == myUid) CoupleColors.mineFill else CoupleColors.partnerFill
                 Text(
                     e.title,
                     style = smallStyle,
-                    color = scheme.onSurface.copy(alpha = alpha),
+                    color = CoupleColors.onFill.copy(alpha = alpha),
                     maxLines = 1,
                     overflow = TextOverflow.Clip,
                     // 띄어쓰기에서 줄바꿈되어 "Fold test2" 가 "Fold" 로만 보이던 문제 방지
@@ -429,8 +522,8 @@ private fun DayCell(
                     modifier = Modifier
                         .padding(top = 1.dp)
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(color.copy(alpha = 0.22f * alpha))
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(fill.copy(alpha = alpha))
                         .padding(horizontal = 2.dp),
                 )
             }
@@ -500,77 +593,165 @@ private fun DayPanel(
     }
 }
 
+/**
+ * 선택한 날의 일정 카드.
+ *  - 위: 제목, 날짜(여러 날이면 기간), 누가 등록했는지
+ *  - 아래: 하루 종일 한 줄 또는 타임라인(시작~끝·내용) 여러 줄, 각 줄 오른쪽에 장소 태그 / [장소 찾기]
+ * 카드를 누르면 수정, 장소 태그를 누르면 그 지도 앱에서 바로 열림.
+ */
 @Composable
 private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdit: (CalendarEvent) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val mine = event.createdBy == myUid
     val color = if (mine) CoupleColors.mine else CoupleColors.partner
     val who = if (mine) couple.myName(myUid) else (couple.names[event.createdBy] ?: "상대")
-    val whenText = buildString {
-        append(event.time?.format(KoreanTime) ?: "하루 종일")
-        if (event.isMultiDay) append(" · ${event.date.format(KoreanMonthDay)} ~ ${event.endDate.format(KoreanMonthDay)}")
-    }
+    /** 장소를 찾을 줄 (-1: 하루 종일 줄), null 이면 지도 고르기 창 닫힘 */
+    var findingSlot by remember { mutableStateOf<Int?>(null) }
+    val press = remember { MutableInteractionSource() }
 
     Card(
         onClick = { onEdit(event) },
+        interactionSource = press,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressBounce(press),
     ) {
-        Row(Modifier.padding(12.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .width(4.dp)
-                    .height(40.dp)
-                    .background(color, RoundedCornerShape(2.dp)),
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(event.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(whenText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                event.place?.let { place ->
-                    // 누르면 저장된 지도 앱에서 그 장소를 바로 연다 (API 없이 링크로)
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    Text(
-                        "📍 ${place.name}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(top = 2.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { MapLinks.open(context, place) }
-                            .semantics { contentDescription = "${place.name}, ${(place.app ?: com.uridul.app.data.MapApp.NAVER).label}에서 열기" }
-                            .padding(vertical = 2.dp),
-                    )
+        Column(Modifier.padding(12.dp)) {
+            Row(Modifier.heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .width(4.dp)
+                        .height(40.dp)
+                        .background(color, RoundedCornerShape(2.dp)),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(event.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (event.isMultiDay) {
+                        Text(
+                            "${event.date.format(KoreanMonthDay)} ~ ${event.endDate.format(KoreanMonthDay)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                if (event.memo.isNotBlank()) {
+                Spacer(Modifier.width(8.dp))
+                // 누가 등록했는지: 캐릭터 얼굴 + 이름
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CharacterAvatar(couple.characterOf(event.createdBy), 30.dp, contentDescription = "$who 등록")
                     Text(
-                        event.memo,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        who,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
                     )
                 }
             }
-            Spacer(Modifier.width(8.dp))
-            // 누가 등록했는지: 캐릭터 얼굴 + 이름
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CharacterAvatar(couple.characterOf(event.createdBy), 30.dp, contentDescription = "$who 등록")
+
+            // 타임라인 (하루 종일이면 한 줄)
+            Column(
+                Modifier.padding(start = 16.dp, top = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (event.allDay) {
+                    TimelineLine(
+                        timeText = "하루 종일",
+                        title = "",
+                        place = event.place,
+                        onFind = { findingSlot = -1 },
+                        onOpen = { MapLinks.open(context, it) },
+                    )
+                } else {
+                    event.slots.forEachIndexed { i, slot ->
+                        TimelineLine(
+                            timeText = slotTimeText(event, slot),
+                            title = slot.title,
+                            place = slot.place,
+                            onFind = { findingSlot = i },
+                            onOpen = { MapLinks.open(context, it) },
+                        )
+                    }
+                }
+            }
+
+            if (event.memo.isNotBlank()) {
                 Text(
-                    who,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = color,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
-                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                    event.memo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                 )
             }
         }
     }
+
+    findingSlot?.let { slot ->
+        MapChooserDialog(
+            onDismiss = { findingSlot = null },
+            onChoose = { app ->
+                findingSlot = null
+                // 지도 앱에서 공유하면 이 일정·이 줄에 바로 저장된다
+                PlaceInbox.expectEvent(event.id, slot)
+                val query = event.slots.getOrNull(slot)?.title?.takeIf { it.isNotBlank() } ?: event.title
+                MapLinks.startSearch(context, app, query)
+            },
+        )
+    }
 }
+
+/** 타임라인 한 줄: 시간(+내용) 왼쪽, 장소 태그 / [장소 찾기] 오른쪽 */
+@Composable
+private fun TimelineLine(
+    timeText: String,
+    title: String,
+    place: com.uridul.app.data.Place?,
+    onFind: () -> Unit,
+    onOpen: (com.uridul.app.data.Place) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // 타임라인 점 대신 작은 하트
+        Text("♥", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                timeText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (title.isNotBlank()) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        PlaceTag(place = place, onFind = onFind, onOpen = onOpen)
+    }
+}
+
+/** "오후 6:30 ~ 오후 8:00", 여러 날 일정이면 "8.7 오후 4:00 ~ 8.14 오후 5:00" */
+private fun slotTimeText(event: CalendarEvent, slot: com.uridul.app.data.TimeSlot): String {
+    val startText = slot.start.format(KoreanTime)
+    val endText = slot.end?.format(KoreanTime)
+    return if (event.isMultiDay) {
+        val from = "${event.date.monthValue}.${event.date.dayOfMonth} $startText"
+        if (endText == null) from else "$from ~ ${event.endDate.monthValue}.${event.endDate.dayOfMonth} $endText"
+    } else {
+        if (endText == null) startText else "$startText ~ $endText"
+    }
+}
+
 
 /** 선택한 날의 기념일 한 줄: 우리 기념일·생일은 분홍 바탕, 연인 기념일은 연한 바탕 */
 @Composable

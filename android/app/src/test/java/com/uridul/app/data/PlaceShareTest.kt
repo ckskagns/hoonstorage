@@ -39,4 +39,24 @@ class PlaceShareTest {
     fun emptyReturnsNull() {
         assertNull(PlaceShare.parse("  ", null))
     }
+
+    @Test
+    fun appUriFromPlaceLinks() {
+        val pkg = "com.uridul.app"
+        assertEquals(
+            "nmap://place?id=2023130036&appname=com.uridul.app",
+            PlaceLinks.appUri(MapApp.NAVER, "https://map.naver.com/p/entry/place/2023130036?placePath=%2Fhome", pkg),
+        )
+        assertEquals(
+            "nmap://place?id=1936878162&appname=com.uridul.app",
+            PlaceLinks.appUri(MapApp.NAVER, "https://m.place.naver.com/restaurant/1936878162/home", pkg),
+        )
+        assertEquals("kakaomap://place?id=12345678", PlaceLinks.appUri(MapApp.KAKAO, "https://place.map.kakao.com/12345678", pkg))
+        assertEquals(
+            "https://www.google.com/maps/place/abc",
+            PlaceLinks.appUri(MapApp.GOOGLE, "https://www.google.com/maps/place/abc", pkg),
+        )
+        assertNull(PlaceLinks.appUri(MapApp.NAVER, "https://naver.me/abc", pkg))
+        assertEquals(true, PlaceLinks.isShortLink("https://naver.me/abc"))
+    }
 }

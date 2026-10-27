@@ -2,6 +2,7 @@ package com.uridul.app.domain
 
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.TimeSlot
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -105,6 +106,16 @@ object CalendarMath {
             draft.endDate.isBefore(draft.date) -> "끝나는 날이 시작하는 날보다 빨라요."
             ChronoUnit.DAYS.between(draft.date, draft.endDate) >= CalendarEvent.MAX_SPAN_DAYS ->
                 "여러 날 일정은 ${CalendarEvent.MAX_SPAN_DAYS}일까지 만들 수 있어요."
+            draft.time != null && draft.timeline.size > TimeSlot.MAX_SLOTS ->
+                "시간대는 ${TimeSlot.MAX_SLOTS}개까지 넣을 수 있어요."
+            draft.time != null && draft.date != draft.endDate && draft.timeline.size > 1 ->
+                "여러 날 일정은 시간대를 하나만 넣을 수 있어요."
+            draft.timeline.any { it.title.length > TimeSlot.TITLE_MAX } ->
+                "시간대 내용은 ${TimeSlot.TITLE_MAX}자까지 쓸 수 있어요."
+            // 하루 일정은 끝나는 시각이 시작보다 늦어야 한다 (여러 날 일정은 마지막 날 시각이라 비교하지 않음)
+            draft.time != null && draft.date == draft.endDate &&
+                draft.timeline.any { s -> s.end != null && !s.end.isAfter(s.start) } ->
+                "끝나는 시간이 시작 시간보다 빨라요."
             else -> null
         }
     }

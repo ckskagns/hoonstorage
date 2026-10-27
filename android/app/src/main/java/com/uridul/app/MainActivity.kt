@@ -40,6 +40,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
+            // 앱에서 고른 화면 모드(화이트/다크)에 맞춰 상태 표시줄 글자색도 바꾼다
+            val dark = com.uridul.app.ui.theme.isAppInDarkTheme()
+            androidx.compose.runtime.LaunchedEffect(dark) {
+                val style = androidx.activity.SystemBarStyle.auto(
+                    android.graphics.Color.TRANSPARENT,
+                    android.graphics.Color.TRANSPARENT,
+                ) { dark }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
             UridulTheme {
                 UridulRoot(viewModel)
             }
@@ -141,6 +150,8 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onUpdateProfile = viewModel::updateProfile,
             onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
             notifyEnabled = notifyEnabled,
+            onAttachPlace = viewModel::attachPlace,
+            onColorsChanged = viewModel::refreshWidgets,
             onSetNotify = { enabled ->
                 viewModel.setNotifyEnabled(enabled)
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)

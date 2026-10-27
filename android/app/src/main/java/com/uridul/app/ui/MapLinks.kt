@@ -7,6 +7,13 @@ import android.net.Uri
 import android.widget.Toast
 import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
+import com.uridul.app.data.PlaceLinks
+import com.uridul.app.data.PlaceShare
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,7 +62,6 @@ object MapLinks {
             start(context, storeIntent(app)) || start(context, webSearch(app, query))
             return false
         }
-        PlaceInbox.expect()
         if (start(context, searchIntent(context, app, query.ifBlank { "맛집" }))) {
             Toast.makeText(context, "장소를 고른 뒤 공유 → 우리둘 을 눌러 주세요", Toast.LENGTH_LONG).show()
             return true
@@ -65,17 +71,37 @@ object MapLinks {
 
     /** 저장된 장소 열기: 링크 → 그 지도 앱에서, 링크가 없으면 이름으로 검색 */
     fun open(context: Context, place: Place) {
-        val app = place.app ?: place.url?.let { com.uridul.app.data.PlaceShare.appOf(it) } ?: MapApp.NAVER
+        val appContext = context.applicationContext
+        val app = place.app ?: place.url?.let { PlaceShare.appOf(it) } ?: MapApp.NAVER
         val url = place.url
-        if (url != null) {
-            val view = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            // 앱이 있으면 그 앱으로 바로, 안 되면 기본(브라우저·앱 링크)으로
-            if (isInstalled(context, app) && start(context, Intent(view).setPackage(app.packageName))) return
-            if (start(context, view)) return
+        if (url == null || !PlaceLinks.isShortLink(url)) {
+            openResolved(appContext, place, app, url)
+            return
         }
-        if (isInstalled(context, app) && start(context, searchIntent(context, app, place.name))) return
+        // 짧은 링크는 실제 주소를 알아낸 뒤 연다 (네트워크, 최대 몇 초)
+        scope.launch {
+            val resolved = withContext(Dispatchers.IO) { PlaceLinks.resolveRedirects(url) }
+            openResolved(appContext, place, PlaceShare.appOf(resolved) ?: app, resolved)
+        }
+    }
+
+    private fun openResolved(context: Context, place: Place, app: MapApp, url: String?) {
+        val installed = isInstalled(context, app)
+        // 1) 지도 앱에서 그 장소를 바로 (장소 번호·지도 주소)
+        val appUri = url?.let { PlaceLinks.appUri(app, it, context.packageName) }
+        if (installed && appUri != null) {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(appUri))
+            if (app == MapApp.GOOGLE) intent.setPackage(app.packageName)
+            if (start(context, intent)) return
+        }
+        // 2) 지도 앱에서 이름으로 검색
+        if (installed && start(context, searchIntent(context, app, place.name))) return
+        // 3) 앱이 없으면 링크(브라우저) 또는 웹 지도 검색
+        if (url != null && start(context, Intent(Intent.ACTION_VIEW, Uri.parse(url)))) return
         start(context, webSearch(app, place.name))
     }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private fun start(context: Context, intent: Intent): Boolean = try {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -95,13 +121,30 @@ object PlaceInbox {
     private val _place = MutableStateFlow<Place?>(null)
     val place: StateFlow<Place?> = _place.asStateFlow()
 
-    /** 장소 찾기를 시작했다는 표시 (지금은 기록만, 공유 처리와 무관) */
-    @Volatile
-    var expecting: Boolean = false
-        private set
+    /** 일정 카드의 [장소 찾기] 에서 시작했으면 (일정 ID, 시간대 번호: -1 은 하루 종일) */
+    data class EventSlot(val eventId: String, val slot: Int)
 
-    fun expect() {
-        expecting = true
+    @Volatile
+    private var target: EventSlot? = null
+
+    @Volatile
+    private var targetAt = 0L
+
+    /** 카드에서 시작한 장소 찾기 (10분이 지나면 잊는다: 한참 뒤의 공유가 엉뚱한 일정에 들어가지 않게) */
+    val eventTarget: EventSlot?
+        get() = target?.takeIf { System.currentTimeMillis() - targetAt < TARGET_TTL_MS }
+
+    private const val TARGET_TTL_MS = 10 * 60 * 1000L
+
+    /** 입력 창에서 장소 찾기를 시작함 (받은 장소는 입력 창이 가져간다) */
+    fun expectEditor() {
+        target = null
+    }
+
+    /** 저장된 일정 카드에서 장소 찾기를 시작함 (받은 장소를 그 일정에 바로 저장) */
+    fun expectEvent(eventId: String, slot: Int) {
+        target = EventSlot(eventId, slot)
+        targetAt = System.currentTimeMillis()
     }
 
     fun offer(place: Place) {
@@ -110,6 +153,6 @@ object PlaceInbox {
 
     fun consume() {
         _place.value = null
-        expecting = false
+        target = null
     }
 }
