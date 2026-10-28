@@ -75,6 +75,8 @@ class PhotoHooks(
     val onUpload: (event: CalendarEvent, uris: List<Uri>, inAlbum: Int) -> Unit = { _, _, _ -> },
     val onDelete: (PhotoMeta) -> Unit = {},
     val loadFull: suspend (id: String) -> ByteArray? = { null },
+    /** 이번 주 장수 다시 세기 (사진첩 사진이 바뀔 때) */
+    val refreshWeek: () -> Unit = {},
     /** 추억 슬라이드 배경 사진 (일정ID_날짜 → 작은 사진) */
     val memoryThumbs: Map<String, ByteArray> = emptyMap(),
 )
@@ -94,6 +96,8 @@ fun rememberPhotoBitmap(key: String, bytes: ByteArray?): ImageBitmap? =
 fun AlbumStrip(event: CalendarEvent, couple: Couple, myUid: String) {
     val hooks = LocalPhotos.current
     val photos by remember(event.id, event.date) { hooks.album(event) }.collectAsState(initial = emptyList())
+    // 사진이 늘거나 줄면(상대가 올린 것 포함) 이번 주 장수를 다시 센다
+    LaunchedEffect(photos.map { it.id }) { hooks.refreshWeek() }
     var viewing by remember { mutableStateOf<Int?>(null) }
     val room = PhotoQuota.remaining(hooks.weekUsed, photos.size)
     val weekFull = hooks.weekUsed >= PhotoQuota.WEEKLY_LIMIT

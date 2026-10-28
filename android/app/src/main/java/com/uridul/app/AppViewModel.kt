@@ -348,10 +348,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val photoUploading: StateFlow<Boolean> = _uploading.asStateFlow()
 
     /** 이번 주 사진 수 다시 세기 (사진은 받지 않고 개수만) */
+    private var weekCountJob: kotlinx.coroutines.Job? = null
+
     fun refreshWeekPhotoCount() {
         val ready = state.value as? AppState.Ready ?: return
         val repo = container.photos ?: return
-        viewModelScope.launch {
+        // 여러 사진첩이 한꺼번에 불러도 한 번만 센다
+        if (weekCountJob?.isActive == true) return
+        weekCountJob = viewModelScope.launch {
             runCatching { repo.countWeek(ready.couple.id, PhotoQuota.weekKey(LocalDate.now())) }
                 .onSuccess { _weekPhotoCount.value = it }
         }
