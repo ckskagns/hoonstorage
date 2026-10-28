@@ -1,9 +1,9 @@
 {
-    "versionCode":  9,
-    "versionName":  "0.8.0",
-    "notes":  "일정 사진첩(한 주 25장, 지우면 다시 올리기), 지난 한 달 추억 슬라이드, 데이트 한 줄 후기·다녀와서 좋았던 곳, 앱 안 알림(종 아이콘)",
-    "size":  47185332,
-    "sha256":  "30ac2b28876afc7b9f05891e7b602d75a64c673c4785b78ef06ef18f6466ee6c",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.8.0/uridul.apk",
-    "releasedAt":  "2026-10-28T14:34:29+09:00"
+    "versionCode":  10,
+    "versionName":  "0.8.1",
+    "notes":  "사진첩·추억 슬라이드가 더 빠르고 가볍게(슬라이드 사진은 필요한 것만, 사진 미리 풀기), 사진 지운 직후 앱이 꺼질 수 있던 문제 수정, 안드로이드 12 알림 수정",
+    "size":  47201716,
+    "sha256":  "49faefbc1d21e6e4d4598b64c5aef514bfbb357cf934c87c1960790704f0b9c2",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.8.1/uridul.apk",
+    "releasedAt":  "2026-10-28T15:03:42+09:00"
 }
