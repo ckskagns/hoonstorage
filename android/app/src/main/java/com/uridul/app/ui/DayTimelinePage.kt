@@ -221,6 +221,8 @@ fun DayTimelinePage(
                     // 하루 종일 / 여러 날 일정
                     if (allDay.isNotEmpty()) {
                         AllDayRow(allDay, myUid, edit?.draft?.id ?: if (edit?.isNew == true && edit.slot < 0) NEW_ID else null) { e ->
+                            // 아직 저장 안 한 새 일정(미리보기)을 누르면 지금 편집을 그대로 둔다
+                            if (e.id == NEW_ID) return@AllDayRow
                             guard { error = null; setEdit(editOf(e)) }
                         }
                     }
@@ -237,7 +239,15 @@ fun DayTimelinePage(
                             scrollToMinute = edit?.let { e -> e.draft.timeline.getOrNull(e.slot)?.start?.toSecondOfDay()?.div(60) }
                                 ?: placed.minOfOrNull { it.block.startMin }
                                 ?: if (date == today) java.time.LocalTime.now().toSecondOfDay() / 60 else 9 * 60,
-                            onBlock = { b -> guard { error = null; setEdit(editOf(b.event, b.slotIndex)) } },
+                            onBlock = { b ->
+                                val current = edit
+                                // 저장 전 새 일정(미리보기)의 블록이면 그 시간대로만 옮긴다 (가짜 "기존 일정" 이 되지 않게)
+                                if (b.event.id == NEW_ID) {
+                                    if (current != null && current.slot >= 0) setEdit(current.copy(slot = b.slotIndex.coerceIn(0, current.draft.timeline.lastIndex.coerceAtLeast(0))))
+                                } else {
+                                    guard { error = null; setEdit(editOf(b.event, b.slotIndex)) }
+                                }
+                            },
                             onEmpty = { minute -> guard { error = null; setEdit(newEdit(date, today, at = minute)) } },
                             onOpenPlace = { MapLinks.open(context, it) },
                         )
