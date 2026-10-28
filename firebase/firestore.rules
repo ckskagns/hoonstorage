@@ -148,6 +148,46 @@ service cloud.firestore {
         allow delete: if isCoupleMember();
       }
 
+      // 데이트 한 줄 후기: 일정 하루마다 두 사람 각자 한 줄 + 하트 1~5개. 자기 후기만 바꿀 수 있다
+      match /reviews/{reviewId} {
+        function couplesMembers() {
+          return get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+
+        function validReview(d) {
+          return d.keys().hasOnly(['eventId', 'date', 'title', 'placeName', 'placeUrl', 'placeApp', 'reviews', 'updatedBy', 'updatedAt'])
+            && d.eventId is string && d.eventId.size() > 0 && d.eventId.size() <= 128
+            && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && d.title is string && d.title.size() <= 100
+            && (!('placeName' in d) || d.placeName == null || (d.placeName is string && d.placeName.size() <= 100))
+            && (!('placeUrl' in d) || d.placeUrl == null || (d.placeUrl is string && d.placeUrl.size() <= 500 && d.placeUrl.matches('^https?://.*')))
+            && (!('placeApp' in d) || d.placeApp == null || d.placeApp in ['naver', 'kakao', 'google'])
+            && d.reviews is map && d.reviews.size() <= 2
+            && d.reviews.keys().hasOnly(couplesMembers())
+            && d.updatedBy == request.auth.uid;
+        }
+
+        // 내 후기 모양: 한 줄(100자) + 하트 1~5
+        function validMine(d) {
+          return !(request.auth.uid in d.reviews)
+            || (d.reviews[request.auth.uid] is map
+                && d.reviews[request.auth.uid].keys().hasOnly(['text', 'hearts'])
+                && d.reviews[request.auth.uid].text is string && d.reviews[request.auth.uid].text.size() <= 100
+                && d.reviews[request.auth.uid].hearts is int
+                && d.reviews[request.auth.uid].hearts >= 1 && d.reviews[request.auth.uid].hearts <= 5);
+        }
+
+        allow read: if signedIn() && request.auth.uid in couplesMembers();
+        allow create: if signedIn() && request.auth.uid in couplesMembers()
+          && validReview(request.resource.data) && validMine(request.resource.data);
+        allow update: if signedIn() && request.auth.uid in couplesMembers()
+          && validReview(request.resource.data) && validMine(request.resource.data)
+          && request.resource.data.reviews.diff(resource.data.reviews).affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.eventId == resource.data.eventId
+          && request.resource.data.date == resource.data.date;
+        allow delete: if signedIn() && request.auth.uid in couplesMembers();
+      }
+
       // 가고 싶은 곳: 지도 앱에서 공유받은 장소 목록 (두 사람만)
       match /wishes/{wishId} {
         function isWishMember() {

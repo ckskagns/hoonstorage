@@ -126,6 +126,9 @@ fun ReadyScreen(
     importPreview: com.uridul.app.data.ImportPreview? = null,
     onConfirmImport: () -> Unit = {},
     onCancelImport: () -> Unit = {},
+    /** 추억 슬라이드 */
+    memories: List<com.uridul.app.domain.Memories.Slide> = emptyList(),
+    onLoadMemories: (LocalDate) -> Unit = {},
 ) {
     // 공유받은 장소를 어디에 담을지 묻는 창
     var placeChoice by remember { mutableStateOf<Place?>(null) }
@@ -312,7 +315,13 @@ fun ReadyScreen(
                 ) { shownTab ->
                 val content = Modifier.fillMaxSize()
                 when (shownTab) {
-                    Tab.Home -> HomeContent(couple, myUid, busy, onInvite, content)
+                    Tab.Home -> HomeContent(
+                        couple, myUid, busy, onInvite, content,
+                        memories = memories,
+                        onLoadMemories = onLoadMemories,
+                        // 추억 카드를 누르면 그 날 하루 페이지에서 그 일정
+                        onOpenMemory = { e -> select(e.date); openDay(e.date, focus = e.id) },
+                    )
                     Tab.Calendar -> CalendarContent(
                         couple = couple,
                         myUid = myUid,
@@ -331,11 +340,11 @@ fun ReadyScreen(
                         couple = couple,
                         myUid = myUid,
                         // 날짜를 고르면 그 날 하루 페이지에서 이 장소로 새 일정
-                        onPlan = { w, date ->
+                        onPlan = { place, date ->
                             select(date)
                             openDay(date, new = true)
                             PlaceInbox.expectEditor()
-                            PlaceInbox.offer(w.place)
+                            PlaceInbox.offer(place)
                         },
                         onVisited = { w, v -> onWishVisited(w.id, v) },
                         onMemo = { w, m -> onWishMemo(w.id, m) },

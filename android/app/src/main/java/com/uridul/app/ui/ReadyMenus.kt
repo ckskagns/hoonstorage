@@ -113,20 +113,20 @@ internal fun PlaceChoiceDialog(
 /** 백업 불러오기 전 확인: 파일 내용과 새로 더할 것 */
 @Composable
 internal fun ImportPreviewDialog(preview: ImportPreview, onConfirm: () -> Unit, onCancel: () -> Unit) {
-    val hasNew = preview.newEvents.isNotEmpty() || preview.newWishes.isNotEmpty()
+    val hasNew = preview.newEvents.isNotEmpty() || preview.newWishes.isNotEmpty() || preview.newReviews.isNotEmpty()
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text("백업 불러오기") },
         text = {
             Text(
                 buildString {
-                    append("파일: 일정 ${preview.data.events.size}개 · 가고 싶은 곳 ${preview.data.wishes.size}곳")
+                    append("파일: 일정 ${preview.data.events.size}개 · 가고 싶은 곳 ${preview.data.wishes.size}곳 · 후기 ${preview.data.reviews.size}개")
                     if (preview.data.exportedAt.isNotBlank()) append("\n저장한 때: ${preview.data.exportedAt.replace('T', ' ')}")
                     append("\n\n")
                     if (!hasNew) {
                         append("지금 달력에 모두 있어서 더할 것이 없어요.")
                     } else {
-                        append("지금 없는 일정 ${preview.newEvents.size}개 · 장소 ${preview.newWishes.size}곳을 더해요.\n이미 있는 것은 바꾸지 않아요.")
+                        append("지금 없는 일정 ${preview.newEvents.size}개 · 장소 ${preview.newWishes.size}곳 · 후기 ${preview.newReviews.size}개를 더해요.\n이미 있는 것은 바꾸지 않아요.")
                     }
                 },
             )

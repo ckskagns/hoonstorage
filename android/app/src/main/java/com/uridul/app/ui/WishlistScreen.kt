@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.uridul.app.data.Couple
 import com.uridul.app.data.WishPlace
 import java.time.LocalDate
@@ -57,7 +58,7 @@ fun WishlistContent(
     wishes: List<WishPlace>,
     couple: Couple,
     myUid: String,
-    onPlan: (WishPlace, LocalDate) -> Unit,
+    onPlan: (com.uridul.app.data.Place, LocalDate) -> Unit,
     onVisited: (WishPlace, Boolean) -> Unit,
     onMemo: (WishPlace, String) -> Unit,
     onDelete: (WishPlace) -> Unit,
@@ -65,7 +66,9 @@ fun WishlistContent(
 ) {
     val context = LocalContext.current
     var choosingMap by remember { mutableStateOf(false) }
-    var planning by remember { mutableStateOf<WishPlace?>(null) }
+    var planning by remember { mutableStateOf<com.uridul.app.data.Place?>(null) }
+    val reviewsNow = LocalReviews.current.reviews
+    val loved = remember(reviewsNow) { lovedPlaces(reviewsNow.values) }
     var editingMemo by remember { mutableStateOf<WishPlace?>(null) }
     var deleting by remember { mutableStateOf<WishPlace?>(null) }
     val todo = wishes.filter { !it.visited }
@@ -107,8 +110,22 @@ fun WishlistContent(
             }
         }
         items(todo, key = { it.id }) { w ->
-            WishCard(w, couple, myUid, onOpen = { MapLinks.open(context, w.place) }, onPlan = { planning = w },
+            WishCard(w, couple, myUid, onOpen = { MapLinks.open(context, w.place) }, onPlan = { planning = w.place },
                 onVisited = { onVisited(w, true) }, onMemo = { editingMemo = w }, onDelete = { deleting = w })
+        }
+        if (loved.isNotEmpty()) {
+            item {
+                Text(
+                    "다녀와서 좋았던 곳 💞 ${loved.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(top = 12.dp, start = 4.dp),
+                )
+            }
+            items(loved, key = { "loved_" + it.place.name }) { lp ->
+                LovedCard(lp, onOpen = { MapLinks.open(context, lp.place) }, onPlan = { planning = lp.place })
+            }
         }
         if (done.isNotEmpty()) {
             item {
@@ -121,7 +138,7 @@ fun WishlistContent(
                 )
             }
             items(done, key = { it.id }) { w ->
-                WishCard(w, couple, myUid, onOpen = { MapLinks.open(context, w.place) }, onPlan = { planning = w },
+                WishCard(w, couple, myUid, onOpen = { MapLinks.open(context, w.place) }, onPlan = { planning = w.place },
                     onVisited = { onVisited(w, false) }, onMemo = { editingMemo = w }, onDelete = { deleting = w })
             }
         }
@@ -137,14 +154,14 @@ fun WishlistContent(
             },
         )
     }
-    planning?.let { w ->
+    planning?.let { place ->
         StartDatePickerDialog(
             initial = LocalDate.now(),
-            title = "📍 ${w.place.name} 언제 갈까요?",
+            title = "📍 ${place.name} 언제 갈까요?",
             onDismiss = { planning = null },
             onConfirm = { date ->
                 planning = null
-                onPlan(w, date)
+                onPlan(place, date)
             },
         )
     }
@@ -242,3 +259,30 @@ private fun WishCard(
 }
 
 private fun Modifier.clip14(): Modifier = clip(RoundedCornerShape(14.dp))
+
+/** 후기 하트가 높았던 곳: 이름(누르면 지도) + 평균 하트 + 몇 번 + 마지막 한 줄 + [또 가자] */
+@Composable
+private fun LovedCard(lp: LovedPlace, onOpen: () -> Unit, onPlan: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
+    ) {
+        Row(Modifier.padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).clip14().clickable(onClick = onOpen).padding(vertical = 2.dp)) {
+                Text("💞 ${lp.place.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HeartsRow(kotlin.math.round(lp.averageHearts).toInt(), 13.sp)
+                    Text(
+                        "  ${"%.1f".format(lp.averageHearts)} · ${lp.visits}번 · ${lp.lastDate.monthValue}/${lp.lastDate.dayOfMonth}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (lp.lastText.isNotBlank()) {
+                    Text("“${lp.lastText}”", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            FilledTonalButton(onClick = onPlan, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("📅 또 가자") }
+        }
+    }
+}

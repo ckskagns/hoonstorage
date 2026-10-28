@@ -234,6 +234,10 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                     modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                 )
             }
+            // 지난 일정(오늘 포함)이면 한 줄 후기
+            if (!event.date.isAfter(rememberToday())) {
+                ReviewStrip(event = event, couple = couple, myUid = myUid)
+            }
         }
     }
 

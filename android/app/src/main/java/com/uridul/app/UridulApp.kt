@@ -65,4 +65,9 @@ class AppContainer(context: Context) {
     val wishes: com.uridul.app.data.WishRepository? by lazy {
         if (firebaseReady) com.uridul.app.data.WishRepository(FirebaseFirestore.getInstance()) else null
     }
+
+    /** 데이트 한 줄 후기 */
+    val reviews: com.uridul.app.data.ReviewRepository? by lazy {
+        if (firebaseReady) com.uridul.app.data.ReviewRepository(FirebaseFirestore.getInstance()) else null
+    }
 }

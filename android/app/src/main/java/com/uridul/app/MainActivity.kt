@@ -91,6 +91,8 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val deletedEvents by viewModel.deletedEvents.collectAsStateWithLifecycle()
     val wishes by viewModel.wishes.collectAsStateWithLifecycle()
     val importPreview by viewModel.importPreview.collectAsStateWithLifecycle()
+    val reviews by viewModel.reviews.collectAsStateWithLifecycle()
+    val memories by viewModel.memories.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumeAfterPermission() }
@@ -136,7 +138,9 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onJoin = viewModel::join,
             onSignOut = { viewModel.signOut(context) },
         )
-        is AppState.Ready -> ReadyScreen(
+        is AppState.Ready -> androidx.compose.runtime.CompositionLocalProvider(
+            com.uridul.app.ui.LocalReviews provides com.uridul.app.ui.ReviewHooks(reviews, viewModel::saveReview, viewModel::deleteMyReview),
+        ) { ReadyScreen(
             couple = s.couple,
             myUid = s.myUid,
             busy = busy,
@@ -172,11 +176,13 @@ private fun UridulRoot(viewModel: AppViewModel) {
             importPreview = importPreview,
             onConfirmImport = viewModel::confirmImport,
             onCancelImport = viewModel::cancelImport,
+            memories = memories,
+            onLoadMemories = viewModel::loadMemories,
             onSetNotify = { enabled ->
                 viewModel.setNotifyEnabled(enabled)
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
             },
             onSignOut = { viewModel.signOut(context) },
-        )
+        ) }
     }
 }

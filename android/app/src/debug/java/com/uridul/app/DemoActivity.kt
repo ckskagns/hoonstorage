@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -91,6 +92,9 @@ class DemoActivity : ComponentActivity() {
             ev("6", 3, "렌터카", "11:00", me),
             ev("7", 9, "엄마 생신", null, partner),
             ev("8", -4, "카페 투어", "14:00", me),
+            ev("10", -2, "영화 데이트", "19:30", partner),
+            ev("11", -9, "선릉감자탕 저녁", "18:30", me).copy(place = com.uridul.app.data.Place("선릉감자탕", null, com.uridul.app.data.MapApp.NAVER)),
+            ev("12", -20, "한강 산책", null, partner),
             // 반복 일정: 매주 같은 요일 운동 (열흘 전부터)
             ev("9", -10, "같이 운동", "07:30", partner).copy(repeat = com.uridul.app.data.Repeat.WEEKLY),
         )
@@ -137,6 +141,17 @@ class DemoActivity : ComponentActivity() {
                     if (i >= 0) events[i] = events[i].copy(skip = if (skipped) events[i].skip + day else events[i].skip - day)
                 }
                 val range = CalendarMath.queryRange(month)
+                val reviews = remember { mutableStateMapOf<String, com.uridul.app.data.DateReview>() }
+                val hooks = com.uridul.app.ui.ReviewHooks(
+                    reviews = reviews.toMap(),
+                    onSave = { e, hearts, text ->
+                        val id = com.uridul.app.data.DateReview.idOf(e.id, e.date)
+                        val old = reviews[id]
+                        reviews[id] = com.uridul.app.data.DateReview(id, e.id, e.date, e.title, e.place, (old?.entries.orEmpty() + (me to com.uridul.app.data.ReviewEntry(text, hearts))))
+                    },
+                    onDelete = { r -> reviews.remove(r.id) },
+                )
+                androidx.compose.runtime.CompositionLocalProvider(com.uridul.app.ui.LocalReviews provides hooks) {
                 ReadyScreen(
                     undo = undo,
                     onUndo = {
@@ -193,7 +208,9 @@ class DemoActivity : ComponentActivity() {
                     onSetCountFromOne = {},
                     onUpdateProfile = { _, _, _ -> },
                     onSignOut = {},
+                    memories = com.uridul.app.domain.Memories.slides(today, events.toList()),
                 )
+                }
             }
         }
     }

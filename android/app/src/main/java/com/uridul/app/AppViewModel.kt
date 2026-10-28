@@ -16,6 +16,9 @@ import com.uridul.app.data.DeletedEvent
 import com.uridul.app.data.DeletedEvents
 import com.uridul.app.data.UndoItem
 import com.uridul.app.data.WishPlace
+import com.uridul.app.data.DateReview
+import com.uridul.app.data.ReviewEntry
+import com.uridul.app.domain.Memories
 import com.uridul.app.data.Backup
 import com.uridul.app.data.BackupFiles
 import com.uridul.app.data.ImportPreview
@@ -330,6 +333,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         container.wishes?.delete(ready.couple.id, id) { e -> _message.value = e.toUserMessage() ?: "지우지 못했어요." }
     }
 
+    // ── 데이트 한 줄 후기 ─────────────────────────────────
+
+    /** 전체 후기 (일정ID_날짜 → 후기) */
+    val reviews: StateFlow<Map<String, DateReview>> = run {
+        val repo = container.reviews
+        if (repo == null) {
+            MutableStateFlow(emptyMap())
+        } else {
+            readyCoupleId
+                .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repo.observe(id) }
+                .map { list -> list.associateBy { it.id } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+        }
+    }
+
+    /** 내 후기 저장 ([event] 는 그 날 기준 일정) */
+    fun saveReview(event: CalendarEvent, hearts: Int, text: String) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.reviews ?: return
+        if (text.length > ReviewEntry.TEXT_MAX || hearts !in ReviewEntry.HEARTS) return
+        repo.save(ready.couple.id, ready.myUid, event, ReviewEntry(text, hearts)) { e ->
+            _message.value = e.toUserMessage() ?: "후기를 저장하지 못했어요."
+        }
+        _message.value = "💗 후기를 남겼어요"
+    }
+
+    fun deleteMyReview(review: DateReview) {
+        val ready = state.value as? AppState.Ready ?: return
+        container.reviews?.deleteMine(ready.couple.id, ready.myUid, review) { e ->
+            _message.value = e.toUserMessage() ?: "후기를 지우지 못했어요."
+        }
+    }
+
+    // ── 추억 슬라이드 (작년 오늘 · 지난 한 달) ─────────────
+
+    private val _memories = MutableStateFlow<List<Memories.Slide>>(emptyList())
+    val memories: StateFlow<List<Memories.Slide>> = _memories.asStateFlow()
+    private var memoriesLoadedFor: Pair<String, LocalDate>? = null
+
+    /** 홈을 볼 때 하루에 한 번 받아온다 (몇 년 전 같은 날 + 지난 한 달) */
+    fun loadMemories(today: LocalDate) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.events ?: return
+        val key = ready.couple.id to today
+        if (memoriesLoadedFor == key) return
+        memoriesLoadedFor = key
+        viewModelScope.launch {
+            val events = runCatching {
+                Memories.queryRanges(today).flatMap { repo.fetchRange(ready.couple.id, it) }
+            }.getOrElse {
+                memoriesLoadedFor = null
+                return@launch
+            }
+            _memories.value = Memories.slides(today, events)
+        }
+    }
+
     // ── 백업 파일 ─────────────────────────────────────────
 
     private val _importPreview = MutableStateFlow<ImportPreview?>(null)
@@ -341,6 +401,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ready = state.value as? AppState.Ready ?: return@launchBusy
         val events = container.events?.fetchAll(ready.couple.id).orEmpty()
         val wishList = container.wishes?.fetchAll(ready.couple.id).orEmpty()
+        val reviewList = container.reviews?.fetchAll(ready.couple.id).orEmpty()
         val text = Backup.encode(
             events = events,
             wishes = wishList,
@@ -348,9 +409,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             countFromOne = ready.couple.countFromOne,
             names = ready.couple.names,
             exportedAt = java.time.LocalDateTime.now().withNano(0).toString(),
+            reviews = reviewList,
         )
         BackupFiles.write(getApplication(), uri, text)
-        _message.value = "백업 파일을 저장했어요 (일정 ${events.size}개 · 가고 싶은 곳 ${wishList.size}곳)"
+        _message.value = "백업 파일을 저장했어요 (일정 ${events.size}개 · 가고 싶은 곳 ${wishList.size}곳 · 후기 ${reviewList.size}개)"
     }
 
     /** 백업 파일을 읽고, 지금 없는 것만 골라 확인 창을 띄운다 */
@@ -360,7 +422,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val data = Backup.decode(text)
         val eventIds = container.events?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()
         val wishIds = container.wishes?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()
-        _importPreview.value = Backup.preview(data, eventIds, wishIds)
+        val reviewIds = container.reviews?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()
+        _importPreview.value = Backup.preview(data, eventIds, wishIds, reviewIds)
     }
 
     fun cancelImport() {
@@ -381,7 +444,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val owner = w.createdBy.takeIf { it in members } ?: ready.myUid
             container.wishes?.restore(ready.couple.id, ready.myUid, w, owner) { _message.value = "일부 장소를 더하지 못했어요. 다시 불러와 주세요." }
         }
-        _message.value = "백업에서 일정 ${preview.newEvents.size}개 · 가고 싶은 곳 ${preview.newWishes.size}곳을 더했어요"
+        preview.newReviews.forEach { r ->
+            container.reviews?.restore(ready.couple.id, ready.myUid, r.copy(entries = r.entries.filterKeys { it in members })) { _message.value = "일부 후기를 더하지 못했어요. 다시 불러와 주세요." }
+        }
+        _message.value = "백업에서 일정 ${preview.newEvents.size}개 · 가고 싶은 곳 ${preview.newWishes.size}곳 · 후기 ${preview.newReviews.size}개를 더했어요"
     }
 
     // ── 일정 검색 ─────────────────────────────────────────

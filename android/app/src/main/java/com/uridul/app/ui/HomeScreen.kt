@@ -41,8 +41,14 @@ fun HomeContent(
     busy: Boolean,
     onInvite: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 추억 슬라이드 (지난 한 달·몇 년 전 같은 날) */
+    memories: List<com.uridul.app.domain.Memories.Slide> = emptyList(),
+    onLoadMemories: (java.time.LocalDate) -> Unit = {},
+    onOpenMemory: (com.uridul.app.data.CalendarEvent) -> Unit = {},
 ) {
     val today = rememberToday()
+    // 날이 바뀌면 추억을 다시 받아온다 (하루에 한 번)
+    androidx.compose.runtime.LaunchedEffect(today) { onLoadMemories(today) }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         // 폭에 따라 1단/2단
@@ -78,6 +84,7 @@ fun HomeContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (!couple.isPaired) InviteBanner(busy, onInvite)
+                        MemorySlides(memories, couple, myUid, onOpenMemory)
                         MilestoneCard(milestones, today, Modifier.fillMaxWidth())
                     }
                 }
@@ -96,6 +103,7 @@ fun HomeContent(
                         .widthIn(max = 560.dp)
                     HeroCard(couple, myUid, today, m)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
+                    MemorySlides(memories, couple, myUid, onOpenMemory, m)
                     MilestoneCard(milestones, today, m)
                 }
             }

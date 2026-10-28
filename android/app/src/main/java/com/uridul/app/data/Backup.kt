@@ -10,6 +10,7 @@ data class BackupData(
     val startDate: LocalDate?,
     val events: List<CalendarEvent>,
     val wishes: List<WishPlace>,
+    val reviews: List<DateReview> = emptyList(),
 )
 
 /** 불러오기 전에 보여줄 요약: 파일에 있는 것 중 지금 없는 것만 더한다 */
@@ -17,6 +18,7 @@ data class ImportPreview(
     val data: BackupData,
     val newEvents: List<CalendarEvent>,
     val newWishes: List<WishPlace>,
+    val newReviews: List<DateReview> = emptyList(),
 )
 
 /**
@@ -43,6 +45,7 @@ object Backup {
         countFromOne: Boolean?,
         names: Map<String, String>,
         exportedAt: String,
+        reviews: List<DateReview> = emptyList(),
     ): String {
         val couple = JSONObject()
             .put("startDate", startDate?.toString() ?: JSONObject.NULL)
@@ -69,6 +72,17 @@ object Backup {
             // 반복 일정은 원본 하나로 (펼친 날짜가 아니라)
             .put("events", JSONArray(WidgetStore.encode(events.map { it.asSeries() }.distinctBy { it.id })))
             .put("wishes", wishArr)
+            .put("reviews", JSONArray().also { arr ->
+                reviews.forEach { r ->
+                    arr.put(
+                        JSONObject()
+                            .put("id", r.id).put("eventId", r.eventId).put("date", r.date.toString()).put("title", r.title)
+                            .put("placeName", r.place?.name ?: JSONObject.NULL).put("placeUrl", r.place?.url ?: JSONObject.NULL)
+                            .put("placeApp", r.place?.app?.key ?: JSONObject.NULL)
+                            .put("entries", JSONObject().also { m -> r.entries.forEach { (uid, e) -> m.put(uid, JSONObject().put("text", e.text).put("hearts", e.hearts)) } }),
+                    )
+                }
+            })
             .toString(2)
     }
 
@@ -101,15 +115,38 @@ object Backup {
         }.orEmpty()
         val couple = root.optJSONObject("couple")
         val start = couple?.optString("startDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-        return BackupData(root.optString("exportedAt"), start, events, wishes)
+        val reviews = root.optJSONArray("reviews")?.let { arr ->
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                runCatching {
+                    val entries = o.getJSONObject("entries").let { m ->
+                        m.keys().asSequence().mapNotNull { uid ->
+                            val e = m.getJSONObject(uid)
+                            val hearts = e.optInt("hearts", 0).takeIf { it in ReviewEntry.HEARTS } ?: return@mapNotNull null
+                            uid to ReviewEntry(e.optString("text").take(ReviewEntry.TEXT_MAX), hearts)
+                        }.toMap()
+                    }
+                    DateReview(
+                        id = o.getString("id").also { require(it.matches(SafeId)) },
+                        eventId = o.getString("eventId"),
+                        date = LocalDate.parse(o.getString("date")),
+                        title = o.optString("title").take(CalendarEvent.TITLE_MAX),
+                        place = if (o.isNull("placeName")) null else Place(o.getString("placeName").take(Place.NAME_MAX), if (o.isNull("placeUrl")) null else o.optString("placeUrl"), MapApp.from(if (o.isNull("placeApp")) null else o.optString("placeApp"))),
+                        entries = entries,
+                    )
+                }.getOrNull()
+            }
+        }.orEmpty()
+        return BackupData(root.optString("exportedAt"), start, events, wishes, reviews)
     }
 
     /** 지금 서버에 없는 것만 고른다 (같은 ID 가 있으면 건너뜀) */
-    fun preview(data: BackupData, existingEventIds: Set<String>, existingWishIds: Set<String>): ImportPreview =
+    fun preview(data: BackupData, existingEventIds: Set<String>, existingWishIds: Set<String>, existingReviewIds: Set<String> = emptySet()): ImportPreview =
         ImportPreview(
             data = data,
             newEvents = data.events.filter { it.id !in existingEventIds },
             newWishes = data.wishes.filter { it.id !in existingWishIds },
+            newReviews = data.reviews.filter { it.id !in existingReviewIds },
         )
 }
 
