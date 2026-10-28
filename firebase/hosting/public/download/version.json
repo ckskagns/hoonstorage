@@ -1,9 +1,9 @@
 {
-    "versionCode":  8,
-    "versionName":  "0.7.0",
-    "notes":  "공휴일·대체공휴일 빨간 날, 일정 검색, 지운 일정 되돌리기·최근 지운 일정, 일정별 알림 시간, 반복 일정(매주·매달·매년·이 날만 빼기), 가고 싶은 곳 목록, 백업 파일 저장·불러오기",
-    "size":  46792116,
-    "sha256":  "fd38c80fbd3bd353152549ea5354ca4c1396317705cc4259a628b03a97c33370",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.7.0/uridul.apk",
-    "releasedAt":  "2026-10-28T11:24:05+09:00"
+    "versionCode":  9,
+    "versionName":  "0.8.0",
+    "notes":  "일정 사진첩(한 주 25장, 지우면 다시 올리기), 지난 한 달 추억 슬라이드, 데이트 한 줄 후기·다녀와서 좋았던 곳, 앱 안 알림(종 아이콘)",
+    "size":  47185332,
+    "sha256":  "30ac2b28876afc7b9f05891e7b602d75a64c673c4785b78ef06ef18f6466ee6c",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.8.0/uridul.apk",
+    "releasedAt":  "2026-10-28T14:34:29+09:00"
 }
