@@ -1,9 +1,9 @@
 {
-    "versionCode":  7,
-    "versionName":  "0.5.2",
-    "notes":  "홈 화면 위젯도 앱에서 고른 화면 모드(화이트·다크)와 일정 색을 따라가요.",
-    "size":  46333364,
-    "sha256":  "885a017188cb36bae72a769740c97916fa0badfdccb627ce94e85058627c613e",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.5.2/uridul.apk",
-    "releasedAt":  "2026-10-27T19:50:46+09:00"
+    "versionCode":  8,
+    "versionName":  "0.7.0",
+    "notes":  "공휴일·대체공휴일 빨간 날, 일정 검색, 지운 일정 되돌리기·최근 지운 일정, 일정별 알림 시간, 반복 일정(매주·매달·매년·이 날만 빼기), 가고 싶은 곳 목록, 백업 파일 저장·불러오기",
+    "size":  46792116,
+    "sha256":  "fd38c80fbd3bd353152549ea5354ca4c1396317705cc4259a628b03a97c33370",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.7.0/uridul.apk",
+    "releasedAt":  "2026-10-28T11:24:05+09:00"
 }
