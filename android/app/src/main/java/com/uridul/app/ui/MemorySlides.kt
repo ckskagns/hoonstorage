@@ -159,6 +159,10 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
     val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
     val other = if (mine) CoupleColors.partnerFill else CoupleColors.mineFill
     val review = LocalReviews.current.of(e)
+    val photoKey = com.uridul.app.data.PhotoMeta.albumKey(e.id, e.date)
+    val photo = rememberPhotoBitmap(photoKey, LocalPhotos.current.memoryThumbs[photoKey])
+    // 사진 위에는 흰 글자, 그림 카드에는 진한 글자
+    val ink = if (photo != null) Color.White else CoupleColors.onFill
     val place = e.place ?: e.slots.firstOrNull { it.place != null }?.place
     Box(
         modifier
@@ -169,15 +173,21 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
             .clickable(onClick = onClick)
             .semantics { contentDescription = "${slide.label} ${e.title}, 눌러서 그 날 보기" },
     ) {
-        // 배경의 큰 그림 (오른쪽 아래, 살짝 투명)
-        Text(
-            slide.emoji,
-            fontSize = 96.sp,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 10.dp, bottom = 4.dp)
-                .graphicsLayer { alpha = 0.9f; rotationZ = -8f },
-        )
+        if (photo != null) {
+            // 그 날 사진이 있으면 사진을 깔고, 글자가 잘 보이게 아래쪽을 어둡게
+            androidx.compose.foundation.Image(photo, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0x99000000)))))
+        } else {
+            // 사진이 없으면 큰 그림 (오른쪽 아래, 살짝 투명)
+            Text(
+                slide.emoji,
+                fontSize = 96.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 10.dp, bottom = 4.dp)
+                    .graphicsLayer { alpha = 0.9f; rotationZ = -8f },
+            )
+        }
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -194,7 +204,7 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
                 Text(
                     e.date.format(KoreanMonthDay),
                     style = MaterialTheme.typography.labelLarge,
-                    color = CoupleColors.onFill.copy(alpha = 0.8f),
+                    color = ink.copy(alpha = 0.8f),
                 )
                 Spacer(Modifier.weight(1f))
                 CharacterAvatar(couple.characterOf(e.createdBy), 28.dp)
@@ -204,7 +214,7 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
                 e.title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = CoupleColors.onFill,
+                color = ink,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(0.72f),
@@ -213,7 +223,7 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
                 Text(
                     "📍 ${it.name}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CoupleColors.onFill.copy(alpha = 0.85f),
+                    color = ink.copy(alpha = 0.85f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(0.72f),
@@ -227,7 +237,7 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
                     Text(
                         "“${best.text}”",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CoupleColors.onFill,
+                        color = ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth(0.72f),
@@ -239,7 +249,7 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
                     "💗 한 줄 후기 남기기",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = CoupleColors.onFill,
+                    color = ink,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .background(Color(0x55FFFFFF))

@@ -66,6 +66,11 @@ class AppContainer(context: Context) {
         if (firebaseReady) com.uridul.app.data.WishRepository(FirebaseFirestore.getInstance()) else null
     }
 
+    /** 일정 사진첩 */
+    val photos: com.uridul.app.data.PhotoRepository? by lazy {
+        if (firebaseReady) com.uridul.app.data.PhotoRepository(FirebaseFirestore.getInstance()) else null
+    }
+
     /** 데이트 한 줄 후기 */
     val reviews: com.uridul.app.data.ReviewRepository? by lazy {
         if (firebaseReady) com.uridul.app.data.ReviewRepository(FirebaseFirestore.getInstance()) else null

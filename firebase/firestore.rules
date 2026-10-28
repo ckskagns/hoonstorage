@@ -188,6 +188,36 @@ service cloud.firestore {
         allow delete: if signedIn() && request.auth.uid in couplesMembers();
       }
 
+      // 일정 사진첩: 작은 사진(목록) 문서 + 큰 사진 문서. 올리기·지우기만 (고치기 없음)
+      // 크기 제한: 작은 사진 40KB·큰 사진 200KB (앱이 줄여서 올림, 여유를 두고 검사)
+      match /photos/{photoId} {
+        function photoMember() {
+          return signedIn() && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+        allow read, delete: if photoMember();
+        allow create: if photoMember()
+          && request.resource.data.keys().hasOnly(['eventId', 'date', 'week', 'thumb', 'width', 'height', 'uploadedBy', 'uploadedAt'])
+          && request.resource.data.eventId is string && request.resource.data.eventId.size() <= 128
+          && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.resource.data.week is string && request.resource.data.week.size() <= 10
+          && request.resource.data.thumb is bytes && request.resource.data.thumb.size() <= 45000
+          && request.resource.data.width is int && request.resource.data.height is int
+          && request.resource.data.uploadedBy == request.auth.uid;
+        allow update: if false;
+      }
+
+      match /photoData/{photoId} {
+        function dataMember() {
+          return signedIn() && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+        allow read, delete: if dataMember();
+        allow create: if dataMember()
+          && request.resource.data.keys().hasOnly(['data', 'uploadedBy'])
+          && request.resource.data.data is bytes && request.resource.data.data.size() <= 210000
+          && request.resource.data.uploadedBy == request.auth.uid;
+        allow update: if false;
+      }
+
       // 가고 싶은 곳: 지도 앱에서 공유받은 장소 목록 (두 사람만)
       match /wishes/{wishId} {
         function isWishMember() {

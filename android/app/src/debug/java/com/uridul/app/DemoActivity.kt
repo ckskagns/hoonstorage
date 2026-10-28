@@ -49,6 +49,33 @@ class DemoActivity : ComponentActivity() {
         }
         // 백업 점검: 실제 서버 데이터로 백업 파일을 앱 전용 폴더에 저장 → 다시 읽어 불러오기 요약 계산 (서버에 쓰지 않음)
         //   adb shell am start -n com.uridul.app/.DemoActivity --ez backupProbe true
+        // 사진첩 점검: 그림을 만들어 실제 서버에 올린다 (사진 고르기 창 없이). 제목이 test0 으로 시작하는 일정에만
+        //   adb shell am start -n com.uridul.app/.DemoActivity --es photoProbe <일정ID> --es photoDate yyyy-MM-dd --ei photoCount 2
+        intent.getStringExtra("photoProbe")?.let { eventId ->
+            lifecycleScope.launch {
+                val log = StringBuilder()
+                runCatching {
+                    val snap = WidgetStore.load(applicationContext) ?: error("연결 정보 없음")
+                    val coupleId = snap.coupleId ?: error("커플 ID 없음")
+                    val uid = snap.myUid ?: error("내 ID 없음")
+                    val date = LocalDate.parse(intent.getStringExtra("photoDate"))
+                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val event = com.uridul.app.data.EventRepository(db).fetchRange(coupleId, date..date).firstOrNull { it.id == eventId }
+                        ?: error("일정 없음")
+                    require(event.title.startsWith("test0")) { "test0 일정만" }
+                    val repo = com.uridul.app.data.PhotoRepository(db)
+                    repeat(intent.getIntExtra("photoCount", 1)) { i ->
+                        val photo = demoPhoto(i)
+                        repo.upload(coupleId, uid, event, photo, LocalDate.now())
+                        log.append("up${i}:${photo.photo.size}/${photo.thumb.size} ")
+                    }
+                    log.append("week=${repo.countWeek(coupleId, com.uridul.app.domain.PhotoQuota.weekKey(LocalDate.now()))}")
+                }.onFailure { log.append("FAIL ${it.message}") }
+                android.util.Log.i("UridulProbe", log.toString())
+                finish()
+            }
+            return
+        }
         if (intent.getBooleanExtra("backupProbe", false)) {
             lifecycleScope.launch {
                 val log = StringBuilder()
@@ -161,7 +188,37 @@ class DemoActivity : ComponentActivity() {
                     },
                     onDelete = { r -> reviews.remove(r.id) },
                 )
-                androidx.compose.runtime.CompositionLocalProvider(com.uridul.app.ui.LocalReviews provides hooks) {
+                // 사진첩 점검용 (데모에서만, 서버 없이 이 화면 안에서만)
+                val demoPhotos = remember { mutableStateListOf<com.uridul.app.data.PhotoMeta>() }
+                val demoFull = remember { mutableMapOf<String, ByteArray>() }
+                val photoScope = androidx.compose.runtime.rememberCoroutineScope()
+                val thisWeek = com.uridul.app.domain.PhotoQuota.weekKey(today)
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    if (demoPhotos.isEmpty()) repeat(2) { i ->
+                        val p = demoPhoto(i)
+                        demoFull["dp$i"] = p.photo
+                        demoPhotos += com.uridul.app.data.PhotoMeta("dp$i", "11", today.minusDays(9), thisWeek, p.thumb, p.width, p.height, me, System.currentTimeMillis() + i)
+                    }
+                }
+                val photoHooks = com.uridul.app.ui.PhotoHooks(
+                    album = { e -> androidx.compose.runtime.snapshotFlow { demoPhotos.filter { it.eventId == e.id && it.date == e.date } } },
+                    weekUsed = demoPhotos.count { it.week == thisWeek },
+                    onUpload = { e, uris, inAlbum ->
+                        photoScope.launch {
+                            val room = com.uridul.app.domain.PhotoQuota.remaining(demoPhotos.count { it.week == thisWeek }, inAlbum)
+                            uris.take(room).forEach { uri ->
+                                val p = com.uridul.app.data.PhotoProcessor.process(applicationContext, uri)
+                                val id = "dp" + System.nanoTime()
+                                demoFull[id] = p.photo
+                                demoPhotos += com.uridul.app.data.PhotoMeta(id, e.id, e.date, thisWeek, p.thumb, p.width, p.height, me, System.currentTimeMillis())
+                            }
+                        }
+                    },
+                    onDelete = { p -> demoPhotos.removeAll { it.id == p.id } },
+                    loadFull = { id -> demoFull[id] },
+                    memoryThumbs = demoPhotos.groupBy { it.albumKey }.mapValues { (_, l) -> l.first().thumb },
+                )
+                androidx.compose.runtime.CompositionLocalProvider(com.uridul.app.ui.LocalReviews provides hooks, com.uridul.app.ui.LocalPhotos provides photoHooks) {
                 ReadyScreen(
                     undo = undo,
                     onUndo = {
@@ -227,4 +284,30 @@ class DemoActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/** 점검용 사진: 색 그라데이션 + 큰 글자 (실제 사진처럼 크기를 줄여 JPEG 로) */
+internal fun demoPhoto(i: Int): com.uridul.app.data.ProcessedPhoto {
+    val w = 1600
+    val h = 1200
+    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(bmp)
+    val colors = listOf(intArrayOf(0xFFFFB1C5.toInt(), 0xFF8EC5FF.toInt()), intArrayOf(0xFFFFE0A3.toInt(), 0xFFFF8FA3.toInt()), intArrayOf(0xFFB5F5C8.toInt(), 0xFF7FB4FF.toInt()))[i % 3]
+    val paint = android.graphics.Paint().apply {
+        shader = android.graphics.LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), colors[0], colors[1], android.graphics.Shader.TileMode.CLAMP)
+    }
+    c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+    // 사진처럼 압축이 덜 되도록 잔무늬
+    val dot = android.graphics.Paint().apply { color = 0x22FFFFFF }
+    val rnd = java.util.Random(i.toLong())
+    repeat(4000) { c.drawCircle(rnd.nextFloat() * w, rnd.nextFloat() * h, 2f + rnd.nextFloat() * 6f, dot) }
+    val text = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); textSize = 220f; isFakeBoldText = true }
+    c.drawText("TEST ${i + 1}", 180f, h / 2f + 80f, text)
+    val big = com.uridul.app.data.PhotoProcessor.scale(bmp, com.uridul.app.domain.PhotoQuota.PHOTO_LONG_SIDE)
+    val photo = com.uridul.app.data.PhotoProcessor.compressUnder(big, com.uridul.app.domain.PhotoQuota.PHOTO_MAX_BYTES)
+    val thumb = com.uridul.app.data.PhotoProcessor.compressUnder(
+        com.uridul.app.data.PhotoProcessor.scale(big, com.uridul.app.domain.PhotoQuota.THUMB_LONG_SIDE),
+        com.uridul.app.domain.PhotoQuota.THUMB_MAX_BYTES,
+    )
+    return com.uridul.app.data.ProcessedPhoto(photo, thumb, big.width, big.height)
 }

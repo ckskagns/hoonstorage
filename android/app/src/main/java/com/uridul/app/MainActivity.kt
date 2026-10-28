@@ -97,6 +97,9 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val reviews by viewModel.reviews.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val inbox by viewModel.inbox.collectAsStateWithLifecycle()
+    val weekPhotos by viewModel.weekPhotoCount.collectAsStateWithLifecycle()
+    val photoUploading by viewModel.photoUploading.collectAsStateWithLifecycle()
+    val memoryPhotos by viewModel.memoryPhotos.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumeAfterPermission() }
@@ -144,6 +147,15 @@ private fun UridulRoot(viewModel: AppViewModel) {
         )
         is AppState.Ready -> androidx.compose.runtime.CompositionLocalProvider(
             com.uridul.app.ui.LocalReviews provides com.uridul.app.ui.ReviewHooks(reviews, viewModel::saveReview, viewModel::deleteMyReview),
+            com.uridul.app.ui.LocalPhotos provides com.uridul.app.ui.PhotoHooks(
+                album = viewModel::albumFlow,
+                weekUsed = weekPhotos,
+                uploading = photoUploading,
+                onUpload = viewModel::uploadPhotos,
+                onDelete = viewModel::deletePhoto,
+                loadFull = viewModel::loadPhoto,
+                memoryThumbs = memoryPhotos,
+            ),
         ) { ReadyScreen(
             couple = s.couple,
             myUid = s.myUid,

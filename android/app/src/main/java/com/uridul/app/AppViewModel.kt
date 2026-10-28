@@ -19,6 +19,9 @@ import com.uridul.app.data.WishPlace
 import com.uridul.app.data.DateReview
 import com.uridul.app.data.ReviewEntry
 import com.uridul.app.domain.Memories
+import com.uridul.app.domain.PhotoQuota
+import com.uridul.app.data.PhotoMeta
+import com.uridul.app.data.PhotoProcessor
 import com.uridul.app.data.Backup
 import com.uridul.app.data.BackupFiles
 import com.uridul.app.data.ImportPreview
@@ -335,6 +338,117 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         container.wishes?.delete(ready.couple.id, id) { e -> _message.value = e.toUserMessage() ?: "지우지 못했어요." }
     }
 
+    // ── 일정 사진첩 ───────────────────────────────────────
+
+    private val _weekPhotoCount = MutableStateFlow(0)
+    /** 이번 주(월~일)에 올린, 아직 남아 있는 사진 수 (두 사람 합계) */
+    val weekPhotoCount: StateFlow<Int> = _weekPhotoCount.asStateFlow()
+
+    private val _uploading = MutableStateFlow(false)
+    val photoUploading: StateFlow<Boolean> = _uploading.asStateFlow()
+
+    /** 이번 주 사진 수 다시 세기 (사진은 받지 않고 개수만) */
+    fun refreshWeekPhotoCount() {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.photos ?: return
+        viewModelScope.launch {
+            runCatching { repo.countWeek(ready.couple.id, PhotoQuota.weekKey(LocalDate.now())) }
+                .onSuccess { _weekPhotoCount.value = it }
+        }
+    }
+
+    /** 일정 하루의 사진첩 */
+    fun albumFlow(event: CalendarEvent): Flow<List<PhotoMeta>> {
+        val ready = state.value as? AppState.Ready ?: return flowOf(emptyList())
+        val repo = container.photos ?: return flowOf(emptyList())
+        return repo.observeAlbum(ready.couple.id, event.id, event.date)
+    }
+
+    /**
+     * 사진 올리기: 이번 주 남은 장수·이 일정 남은 장수만큼만 (넘치면 앞에서부터, 안내).
+     * 한 장씩 줄여서 올리고, 올릴 때마다 이번 주 수를 다시 센다.
+     */
+    fun uploadPhotos(event: CalendarEvent, uris: List<android.net.Uri>, inAlbum: Int) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.photos ?: return
+        if (uris.isEmpty() || _uploading.value) return
+        viewModelScope.launch {
+            _uploading.value = true
+            try {
+                val today = LocalDate.now()
+                val used = runCatching { repo.countWeek(ready.couple.id, PhotoQuota.weekKey(today)) }.getOrDefault(_weekPhotoCount.value)
+                _weekPhotoCount.value = used
+                val room = PhotoQuota.remaining(used, inAlbum)
+                if (room == 0) {
+                    _message.value = if (used >= PhotoQuota.WEEKLY_LIMIT) {
+                        "이번 주 사진 ${PhotoQuota.WEEKLY_LIMIT}장을 다 올렸어요. 이번 주에 올린 사진을 지우면 다시 올릴 수 있어요"
+                    } else {
+                        "이 일정에는 사진을 ${PhotoQuota.PER_EVENT_MAX}장까지 올릴 수 있어요"
+                    }
+                    return@launch
+                }
+                var done = 0
+                for (uri in uris.take(room)) {
+                    val photo = PhotoProcessor.process(getApplication(), uri)
+                    repo.upload(ready.couple.id, ready.myUid, event, photo, today)
+                    done++
+                    _weekPhotoCount.value = used + done
+                }
+                _message.value = buildString {
+                    append("📷 사진 ${done}장을 올렸어요")
+                    if (uris.size > room) append(" (남은 ${room}장만, 나머지 ${uris.size - room}장은 빼고)")
+                }
+                refreshMemoryPhotos()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = e.toUserMessage() ?: "사진을 올리지 못했어요."
+            } finally {
+                _uploading.value = false
+                refreshWeekPhotoCount()
+            }
+        }
+    }
+
+    fun deletePhoto(photo: PhotoMeta) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.photos ?: return
+        viewModelScope.launch {
+            runCatching { repo.delete(ready.couple.id, photo.id) }
+                .onSuccess {
+                    _message.value = if (photo.week == PhotoQuota.weekKey(LocalDate.now())) {
+                        "사진을 지웠어요 · 이번 주에 한 장 더 올릴 수 있어요"
+                    } else {
+                        "사진을 지웠어요"
+                    }
+                    refreshMemoryPhotos()
+                }
+                .onFailure { e -> _message.value = (e as? Exception)?.toUserMessage() ?: "사진을 지우지 못했어요." }
+            refreshWeekPhotoCount()
+        }
+    }
+
+    /** 크게 볼 사진 (그때 받아온다) */
+    suspend fun loadPhoto(id: String): ByteArray? {
+        val ready = state.value as? AppState.Ready ?: return null
+        return runCatching { container.photos?.fetchPhoto(ready.couple.id, id) }.getOrNull()
+    }
+
+    private val _memoryPhotos = MutableStateFlow<Map<String, ByteArray>>(emptyMap())
+    /** 추억 슬라이드에 깔 사진 (일정ID_날짜 → 첫 사진의 작은 사진) */
+    val memoryPhotos: StateFlow<Map<String, ByteArray>> = _memoryPhotos.asStateFlow()
+
+    private fun refreshMemoryPhotos() {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.photos ?: return
+        val today = LocalDate.now()
+        viewModelScope.launch {
+            val ranges = Memories.queryRanges(today)
+            val metas = runCatching { ranges.flatMap { repo.fetchRange(ready.couple.id, it.start, it.endInclusive) } }.getOrNull() ?: return@launch
+            _memoryPhotos.value = metas.sortedBy { it.uploadedAtMillis }.groupBy { it.albumKey }.mapValues { (_, list) -> list.first().thumb }
+        }
+    }
+
     // ── 앱 안 알림 (종 아이콘) ────────────────────────────
 
     /** 일정 알림 보관함 (최근 것부터) */
@@ -398,6 +512,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             _memories.value = Memories.slides(today, events)
+            refreshMemoryPhotos()
+            refreshWeekPhotoCount()
         }
     }
 
