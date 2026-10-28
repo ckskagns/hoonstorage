@@ -85,8 +85,13 @@ object Reminders {
         prefs(context).edit().putBoolean(KEY_ASKED, true).apply()
     }
 
+    /** 알림을 보낼 수 있는지 (안드로이드 13 미만은 따로 묻는 권한이 없어서 알림 설정만 본다) */
     fun hasPermission(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        }
 
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -204,6 +209,7 @@ object Reminders {
 
     private fun timeText(e: CalendarEvent): String = e.time?.format(KoreanTime) ?: "종일"
 
+    @android.annotation.SuppressLint("MissingPermission") // 바로 위 hasPermission 으로 확인한 뒤에만 보낸다
     private fun notify(context: Context, id: Int, title: String, lines: List<String>, date: LocalDate) {
         if (!hasPermission(context)) return
         ensureChannel(context)

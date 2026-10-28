@@ -225,70 +225,31 @@ fun ReadyScreen(
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "메뉴")
                         }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("내 프로필 (이름·캐릭터)") },
-                                leadingIcon = {
-                                    CharacterAvatar(couple.myCharacter(myUid), 24.dp)
-                                },
-                                onClick = { menuOpen = false; editingProfile = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("시작일 변경") },
-                                onClick = { menuOpen = false; picking = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("사귄 날을 1일로 계산") },
-                                trailingIcon = { Checkbox(checked = couple.countFromOne, onCheckedChange = null) },
-                                onClick = { menuOpen = false; onSetCountFromOne(!couple.countFromOne) },
-                            )
-                            if (!couple.isPaired) {
-                                DropdownMenuItem(
-                                    text = { Text("초대 링크 보내기") },
-                                    onClick = { menuOpen = false; onInvite() },
-                                )
-                            }
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("일정 알림 (아침 9시·일정 전)") },
-                                trailingIcon = { Checkbox(checked = notifyEnabled, onCheckedChange = null) },
-                                onClick = { menuOpen = false; onSetNotify(!notifyEnabled) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("화면 모드 (${uiSettings.theme.label})") },
-                                onClick = { menuOpen = false; pickingTheme = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("일정 색") },
-                                trailingIcon = {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Box(Modifier.size(14.dp).background(CoupleColors.mineFill, CircleShape))
-                                        Box(Modifier.size(14.dp).background(CoupleColors.partnerFill, CircleShape))
-                                    }
-                                },
-                                onClick = { menuOpen = false; pickingColors = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (deletedEvents.isEmpty()) "최근 지운 일정" else "최근 지운 일정 (${deletedEvents.size})") },
-                                onClick = { menuOpen = false; showingDeleted = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("백업 파일 저장") },
-                                onClick = { menuOpen = false; exportLauncher.launch(com.uridul.app.data.Backup.fileName(LocalDate.now())) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("백업 불러오기") },
-                                onClick = { menuOpen = false; importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
-                                onClick = { menuOpen = false; onCheckUpdate() },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("로그아웃") },
-                                onClick = { menuOpen = false; onSignOut() },
-                            )
-                        }
+                        MainMenu(
+                            expanded = menuOpen,
+                            onDismiss = { menuOpen = false },
+                            couple = couple,
+                            myUid = myUid,
+                            notifyEnabled = notifyEnabled,
+                            themeLabel = uiSettings.theme.label,
+                            deletedCount = deletedEvents.size,
+                            onAction = { action ->
+                                when (action) {
+                                    MenuAction.Profile -> editingProfile = true
+                                    MenuAction.StartDate -> picking = true
+                                    MenuAction.ToggleCountFromOne -> onSetCountFromOne(!couple.countFromOne)
+                                    MenuAction.Invite -> onInvite()
+                                    MenuAction.ToggleNotify -> onSetNotify(!notifyEnabled)
+                                    MenuAction.Theme -> pickingTheme = true
+                                    MenuAction.Colors -> pickingColors = true
+                                    MenuAction.Deleted -> showingDeleted = true
+                                    MenuAction.BackupSave -> exportLauncher.launch(com.uridul.app.data.Backup.fileName(LocalDate.now()))
+                                    MenuAction.BackupLoad -> importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                                    MenuAction.CheckUpdate -> onCheckUpdate()
+                                    MenuAction.SignOut -> onSignOut()
+                                }
+                            },
+                        )
                     },
                 )
             },
@@ -412,59 +373,26 @@ fun ReadyScreen(
     }
 
     placeChoice?.let { place ->
-        AlertDialog(
-            onDismissRequest = { placeChoice = null },
-            title = { Text("📍 ${place.name}") },
-            text = { Text("이 장소를 어디에 담을까요?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    placeChoice = null
-                    tabKey = Tab.Wish.key
-                    onAddWish(place)
-                }) { Text("가고 싶은 곳에 담기") }
+        PlaceChoiceDialog(
+            place = place,
+            selected = selected,
+            onWish = {
+                placeChoice = null
+                tabKey = Tab.Wish.key
+                onAddWish(place)
             },
-            dismissButton = {
-                TextButton(onClick = {
-                    placeChoice = null
-                    // 고른 날 하루 페이지에서 이 장소로 새 일정
-                    openDay(selected, new = true)
-                    PlaceInbox.expectEditor()
-                    PlaceInbox.offer(place)
-                }) { Text("${selected.monthValue}월 ${selected.dayOfMonth}일 일정에 넣기") }
+            onEvent = {
+                placeChoice = null
+                // 고른 날 하루 페이지에서 이 장소로 새 일정
+                openDay(selected, new = true)
+                PlaceInbox.expectEditor()
+                PlaceInbox.offer(place)
             },
+            onDismiss = { placeChoice = null },
         )
     }
 
-    importPreview?.let { p ->
-        AlertDialog(
-            onDismissRequest = onCancelImport,
-            title = { Text("백업 불러오기") },
-            text = {
-                Text(
-                    buildString {
-                        append("파일: 일정 ${p.data.events.size}개 · 가고 싶은 곳 ${p.data.wishes.size}곳")
-                        if (p.data.exportedAt.isNotBlank()) append("\n저장한 때: ${p.data.exportedAt.replace('T', ' ')}")
-                        append("\n\n")
-                        if (p.newEvents.isEmpty() && p.newWishes.isEmpty()) {
-                            append("지금 달력에 모두 있어서 더할 것이 없어요.")
-                        } else {
-                            append("지금 없는 일정 ${p.newEvents.size}개 · 장소 ${p.newWishes.size}곳을 더해요.\n이미 있는 것은 바꾸지 않아요.")
-                        }
-                    },
-                )
-            },
-            confirmButton = {
-                if (p.newEvents.isNotEmpty() || p.newWishes.isNotEmpty()) {
-                    TextButton(onClick = onConfirmImport) { Text("더하기") }
-                } else {
-                    TextButton(onClick = onCancelImport) { Text("확인") }
-                }
-            },
-            dismissButton = {
-                if (p.newEvents.isNotEmpty() || p.newWishes.isNotEmpty()) TextButton(onClick = onCancelImport) { Text("취소") }
-            },
-        )
-    }
+    importPreview?.let { p -> ImportPreviewDialog(p, onConfirm = onConfirmImport, onCancel = onCancelImport) }
 
     if (showingDeleted) {
         DeletedEventsDialog(

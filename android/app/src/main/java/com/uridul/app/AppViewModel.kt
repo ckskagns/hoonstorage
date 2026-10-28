@@ -17,6 +17,7 @@ import com.uridul.app.data.DeletedEvents
 import com.uridul.app.data.UndoItem
 import com.uridul.app.data.WishPlace
 import com.uridul.app.data.Backup
+import com.uridul.app.data.BackupFiles
 import com.uridul.app.data.ImportPreview
 import com.uridul.app.data.toSeriesDates
 import com.uridul.app.domain.Recurrence
@@ -348,26 +349,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             names = ready.couple.names,
             exportedAt = java.time.LocalDateTime.now().withNano(0).toString(),
         )
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val out = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
-                ?: throw UserFacingException("파일을 만들지 못했어요.")
-            out.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-        }
+        BackupFiles.write(getApplication(), uri, text)
         _message.value = "백업 파일을 저장했어요 (일정 ${events.size}개 · 가고 싶은 곳 ${wishList.size}곳)"
     }
 
     /** 백업 파일을 읽고, 지금 없는 것만 골라 확인 창을 띄운다 */
     fun readBackup(uri: android.net.Uri) = launchBusy {
         val ready = state.value as? AppState.Ready ?: return@launchBusy
-        val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val input = getApplication<Application>().contentResolver.openInputStream(uri)
-                ?: throw UserFacingException("파일을 열지 못했어요.")
-            input.use { stream ->
-                val bytes = stream.readBytes()
-                if (bytes.size > Backup.MAX_BYTES) throw UserFacingException("파일이 너무 커요. 우리둘 백업 파일인지 확인해 주세요.")
-                bytes.toString(Charsets.UTF_8)
-            }
-        }
+        val text = BackupFiles.read(getApplication(), uri)
         val data = Backup.decode(text)
         val eventIds = container.events?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()
         val wishIds = container.wishes?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()

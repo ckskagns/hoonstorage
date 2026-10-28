@@ -112,3 +112,22 @@ object Backup {
             newWishes = data.wishes.filter { it.id !in existingWishIds },
         )
 }
+
+/** 백업 파일 쓰기·읽기 (사용자가 고른 파일 주소로, 백그라운드에서) */
+object BackupFiles {
+    suspend fun write(context: android.content.Context, uri: android.net.Uri, text: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val out = context.contentResolver.openOutputStream(uri, "wt") ?: throw UserFacingException("파일을 만들지 못했어요.")
+            out.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+        }
+
+    suspend fun read(context: android.content.Context, uri: android.net.Uri): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val input = context.contentResolver.openInputStream(uri) ?: throw UserFacingException("파일을 열지 못했어요.")
+            input.use { stream ->
+                val bytes = stream.readBytes()
+                if (bytes.size > Backup.MAX_BYTES) throw UserFacingException("파일이 너무 커요. 우리둘 백업 파일인지 확인해 주세요.")
+                bytes.toString(Charsets.UTF_8)
+            }
+        }
+}

@@ -340,7 +340,7 @@ private fun CropFrame(
     latest = state
     val zoomMax = remember { mutableFloatStateOf(5f) }
 
-    BoxWithConstraints(modifier) {
+    Box(modifier) {
         Box(
             Modifier
                 .fillMaxWidth()
