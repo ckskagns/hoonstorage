@@ -63,7 +63,34 @@ class EventRepository(private val db: FirebaseFirestore) {
      * 실패하면 onError 로 알린다.
      */
     fun save(coupleId: String, uid: String, draft: EventDraft, onError: (Exception) -> Unit) {
-        val data = mutableMapOf<String, Any?>(
+        val data = dataOf(draft, uid)
+        val task = if (draft.id == null) {
+            data["createdBy"] = uid
+            data["createdAt"] = FieldValue.serverTimestamp()
+            events(coupleId).document().set(data)
+        } else {
+            events(coupleId).document(draft.id).update(data)
+        }
+        task.addOnFailureListener(onError)
+    }
+
+    /** 일정 전체 목록 (검색용). 오프라인이면 폰에 남아 있는 것만. */
+    suspend fun fetchAll(coupleId: String): List<CalendarEvent> =
+        events(coupleId).orderBy("date").get().await().documents.mapNotNull { it.toEvent() }
+
+    /**
+     * 지운 일정 되돌리기: 같은 문서 ID 로 다시 만든다 (만든 사람은 원래 그대로).
+     * 상대가 만든 일정도 되돌릴 수 있도록 규칙에서 createdBy 가 커플 멤버이면 허용한다.
+     */
+    fun restore(coupleId: String, uid: String, event: CalendarEvent, onError: (Exception) -> Unit) {
+        val data = dataOf(event.toDraft(), uid)
+        data["createdBy"] = event.createdBy.ifEmpty { uid }
+        data["createdAt"] = FieldValue.serverTimestamp()
+        events(coupleId).document(event.id).set(data).addOnFailureListener(onError)
+    }
+
+    private fun dataOf(draft: EventDraft, uid: String): MutableMap<String, Any?> {
+        return mutableMapOf<String, Any?>(
             "title" to draft.title.trim(),
             "date" to draft.date.toString(),
             "endDate" to draft.endDate.toString(),
@@ -80,17 +107,11 @@ class EventRepository(private val db: FirebaseFirestore) {
                     "place" to placeMap(s.place),
                 )
             },
+            // 알림 시간 (몇 분 전, 끄기 -1). 기본값이면 비워 둔다
+            "remind" to draft.remind?.takeIf { it in Remind.allowed },
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
-        val task = if (draft.id == null) {
-            data["createdBy"] = uid
-            data["createdAt"] = FieldValue.serverTimestamp()
-            events(coupleId).document().set(data)
-        } else {
-            events(coupleId).document(draft.id).update(data)
-        }
-        task.addOnFailureListener(onError)
     }
 
     fun delete(coupleId: String, eventId: String, onError: (Exception) -> Unit) {
@@ -146,6 +167,7 @@ class EventRepository(private val db: FirebaseFirestore) {
                     place = parsePlace(m["place"]),
                 )
             },
+            remind = (get("remind") as? Number)?.toInt()?.takeIf { it in Remind.allowed },
         )
     }
 

@@ -304,6 +304,7 @@ private fun MonthGrid(
                                         isToday = day == today,
                                         isSelected = day == selected,
                                         special = specials[day]?.firstOrNull(),
+                                        holiday = com.uridul.app.domain.Holidays.isHoliday(day),
                                         allCount = dayEvents[day]?.size ?: 0,
                                         singles = dayEvents[day].orEmpty().filter { !it.isMultiDay },
                                         lanes = layout.lanesUsed[col],
@@ -401,6 +402,8 @@ private fun DayCell(
     isToday: Boolean,
     isSelected: Boolean,
     special: SpecialDay?,
+    /** 공휴일·대체공휴일이면 일요일처럼 빨간 숫자 */
+    holiday: Boolean,
     /** 이 날의 전체 일정 수 (여러 날 일정 포함) */
     allCount: Int,
     /** 하루 일정 (여러 날 일정은 막대로 따로 그림) */
@@ -429,8 +432,9 @@ private fun DayCell(
         lineHeight = with(density) { 14.dp.toSp() },
     )
     val dayColor = when {
+        !inMonth && (holiday || day.dayOfWeek == DayOfWeek.SUNDAY) -> CoupleColors.sunday.copy(alpha = 0.4f)
         !inMonth -> scheme.onSurface.copy(alpha = 0.35f)
-        day.dayOfWeek == DayOfWeek.SUNDAY -> CoupleColors.sunday
+        holiday || day.dayOfWeek == DayOfWeek.SUNDAY -> CoupleColors.sunday
         day.dayOfWeek == DayOfWeek.SATURDAY -> CoupleColors.saturday
         else -> scheme.onSurface
     }
@@ -491,10 +495,16 @@ private fun DayCell(
                 when {
                     !showLabels -> special.emoji
                     special.kind == SpecialKind.MILESTONE -> "♥${special.title}"
-                    else -> "${special.emoji}${special.title}"
+                    // 공휴일은 빨간 글자만으로 알 수 있어서 그림 없이 (좁은 칸에서 이름이 잘리지 않게)
+                    special.kind == SpecialKind.HOLIDAY -> special.shortTitle
+                    else -> "${special.emoji}${special.shortTitle}"
                 },
                 style = smallStyle,
-                color = if (personal) scheme.primary else scheme.onSurfaceVariant.copy(alpha = if (inMonth) 1f else 0.5f),
+                color = when {
+                    personal -> scheme.primary
+                    special.kind == SpecialKind.HOLIDAY -> CoupleColors.sunday.copy(alpha = if (inMonth) 1f else 0.5f)
+                    else -> scheme.onSurfaceVariant.copy(alpha = if (inMonth) 1f else 0.5f)
+                },
                 fontWeight = if (personal) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
@@ -771,7 +781,11 @@ private fun SpecialDayCard(special: SpecialDay) {
                     special.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (personal) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    color = when {
+                        personal -> MaterialTheme.colorScheme.onPrimaryContainer
+                        special.kind == SpecialKind.HOLIDAY -> CoupleColors.sunday
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
                 )
                 if (special.note.isNotBlank()) {
                     Text(

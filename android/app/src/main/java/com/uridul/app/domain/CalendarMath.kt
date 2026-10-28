@@ -103,6 +103,7 @@ object CalendarMath {
             title.isEmpty() -> "제목을 입력해 주세요."
             title.length > CalendarEvent.TITLE_MAX -> "제목은 ${CalendarEvent.TITLE_MAX}자까지 쓸 수 있어요."
             draft.memo.length > CalendarEvent.MEMO_MAX -> "메모는 ${CalendarEvent.MEMO_MAX}자까지 쓸 수 있어요."
+            draft.remind != null && draft.remind !in com.uridul.app.data.Remind.allowed -> "알림 시간을 다시 골라 주세요."
             draft.endDate.isBefore(draft.date) -> "끝나는 날이 시작하는 날보다 빨라요."
             ChronoUnit.DAYS.between(draft.date, draft.endDate) >= CalendarEvent.MAX_SPAN_DAYS ->
                 "여러 날 일정은 ${CalendarEvent.MAX_SPAN_DAYS}일까지 만들 수 있어요."

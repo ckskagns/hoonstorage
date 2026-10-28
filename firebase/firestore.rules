@@ -118,8 +118,10 @@ service cloud.firestore {
 
         function validEvent(d) {
           return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo', 'place', 'timeline',
-                                   'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+                                   'remind', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
             && (!('place' in d) || d.place == null || validPlace(d.place))
+            // 알림: 몇 분 전 (-1 끄기 ~ 1440 하루 전)
+            && (!('remind' in d) || d.remind == null || (d.remind is int && d.remind >= -1 && d.remind <= 1440))
             // 타임라인: 시간대 목록 (시작·끝·내용·장소), 하루 최대 12개
             && (!('timeline' in d) || d.timeline == null || (d.timeline is list && d.timeline.size() <= 12))
             && d.title is string && d.title.size() > 0 && d.title.size() <= 100
@@ -132,9 +134,11 @@ service cloud.firestore {
         }
 
         allow read: if isCoupleMember();
+        // 만든 사람은 커플 멤버여야 한다 (지운 상대 일정을 "되돌리기" 할 때 원래 만든 사람 그대로 다시 만든다)
         allow create: if isCoupleMember()
           && validEvent(request.resource.data)
-          && request.resource.data.createdBy == request.auth.uid;
+          && request.resource.data.createdBy is string
+          && request.resource.data.createdBy in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
         allow update: if isCoupleMember()
           && validEvent(request.resource.data)
           && request.resource.data.createdBy == resource.data.createdBy;

@@ -99,7 +99,7 @@ object WidgetStore {
         return if (prefs[MONTH] == month.toString()) decode(prefs[MONTH_EVENTS]) else decode(prefs[EVENTS])
     }
 
-    private fun encode(events: List<CalendarEvent>): String {
+    internal fun encode(events: List<CalendarEvent>): String {
         val json = JSONArray()
         events.forEach { e ->
             json.put(
@@ -110,6 +110,8 @@ object WidgetStore {
                     .put("endDate", e.endDate.toString())
                     .put("time", e.time?.toString() ?: JSONObject.NULL)
                     .put("createdBy", e.createdBy)
+                    .put("memo", e.memo)
+                    .put("remind", e.remind ?: JSONObject.NULL)
                     .put("placeName", e.place?.name ?: JSONObject.NULL)
                     .put("placeUrl", e.place?.url ?: JSONObject.NULL)
                     .put("placeApp", e.place?.app?.key ?: JSONObject.NULL)
@@ -131,7 +133,7 @@ object WidgetStore {
         return json.toString()
     }
 
-    private fun decode(raw: String?): List<CalendarEvent> {
+    internal fun decode(raw: String?): List<CalendarEvent> {
         if (raw == null) return emptyList()
         return runCatching {
             val json = JSONArray(raw)
@@ -144,7 +146,8 @@ object WidgetStore {
                         date = LocalDate.parse(o.getString("date")),
                         endDate = LocalDate.parse(o.getString("endDate")),
                         time = if (o.isNull("time")) null else LocalTime.parse(o.getString("time")),
-                        memo = "",
+                        memo = o.optString("memo"),
+                        remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
                         createdBy = o.optString("createdBy"),
                         place = if (o.isNull("placeName") || !o.has("placeName")) null else Place(
                             o.getString("placeName"),

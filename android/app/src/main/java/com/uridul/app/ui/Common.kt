@@ -53,6 +53,23 @@ fun rememberToday(): LocalDate {
     return today
 }
 
+/**
+ * 화면 전체를 덮는 창(하루 페이지·검색)에서 상태 표시줄 아이콘 색을 화면 모드에 맞춘다.
+ * (창이 따로 떠서 앱 화면의 설정을 이어받지 못하기 때문에 직접 맞춘다)
+ */
+@Composable
+fun FullScreenDialogBars() {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val dark = com.uridul.app.ui.theme.LocalDarkTheme.current
+    androidx.compose.runtime.SideEffect {
+        val window = (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window ?: return@SideEffect
+        androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
+        }
+    }
+}
+
 val KoreanTime: DateTimeFormatter = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
 val KoreanMonthDay: DateTimeFormatter = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
 

@@ -11,6 +11,8 @@ enum class SpecialKind(val personal: Boolean) {
     /** 100일 단위, 주년 */
     MILESTONE(true),
     BIRTHDAY(true),
+    /** 공휴일·대체공휴일 (빨간 날) */
+    HOLIDAY(false),
     /** 발렌타인데이, 크리스마스 같은 연인 기념일 */
     COUPLE_DAY(false),
 }
@@ -25,6 +27,16 @@ data class SpecialDay(
     val note: String = "",
 ) {
     val label: String get() = "$emoji $title"
+
+    /** 달력 칸처럼 좁은 곳에 쓸 짧은 이름 ("추석 연휴" → "추석", "대체공휴일" → "대체휴일") */
+    val shortTitle: String
+        get() = when {
+            kind != SpecialKind.HOLIDAY -> title
+            title == "대체공휴일" -> "대체휴일"
+            title.endsWith(" 연휴") -> title.removeSuffix(" 연휴")
+            title.endsWith("선거일") -> "선거일"
+            else -> title
+        }
 }
 
 /**
@@ -91,6 +103,12 @@ object SpecialDays {
                 if (date in from..to) all += SpecialDay(date, "${b.name} 생일", "🎂", SpecialKind.BIRTHDAY, "${b.name}의 생일")
             }
             if (includeCoupleDays) {
+                // 공휴일 (신정·성탄절은 "새해 첫날"·"크리스마스" 와 같은 날이라 이름은 한 번만)
+                Holidays.ofYear(year).forEach { h ->
+                    if (h.date in from..to && h.name !in CoveredByCoupleDay) {
+                        all += SpecialDay(h.date, h.name, h.emoji, SpecialKind.HOLIDAY, if (h.substitute) "쉬는 날" else "공휴일")
+                    }
+                }
                 yearly.forEach { y ->
                     val date = LocalDate.of(year, y.month, y.day)
                     if (date in from..to) all += SpecialDay(date, y.title, y.emoji, SpecialKind.COUPLE_DAY, y.note)
@@ -123,9 +141,11 @@ object SpecialDays {
     ): List<SpecialDay> {
         val all = between(start, countFromOne, birthdays, today, today.plusDays(800)).values.flatten()
         val personal = all.filter { it.kind.personal }.take(personalLimit)
-        val coupleDays = all.filter { !it.kind.personal }.take(coupleDayLimit)
+        val coupleDays = all.filter { it.kind == SpecialKind.COUPLE_DAY }.take(coupleDayLimit)
         return (personal + coupleDays).sortedWith(compareBy({ it.date }, { it.kind.ordinal }))
     }
+
+    private val CoveredByCoupleDay = setOf("신정", "성탄절")
 
     fun daysLeft(today: LocalDate, day: SpecialDay): Long = ChronoUnit.DAYS.between(today, day.date)
 }

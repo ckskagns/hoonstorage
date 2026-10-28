@@ -79,6 +79,7 @@ import com.uridul.app.data.Couple
 import com.uridul.app.data.EventDraft
 import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
+import com.uridul.app.data.Remind
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.toDraft
 import com.uridul.app.domain.CalendarMath
@@ -116,6 +117,10 @@ fun DayTimelinePage(
     incomingPlace: Place?,
     onIncomingPlaceConsumed: () -> Unit,
     onAttachPlace: (eventId: String, slot: Int, place: Place) -> Unit,
+    /** 방금 지운 일정 (아래에 "되돌리기" 안내) */
+    undo: CalendarEvent? = null,
+    onUndo: () -> Unit = {},
+    onDismissUndo: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val today = rememberToday()
@@ -134,6 +139,14 @@ fun DayTimelinePage(
     val edit = remember(editJson) { EditCodec.decode(editJson) }
     fun setEdit(e: SlotEdit?) {
         editJson = e?.let(EditCodec::encode).orEmpty()
+    }
+    // 검색 결과에서 다른 달 일정을 연 경우: 그 달 일정이 불러와지면 그때 그 일정을 연다
+    var focusPending by rememberSaveable { mutableStateOf(focusEventId != null && editJson.isEmpty()) }
+    LaunchedEffect(dayEvents) {
+        if (!focusPending) return@LaunchedEffect
+        val target = dayEvents.firstOrNull { it.id == focusEventId } ?: return@LaunchedEffect
+        focusPending = false
+        if (editJson.isEmpty()) setEdit(editOf(target))
     }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDiscard by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -177,12 +190,14 @@ fun DayTimelinePage(
         onDismissRequest = { if (edit != null) guard { setEdit(null) } else closePage() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        FullScreenDialogBars()
         val appear = remember { MutableTransitionState(false).apply { targetState = true } }
         AnimatedVisibility(
             visibleState = appear,
             enter = slideInHorizontally(spring(dampingRatio = 0.85f, stiffness = 500f)) { it / 3 } + fadeIn(),
         ) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+              Box(Modifier.fillMaxSize()) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
                     // 머리글: ← 10월 27일 (화)  · 기념일
                     Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -272,6 +287,14 @@ fun DayTimelinePage(
                         }
                     }
                 }
+                // 방금 지운 일정 되돌리기 (편집 칸이 닫혀 있을 때)
+                UndoBar(
+                    event = if (edit == null) undo else null,
+                    onUndo = onUndo,
+                    onDismiss = onDismissUndo,
+                    modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = 16.dp),
+                )
+              }
             }
         }
     }
@@ -302,7 +325,7 @@ fun DayTimelinePage(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("일정을 삭제할까요?") },
-            text = { Text("\"${e?.draft?.title.orEmpty()}\" 일정 전체가 상대 폰에서도 함께 사라져요.") },
+            text = { Text("\"${e?.draft?.title.orEmpty()}\" 일정 전체가 상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -601,6 +624,12 @@ private fun EditPanel(
                 }
             }
 
+            RemindRow(
+                remind = d.remind,
+                allDay = allDay,
+                onPick = { onChange(edit.copy(draft = d.copy(remind = it))) },
+            )
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!edit.isNew) {
                     TextButton(onClick = onDelete) { Text("일정 삭제", color = MaterialTheme.colorScheme.error) }
@@ -742,6 +771,55 @@ private fun TimeCell(label: String, time: LocalTime?, enabled: Boolean, onPick: 
     }
 }
 
+/** 알림 시간 고르기: [🔔 알림   30분 전 ▾] */
+@Composable
+private fun RemindRow(remind: Int?, allDay: Boolean, onPick: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val current = Remind.effective(remind, allDay)
+    val options = if (allDay) Remind.allDayOptions else Remind.timedOptions
+    val line = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+    Box {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.dp, line, RoundedCornerShape(14.dp))
+                .clickable { open = true }
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .semantics { contentDescription = "알림 ${Remind.label(remind, allDay)}, 눌러서 바꾸기" },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (current == Remind.OFF) "🔕" else "🔔")
+            Spacer(Modifier.width(8.dp))
+            Text("알림", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(
+                Remind.label(remind, allDay),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (current == Remind.OFF) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+            )
+            Text("  ▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { o ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = {
+                        Text(
+                            o.label,
+                            fontWeight = if (o.minutes == current) FontWeight.Bold else FontWeight.Normal,
+                            color = if (o.minutes == current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onPick(o.minutes)
+                    },
+                )
+            }
+        }
+    }
+}
+
 /** 선택 상자 목록: 0시~23시 30분 단위 + 23:59, 지금 값이 목록에 없으면(예: 20:20) 끼워 넣는다 */
 private fun timeOptions(current: LocalTime?): List<LocalTime> {
     val base = (0 until 48).map { LocalTime.of(it / 2, (it % 2) * 30) } + LocalTime.of(23, 59)
@@ -754,7 +832,9 @@ private fun timeOptions(current: LocalTime?): List<LocalTime> {
 private data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Boolean, val original: EventDraft?) {
 
     fun finalDraft(): EventDraft = if (slot < 0) {
-        draft.copy(time = null, timeline = emptyList())
+        // 하루 종일에 없는 알림 값(예: 1시간 전)은 기본값으로
+        val remind = draft.remind?.takeIf { r -> Remind.allDayOptions.any { it.minutes == r } }
+        draft.copy(time = null, timeline = emptyList(), remind = remind)
     } else {
         // 저장할 때는 시간 순으로 (대표 시작 시각·알림·정렬이 맞도록)
         val sorted = draft.timeline.sortedBy { it.start }
@@ -844,6 +924,7 @@ private fun EventDraft.toPreview(createdBy: String): CalendarEvent = CalendarEve
     createdBy = createdBy,
     place = place,
     timeline = timeline,
+    remind = remind,
 )
 
 /** 편집 상태 저장용 JSON */
@@ -881,6 +962,7 @@ private object EditCodec {
         .put("time", d.time?.toString() ?: JSONObject.NULL)
         .put("memo", d.memo)
         .put("place", placeJson(d.place))
+        .put("remind", d.remind ?: JSONObject.NULL)
         .put("timeline", JSONArray().also { arr ->
             d.timeline.forEach { s ->
                 arr.put(
@@ -903,6 +985,7 @@ private object EditCodec {
             time = if (o.isNull("time")) null else LocalTime.parse(o.getString("time")),
             memo = o.getString("memo"),
             place = parsePlace(o, "place"),
+            remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
             timeline = (0 until arr.length()).map { i ->
                 val s = arr.getJSONObject(i)
                 TimeSlot(

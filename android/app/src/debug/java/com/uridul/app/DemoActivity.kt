@@ -62,7 +62,7 @@ class DemoActivity : ComponentActivity() {
             ev("1", 0, "저녁 데이트", "19:00", me, memo = "성수동 파스타집 예약함"),
             ev("2", 0, "토끼 회식", "18:30", partner),
             ev("3", 1, "영화 보기 (아주 긴 제목이 들어가도 잘리는지 확인하는 일정)", "20:10", partner),
-            ev("4", 3, "제주도 여행", null, me, days = 2),
+            ev("4", 3, "제주도 여행", null, me, days = 2, memo = "jeju 렌터카 예약"),
             ev("5", 3, "비행기", "09:05", partner),
             ev("6", 3, "렌터카", "11:00", me),
             ev("7", 9, "엄마 생신", null, partner),
@@ -91,7 +91,21 @@ class DemoActivity : ComponentActivity() {
                 var month by remember { mutableStateOf(YearMonth.now()) }
                 var request by remember { mutableStateOf<OpenRequest?>(OpenRequest(tab = startTab)) }
                 val snackbar = remember { SnackbarHostState() }
+                var undo by remember { mutableStateOf<CalendarEvent?>(null) }
+                val deleted = remember { mutableStateListOf<com.uridul.app.data.DeletedEvent>() }
+                fun restore(e: CalendarEvent) {
+                    events.removeAll { it.id == e.id }
+                    events += e
+                    deleted.removeAll { it.event.id == e.id }
+                    undo = null
+                }
                 ReadyScreen(
+                    undo = undo,
+                    onUndo = { undo?.let(::restore) },
+                    onDismissUndo = { undo = null },
+                    deletedEvents = deleted.toList(),
+                    onRestoreDeleted = ::restore,
+                    onLoadAllEvents = { events.toList() },
                     couple = couple,
                     myUid = me,
                     busy = false,
@@ -107,11 +121,20 @@ class DemoActivity : ComponentActivity() {
                         } else {
                             val id = draft.id ?: "new${events.size + 1}"
                             events.removeAll { it.id == id }
-                            events += CalendarEvent(id, draft.title.trim(), draft.date, draft.endDate, draft.time, draft.memo, me)
+                            events += CalendarEvent(
+                                id, draft.title.trim(), draft.date, draft.endDate, draft.time, draft.memo, me,
+                                place = draft.place, timeline = draft.timeline, remind = draft.remind,
+                            )
                             true
                         }
                     },
-                    onDeleteEvent = { id -> events.removeAll { it.id == id } },
+                    onDeleteEvent = { id ->
+                        events.firstOrNull { it.id == id }?.let { e ->
+                            undo = e
+                            deleted.add(0, com.uridul.app.data.DeletedEvent(e, System.currentTimeMillis()))
+                        }
+                        events.removeAll { it.id == id }
+                    },
                     onInvite = {},
                     onChangeStartDate = {},
                     onSetCountFromOne = {},

@@ -87,6 +87,8 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val openRequest by viewModel.openRequest.collectAsStateWithLifecycle()
     val update by viewModel.update.collectAsStateWithLifecycle()
     val notifyEnabled by viewModel.notifyEnabled.collectAsStateWithLifecycle()
+    val undo by viewModel.undo.collectAsStateWithLifecycle()
+    val deletedEvents by viewModel.deletedEvents.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumeAfterPermission() }
@@ -151,6 +153,12 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
             notifyEnabled = notifyEnabled,
             onAttachPlace = viewModel::attachPlace,
+            undo = undo,
+            onUndo = viewModel::undoDelete,
+            onDismissUndo = viewModel::dismissUndo,
+            deletedEvents = deletedEvents,
+            onRestoreDeleted = viewModel::restoreDeleted,
+            onLoadAllEvents = viewModel::loadAllEvents,
             onSetNotify = { enabled ->
                 viewModel.setNotifyEnabled(enabled)
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)

@@ -18,8 +18,10 @@ class SpecialDaysTest {
     @Test
     fun birthdaysEveryYear() {
         assertEquals(listOf("나나 생일"), on(LocalDate.of(2026, 10, 18)).map { it.title })
-        assertEquals(listOf("후이 생일"), on(LocalDate.of(2027, 5, 13)).map { it.title })
-        assertEquals(SpecialKind.BIRTHDAY, on(LocalDate.of(2027, 5, 13)).single().kind)
+        // 2027-05-13 은 부처님오신날이기도 하다: 생일이 먼저, 공휴일이 다음
+        assertEquals(listOf("후이 생일", "부처님오신날"), on(LocalDate.of(2027, 5, 13)).map { it.title })
+        assertEquals(SpecialKind.BIRTHDAY, on(LocalDate.of(2027, 5, 13)).first().kind)
+        assertEquals(listOf("후이 생일"), on(LocalDate.of(2028, 5, 13)).map { it.title })
     }
 
     @Test
@@ -32,6 +34,23 @@ class SpecialDaysTest {
             listOf(on(LocalDate.of(2026, 12, 24)), on(LocalDate.of(2026, 12, 25))).map { it.single().title },
         )
         assertEquals("칠석", on(LocalDate.of(2027, 8, 8)).single().title)
+    }
+
+    @Test
+    fun holidaysShownButNotDuplicated() {
+        assertEquals(listOf("추석"), on(LocalDate.of(2026, 9, 25)).map { it.title })
+        assertEquals(SpecialKind.HOLIDAY, on(LocalDate.of(2026, 9, 25)).single().kind)
+        // 신정·성탄절은 "새해 첫날"·"크리스마스" 이름 하나만
+        assertEquals(listOf("새해 첫날"), on(LocalDate.of(2027, 1, 1)).map { it.title })
+        assertEquals(listOf("크리스마스"), on(LocalDate.of(2027, 12, 25)).map { it.title })
+        // 우리 기념일 → 공휴일 → 연인 기념일 순
+        assertEquals(listOf("대체공휴일"), on(LocalDate.of(2026, 3, 2)).map { it.title })
+    }
+
+    @Test
+    fun upcomingDoesNotFillWithHolidays() {
+        val list = SpecialDays.upcoming(start, true, birthdays, LocalDate.of(2027, 9, 1), personalLimit = 2, coupleDayLimit = 2)
+        assertTrue(list.none { it.kind == SpecialKind.HOLIDAY })
     }
 
     @Test

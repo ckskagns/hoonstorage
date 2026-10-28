@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.layout.navigationBarsPadding
+import com.uridul.app.data.DeletedEvent
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -97,7 +100,18 @@ fun ReadyScreen(
     /** 일정 색을 바꾸면 위젯도 다시 그린다 */
     onColorsChanged: () -> Unit = {},
     onSetNotify: (Boolean) -> Unit = {},
+    /** 방금 지운 일정 ("되돌리기" 안내) */
+    undo: CalendarEvent? = null,
+    onUndo: () -> Unit = {},
+    onDismissUndo: () -> Unit = {},
+    /** 최근 지운 일정 (이 폰에 30일 보관) */
+    deletedEvents: List<DeletedEvent> = emptyList(),
+    onRestoreDeleted: (CalendarEvent) -> Unit = {},
+    /** 검색용 전체 일정 불러오기 */
+    onLoadAllEvents: suspend () -> List<CalendarEvent>? = { null },
 ) {
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var showingDeleted by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf(false) }
     var pickingTheme by remember { mutableStateOf(false) }
     var pickingColors by remember { mutableStateOf(false) }
@@ -160,6 +174,9 @@ fun ReadyScreen(
                     },
                     actions = {
                         if (tab == Tab.Calendar) {
+                            IconButton(onClick = { searching = true }) {
+                                Icon(Icons.Filled.Search, contentDescription = "일정 검색")
+                            }
                             TextButton(onClick = { select(LocalDate.now()) }) { Text("오늘") }
                         }
                         IconButton(onClick = { menuOpen = true }) {
@@ -190,7 +207,7 @@ fun ReadyScreen(
                             }
                             HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("일정 알림 (당일 아침·30분 전)") },
+                                text = { Text("일정 알림 (아침 9시·일정 전)") },
                                 trailingIcon = { Checkbox(checked = notifyEnabled, onCheckedChange = null) },
                                 onClick = { menuOpen = false; onSetNotify(!notifyEnabled) },
                             )
@@ -207,6 +224,10 @@ fun ReadyScreen(
                                     }
                                 },
                                 onClick = { menuOpen = false; pickingColors = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (deletedEvents.isEmpty()) "최근 지운 일정" else "최근 지운 일정 (${deletedEvents.size})") },
+                                onClick = { menuOpen = false; showingDeleted = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
@@ -297,6 +318,44 @@ fun ReadyScreen(
                 }
             }
         }
+        // 방금 지운 일정 되돌리기 (하루 페이지·입력 창이 열려 있으면 그쪽에서 보여준다)
+        UndoBar(
+            event = if (dayPage == null && editing == null && !searching) undo else null,
+            onUndo = onUndo,
+            onDismiss = onDismissUndo,
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = if (wide) 24.dp else 88.dp),
+        )
+    }
+
+    if (searching) {
+        SearchDialog(
+            myUid = myUid,
+            load = onLoadAllEvents,
+            onOpen = { e ->
+                searching = false
+                val day = if (e.occursOn(LocalDate.now())) LocalDate.now() else e.date
+                select(day)
+                openDay(day, focus = e.id)
+            },
+            onDismiss = { searching = false },
+        )
+    }
+
+    if (showingDeleted) {
+        DeletedEventsDialog(
+            items = deletedEvents,
+            onRestore = { e ->
+                onRestoreDeleted(e)
+                showingDeleted = false
+                // 되돌린 일정이 있는 날을 보여준다
+                tabKey = Tab.Calendar.key
+                select(e.date)
+            },
+            onDismiss = { showingDeleted = false },
+        )
     }
 
     // 하루 페이지 (하루 일정을 한 페이지에서 모두 관리)
@@ -320,6 +379,9 @@ fun ReadyScreen(
                 incomingPlace = if (editing == null) sharedPlace else null,
                 onIncomingPlaceConsumed = PlaceInbox::consume,
                 onAttachPlace = onAttachPlace,
+                undo = if (editing == null) undo else null,
+                onUndo = onUndo,
+                onDismissUndo = onDismissUndo,
             )
         }
     }

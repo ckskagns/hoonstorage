@@ -124,6 +124,10 @@ fun EventEditorDialog(
             memo = memo,
             place = if (allDay) dayPlace else null,
             timeline = timeline,
+            // 알림 시간은 하루 페이지에서 고른 값을 그대로 (하루 종일에 없는 값이면 기본값)
+            remind = initial.remind?.takeIf { r ->
+                if (allDay) com.uridul.app.data.Remind.allDayOptions.any { it.minutes == r } else true
+            },
         )
     }
 
@@ -398,7 +402,7 @@ fun EventEditorDialog(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("일정을 삭제할까요?") },
-            text = { Text("상대 폰에서도 함께 사라져요.") },
+            text = { Text("상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false

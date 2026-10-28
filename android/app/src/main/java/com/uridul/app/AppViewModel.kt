@@ -12,6 +12,8 @@ import com.uridul.app.data.AppRelease
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
+import com.uridul.app.data.DeletedEvent
+import com.uridul.app.data.DeletedEvents
 import com.uridul.app.data.EventDraft
 import com.uridul.app.data.Place
 import com.uridul.app.data.toDraft
@@ -187,8 +189,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteEvent(eventId: String) {
         val ready = state.value as? AppState.Ready ?: return
+        // 되돌릴 수 있도록 지우기 전 내용을 기억해 둔다
+        val event = monthEvents.value.firstOrNull { it.id == eventId } ?: searchCache.firstOrNull { it.id == eventId }
         container.events?.delete(ready.couple.id, eventId) { e ->
+            _undo.value = null
             _message.value = e.toUserMessage() ?: "삭제하지 못했어요."
+        }
+        if (event != null) {
+            DeletedEvents.add(getApplication(), event)
+            _undo.value = event
+        }
+    }
+
+    // ── 지운 일정 되돌리기 ─────────────────────────────────
+
+    private val _undo = MutableStateFlow<CalendarEvent?>(null)
+    /** 방금 지운 일정 ("되돌리기" 안내를 잠깐 보여준다) */
+    val undo: StateFlow<CalendarEvent?> = _undo.asStateFlow()
+
+    /** 최근 지운 일정 (이 폰에 30일 보관) */
+    val deletedEvents: StateFlow<List<DeletedEvent>> = DeletedEvents.items
+
+    fun undoDelete() {
+        val event = _undo.value ?: return
+        _undo.value = null
+        restoreDeleted(event)
+    }
+
+    fun dismissUndo() {
+        _undo.value = null
+    }
+
+    fun restoreDeleted(event: CalendarEvent) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.events ?: return
+        repo.restore(ready.couple.id, ready.myUid, event) { e ->
+            _message.value = e.toUserMessage() ?: "되돌리지 못했어요."
+        }
+        DeletedEvents.remove(getApplication(), event.id)
+        if (_undo.value?.id == event.id) _undo.value = null
+        _message.value = "\"${event.title}\" 일정을 되돌렸어요 (${event.date.monthValue}월 ${event.date.dayOfMonth}일)"
+    }
+
+    // ── 일정 검색 ─────────────────────────────────────────
+
+    /** 검색 창에서 받아 둔 전체 일정 (검색 결과에서 연 일정을 지울 때도 쓴다) */
+    @Volatile
+    private var searchCache: List<CalendarEvent> = emptyList()
+
+    /** 검색용 전체 일정. 실패하면 null */
+    suspend fun loadAllEvents(): List<CalendarEvent>? {
+        val ready = state.value as? AppState.Ready ?: return null
+        val repo = container.events ?: return null
+        return try {
+            repo.fetchAll(ready.couple.id).also { searchCache = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -206,7 +264,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else if (!Reminders.hasPermission(context)) {
             "폰 설정에서 우리둘 알림을 허용해야 알림이 와요"
         } else {
-            "일정 당일 아침 9시와 일정 30분 전에 알려드릴게요"
+            "일정 당일 아침 9시와 일정 전(기본 30분 전)에 알려드릴게요"
         }
     }
 
@@ -268,6 +326,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        DeletedEvents.load(app)
         // 앱을 열 때 새 버전이 있는지 한 번 확인한다
         checkForUpdate(manual = false)
         // 커플 정보가 바뀔 때마다 위젯용 데이터를 저장하고 위젯을 다시 그린다
@@ -312,8 +371,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         WidgetStore.saveEvents(context, events)
                         CalendarWidget().updateAll(context)
                         MonthWidget.refreshAll(context)
-                        // 오늘 시간 일정의 30분 전 알림을 다시 맞춘다 (추가·수정·삭제 반영)
-                        Reminders.scheduleTimed(context, CalendarMath.eventsOn(events, LocalDate.now()))
+                        // 시간 일정 알림(일정마다 고른 시간)을 다시 맞춘다 (추가·수정·삭제 반영)
+                        Reminders.scheduleTimed(context, events)
                     }
             }
         }

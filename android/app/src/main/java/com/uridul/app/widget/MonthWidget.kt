@@ -316,7 +316,8 @@ private fun DayCell(
     val dayColor = when {
         isToday -> WidgetColors.OnPrimary
         !inMonth -> WidgetColors.Faded
-        day.dayOfWeek == DayOfWeek.SUNDAY -> WidgetColors.Sunday
+        // 공휴일·대체공휴일도 일요일처럼 빨간 숫자
+        day.dayOfWeek == DayOfWeek.SUNDAY || com.uridul.app.domain.Holidays.isHoliday(day) -> WidgetColors.Sunday
         day.dayOfWeek == DayOfWeek.SATURDAY -> WidgetColors.Saturday
         else -> WidgetColors.OnSurface
     }
@@ -351,10 +352,17 @@ private fun DayCell(
                 when {
                     !wide -> special.emoji
                     special.kind == SpecialKind.MILESTONE -> "♥${special.title}"
-                    else -> "${special.emoji}${special.title}"
+                    // 공휴일은 빨간 글자만으로 알 수 있어서 그림 없이 (좁은 칸에서 이름이 잘리지 않게)
+                    special.kind == SpecialKind.HOLIDAY -> special.shortTitle
+                    else -> "${special.emoji}${special.shortTitle}"
                 },
                 style = TextStyle(
-                    color = if (!inMonth) WidgetColors.Faded else if (personal) WidgetColors.Primary else WidgetColors.SubText,
+                    color = when {
+                        !inMonth -> WidgetColors.Faded
+                        personal -> WidgetColors.Primary
+                        special.kind == SpecialKind.HOLIDAY -> WidgetColors.Sunday
+                        else -> WidgetColors.SubText
+                    },
                     fontSize = 9.sp,
                     fontWeight = if (personal) FontWeight.Bold else FontWeight.Normal,
                     textAlign = TextAlign.Center,

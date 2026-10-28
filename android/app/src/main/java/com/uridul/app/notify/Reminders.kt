@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.uridul.app.MainActivity
 import com.uridul.app.R
 import com.uridul.app.data.CalendarEvent
+import com.uridul.app.data.Remind
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.WidgetStore
 import com.uridul.app.domain.CalendarMath
@@ -36,7 +37,9 @@ import java.time.ZoneId
  *
  *  - 매일 아침 9시: 오늘 일정 + 오늘 기념일·생일·연인 기념일 + 내일 우리 기념일·생일 미리 알림
  *    (알림 시각에 서버에서 일정을 새로 받아오므로, 앱을 열지 않아도 상대가 추가한 일정까지 알려준다)
- *  - 시간이 정해진 오늘 일정: 30분 전에 한 번 더
+ *  - 시간이 정해진 일정: 일정마다 고른 시간(기본 30분 전 · 시작할 때 · 1시간 전 · 하루 전 등)에 한 번 더
+ *  - 하루 종일 일정은 아침 알림에 들어가고, "전날·당일" 로 고르면 전날 아침 알림에도 들어간다
+ *  - "알림 끄기" 로 고른 일정은 알리지 않는다
  *
  * 두 사람 폰에서 각각 예약되므로 둘 다 같은 알림을 받는다.
  */
@@ -59,6 +62,7 @@ object Reminders {
     private const val EXTRA_TIME = "event_time"
     private const val EXTRA_DATE = "event_date"
     private const val EXTRA_PLACE = "event_place"
+    private const val EXTRA_LEAD = "event_lead"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -112,7 +116,11 @@ object Reminders {
         val snapshot = WidgetStore.load(context) ?: return
         val today = LocalDate.now()
         val events = Widgets.fetchUpcomingEvents(context, snapshot) ?: WidgetStore.loadEvents(context)
-        val todayEvents = CalendarMath.eventsOn(events, today)
+        // 알림을 끈 일정은 아침 알림에서도 뺀다
+        val todayEvents = CalendarMath.eventsOn(events, today).filter { it.remindValue != Remind.OFF }
+        // 하루 종일 일정 중 "전날·당일" 로 고른 내일 일정
+        val tomorrowEvents = CalendarMath.eventsOn(events, today.plusDays(1))
+            .filter { it.allDay && it.date == today.plusDays(1) && it.remindValue == Remind.DAY_BEFORE }
         val specials = SpecialDays.on(snapshot.startDate, snapshot.countFromOne, snapshot.birthdays, today)
         val tomorrow = SpecialDays.on(snapshot.startDate, snapshot.countFromOne, snapshot.birthdays, today.plusDays(1))
             .filter { it.kind.personal }
@@ -129,38 +137,53 @@ object Reminders {
                     }
                 }
             }
+            tomorrowEvents.forEach { e -> add("내일  ${e.title}" + (e.place?.let { p -> "  📍${p.name}" } ?: "")) }
             tomorrow.forEach { add("${it.emoji} 내일은 ${it.title}이에요") }
         }
         if (lines.isNotEmpty()) {
             val title = when {
                 todayEvents.isNotEmpty() -> "오늘 일정 ${todayEvents.size}개 💕"
                 specials.isNotEmpty() -> "오늘은 ${specials.first().title} ${specials.first().emoji}"
+                tomorrowEvents.isNotEmpty() -> "내일 일정이 있어요 💕"
                 else -> "내일은 ${tomorrow.first().title} ${tomorrow.first().emoji}"
             }
             notify(context, DAILY_NOTIFICATION_ID, title, lines, today)
         }
-        scheduleTimed(context, todayEvents)
+        scheduleTimed(context, events)
     }
 
-    /** 오늘 시간이 정해진 일정마다 30분 전 알림 예약 (앱에서 일정이 바뀔 때도 다시 부른다) */
-    fun scheduleTimed(context: Context, todayEvents: List<CalendarEvent>) {
+    /**
+     * 시간 일정마다 고른 시간(기본 30분 전, 하루 전 등)에 알림 예약. 앞으로 이틀 안의 알림만 맞춘다
+     * (그 뒤의 알림은 다음 아침 9시 알림이나 앱을 열 때 다시 맞춘다). 앱에서 일정이 바뀔 때도 다시 부른다.
+     */
+    fun scheduleTimed(context: Context, events: List<CalendarEvent>) {
         cancelTimed(context)
         if (!isEnabled(context)) return
         val now = LocalDateTime.now()
-        val today = now.toLocalDate()
         val ids = mutableSetOf<String>()
-        // 시간대마다 30분 전 (여러 날 일정은 첫날 시작 시각만)
-        todayEvents.filter { it.time != null && it.date == today }.forEach { e ->
-            e.slots.forEachIndexed { i, slot ->
-                val at = today.atTime(slot.start).minusMinutes(LEAD_MINUTES)
-                if (!at.isAfter(now)) return@forEachIndexed
-                val key = "${e.id}#$i"
-                setAlarm(context, at, eventIntent(context, key, e, slot))
-                ids += key
-            }
+        alarmsFor(events, now).forEach { a ->
+            setAlarm(context, a.at, eventIntent(context, a.key, a.event, a.slot, a.lead))
+            ids += a.key
         }
         prefs(context).edit().putStringSet(KEY_SCHEDULED, ids).apply()
     }
+
+    /** 예약할 알림 하나 */
+    internal data class Alarm(val key: String, val at: LocalDateTime, val event: CalendarEvent, val slot: TimeSlot, val lead: Int)
+
+    /** 지금부터 [HORIZON_HOURS] 안에 울릴 시간 일정 알림 (여러 날 일정은 첫날 시작 시각만) */
+    internal fun alarmsFor(events: List<CalendarEvent>, now: LocalDateTime): List<Alarm> {
+        val until = now.plusHours(HORIZON_HOURS)
+        return events.filter { it.time != null && it.remindValue != Remind.OFF }.flatMap { e ->
+            val lead = e.remindValue
+            e.slots.mapIndexedNotNull { i, slot ->
+                val at = e.date.atTime(slot.start).minusMinutes(lead.toLong())
+                if (at.isAfter(now) && !at.isAfter(until)) Alarm("${e.id}#$i", at, e, slot, lead) else null
+            }
+        }
+    }
+
+    private const val HORIZON_HOURS = 48L
 
     private fun cancelTimed(context: Context) {
         prefs(context).getStringSet(KEY_SCHEDULED, emptySet()).orEmpty().forEach { id ->
@@ -175,7 +198,8 @@ object Reminders {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: return
         val time = intent.getStringExtra(EXTRA_TIME).orEmpty()
         val date = intent.getStringExtra(EXTRA_DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now()
-        notify(context, id.hashCode(), "${LEAD_MINUTES}분 뒤 일정이 있어요 ⏰", listOf("$time  $title" + (intent.getStringExtra(EXTRA_PLACE)?.let { "  📍$it" } ?: "")), date)
+        val lead = intent.getIntExtra(EXTRA_LEAD, LEAD_MINUTES.toInt())
+        notify(context, id.hashCode(), "${Remind.leadText(lead)} ⏰", listOf("$time  $title" + (intent.getStringExtra(EXTRA_PLACE)?.let { "  📍$it" } ?: "")), date)
     }
 
     private fun timeText(e: CalendarEvent): String = e.time?.format(KoreanTime) ?: "종일"
@@ -215,7 +239,7 @@ object Reminders {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun eventIntent(context: Context, id: String, event: CalendarEvent? = null, slot: TimeSlot? = null): PendingIntent {
+    private fun eventIntent(context: Context, id: String, event: CalendarEvent? = null, slot: TimeSlot? = null, lead: Int = LEAD_MINUTES.toInt()): PendingIntent {
         val intent = Intent(context, ReminderReceiver::class.java)
             .setAction(ACTION_EVENT)
             // 일정마다 다른 알람이 되도록 data 로 구분한다
@@ -227,6 +251,7 @@ object Reminders {
                 .putExtra(EXTRA_TIME, (slot?.start ?: event.time)?.format(KoreanTime).orEmpty())
                 .putExtra(EXTRA_DATE, event.date.toString())
                 .putExtra(EXTRA_PLACE, slot?.place?.name ?: event.place?.name)
+                .putExtra(EXTRA_LEAD, lead)
         }
         return PendingIntent.getBroadcast(
             context,
