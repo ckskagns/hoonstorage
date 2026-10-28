@@ -26,6 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,8 +68,20 @@ fun MemorySlides(
     val pager = rememberPagerState { slides.size }
     val dragged by pager.interactionSource.collectIsDraggedAsState()
     // 손대지 않으면 자동으로 다음 장 (넘기는 중이면 멈춘다)
-    LaunchedEffect(pager.settledPage, dragged, slides.size) {
-        if (dragged || slides.size < 2) return@LaunchedEffect
+    // 후기 쓰는 창이 열려 있으면 넘기지 않는다 (창이 그 장에 묶여 있지 않도록 여기서 띄운다)
+    var writingFor by remember { mutableStateOf<CalendarEvent?>(null) }
+    val hooks = LocalReviews.current
+    writingFor?.let { e ->
+        ReviewDialog(
+            title = e.title,
+            existing = hooks.of(e)?.entries?.get(myUid),
+            onSave = { hearts, text -> writingFor = null; hooks.onSave(e, hearts, text) },
+            onDelete = null,
+            onDismiss = { writingFor = null },
+        )
+    }
+    LaunchedEffect(pager.settledPage, dragged, slides.size, writingFor) {
+        if (dragged || writingFor != null || slides.size < 2) return@LaunchedEffect
         delay(AUTO_ADVANCE_MILLIS)
         pager.animateScrollToPage((pager.settledPage + 1) % slides.size)
     }
@@ -103,6 +118,7 @@ fun MemorySlides(
                     couple = couple,
                     myUid = myUid,
                     onClick = { onOpen(slides[page].event) },
+                    onWrite = { writingFor = slides[page].event },
                     modifier = Modifier.graphicsLayer {
                         val s = 1f - 0.08f * offset
                         scaleX = s
@@ -137,7 +153,7 @@ fun MemorySlides(
 
 /** 그림 카드 한 장: 큰 그림 + 언제 + 제목 + 장소 + 후기 */
 @Composable
-private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onClick: () -> Unit, modifier: Modifier) {
+private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onClick: () -> Unit, onWrite: () -> Unit, modifier: Modifier) {
     val e = slide.event
     val mine = e.createdBy == myUid
     val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
@@ -218,10 +234,17 @@ private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onC
                     )
                 }
             } else {
+                // 눌러서 바로 후기 쓰기 (카드의 나머지 부분은 그 날로 이동)
                 Text(
-                    "💗 한 줄 후기를 남겨 보세요",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CoupleColors.onFill.copy(alpha = 0.7f),
+                    "💗 한 줄 후기 남기기",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = CoupleColors.onFill,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0x55FFFFFF))
+                        .clickable(onClick = onWrite)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
         }
