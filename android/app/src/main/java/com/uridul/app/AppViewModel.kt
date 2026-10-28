@@ -74,6 +74,8 @@ data class OpenRequest(
     val tab: String,
     val date: LocalDate? = null,
     val addEvent: Boolean = false,
+    /** 이 일정을 연 채로 그 날 하루 페이지 (알림을 눌러 열었을 때) */
+    val focusEventId: String? = null,
 )
 
 sealed interface AppState {
@@ -333,6 +335,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         container.wishes?.delete(ready.couple.id, id) { e -> _message.value = e.toUserMessage() ?: "지우지 못했어요." }
     }
 
+    // ── 앱 안 알림 (종 아이콘) ────────────────────────────
+
+    /** 일정 알림 보관함 (최근 것부터) */
+    val inbox: StateFlow<List<com.uridul.app.data.InboxItem>> = com.uridul.app.data.NotificationInbox.items
+
+    fun markInboxRead(id: String) = com.uridul.app.data.NotificationInbox.markRead(getApplication(), id)
+
+    fun markAllInboxRead() = com.uridul.app.data.NotificationInbox.markAllRead(getApplication())
+
     // ── 데이트 한 줄 후기 ─────────────────────────────────
 
     /** 전체 후기 (일정ID_날짜 → 후기) */
@@ -546,6 +557,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         DeletedEvents.load(app)
+        com.uridul.app.data.NotificationInbox.load(app)
         // 앱을 열 때 새 버전이 있는지 한 번 확인한다
         checkForUpdate(manual = false)
         // 커플 정보가 바뀔 때마다 위젯용 데이터를 저장하고 위젯을 다시 그린다

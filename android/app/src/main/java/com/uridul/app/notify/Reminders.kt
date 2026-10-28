@@ -15,6 +15,8 @@ import androidx.core.content.ContextCompat
 import com.uridul.app.MainActivity
 import com.uridul.app.R
 import com.uridul.app.data.CalendarEvent
+import com.uridul.app.data.InboxItem
+import com.uridul.app.data.NotificationInbox
 import com.uridul.app.data.Remind
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.WidgetStore
@@ -152,7 +154,8 @@ object Reminders {
                 tomorrowEvents.isNotEmpty() -> "내일 일정이 있어요 💕"
                 else -> "내일은 ${tomorrow.first().title} ${tomorrow.first().emoji}"
             }
-            notify(context, DAILY_NOTIFICATION_ID, title, lines, today)
+            // 오늘 일정이 하나뿐이면 누를 때 그 일정을 바로 연다
+            notify(context, DAILY_NOTIFICATION_ID, title, lines, today, eventId = todayEvents.singleOrNull()?.id, inboxId = "daily-$today")
         }
         scheduleTimed(context, events)
     }
@@ -204,13 +207,29 @@ object Reminders {
         val time = intent.getStringExtra(EXTRA_TIME).orEmpty()
         val date = intent.getStringExtra(EXTRA_DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now()
         val lead = intent.getIntExtra(EXTRA_LEAD, LEAD_MINUTES.toInt())
-        notify(context, id.hashCode(), "${Remind.leadText(lead)} ⏰", listOf("$time  $title" + (intent.getStringExtra(EXTRA_PLACE)?.let { "  📍$it" } ?: "")), date)
+        notify(
+            context, id.hashCode(), "${Remind.leadText(lead)} ⏰",
+            listOf("$time  $title" + (intent.getStringExtra(EXTRA_PLACE)?.let { "  📍$it" } ?: "")), date,
+            // 알림 이름 "일정ID@날짜#시간대" 에서 일정 ID
+            eventId = id.substringBefore('@').substringBefore('#'),
+            inboxId = "event-$id",
+        )
     }
 
     private fun timeText(e: CalendarEvent): String = e.time?.format(KoreanTime) ?: "종일"
 
     @android.annotation.SuppressLint("MissingPermission") // 바로 위 hasPermission 으로 확인한 뒤에만 보낸다
-    private fun notify(context: Context, id: Int, title: String, lines: List<String>, date: LocalDate) {
+    private fun notify(
+        context: Context,
+        id: Int,
+        title: String,
+        lines: List<String>,
+        date: LocalDate,
+        eventId: String? = null,
+        inboxId: String = "n$id-$date",
+    ) {
+        // 앱 안 알림 보관함에도 적어 둔다 (폰 알림을 꺼 두었어도 종 아이콘에서 볼 수 있게)
+        NotificationInbox.add(context, InboxItem(inboxId, title, lines.joinToString("\n"), date, eventId, System.currentTimeMillis()))
         if (!hasPermission(context)) return
         ensureChannel(context)
         val open = PendingIntent.getActivity(
@@ -219,7 +238,9 @@ object Reminders {
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(MainExtras.TAB, "calendar")
-                .putExtra(MainExtras.DATE, date.toString()),
+                .putExtra(MainExtras.DATE, date.toString())
+                .putExtra(MainExtras.EVENT_ID, eventId)
+                .putExtra(MainExtras.INBOX_ID, inboxId),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val style = NotificationCompat.InboxStyle().also { s -> lines.take(6).forEach(s::addLine) }

@@ -129,6 +129,10 @@ fun ReadyScreen(
     /** 추억 슬라이드 */
     memories: List<com.uridul.app.domain.Memories.Slide> = emptyList(),
     onLoadMemories: (LocalDate) -> Unit = {},
+    /** 앱 안 알림 (종 아이콘) */
+    inbox: List<com.uridul.app.data.InboxItem> = emptyList(),
+    onInboxRead: (String) -> Unit = {},
+    onInboxAllRead: () -> Unit = {},
 ) {
     // 공유받은 장소를 어디에 담을지 묻는 창
     var placeChoice by remember { mutableStateOf<Place?>(null) }
@@ -199,6 +203,8 @@ fun ReadyScreen(
         tabKey = if (request.tab == Tab.Calendar.key) Tab.Calendar.key else Tab.Home.key
         request.date?.let { selectedText = it.toString() }
         if (request.addEvent) openDay(request.date ?: selected, new = true)
+        // 알림을 눌러 열었으면 그 일정을 연 채로 그 날 하루 페이지
+        request.focusEventId?.let { id -> openDay(request.date ?: selected, focus = id) }
         onOpenRequestHandled()
     }
 
@@ -225,6 +231,17 @@ fun ReadyScreen(
                             }
                             TextButton(onClick = { select(LocalDate.now()) }) { Text("오늘") }
                         }
+                        // 🔔 알림 목록 (작은 창). 누르면 그 일정으로 이동 + 읽음
+                        NotificationBell(
+                            items = inbox,
+                            onOpen = { item ->
+                                onInboxRead(item.id)
+                                select(item.date)
+                                val focus = item.eventId
+                                if (focus != null) openDay(item.date, focus = focus) else tabKey = Tab.Calendar.key
+                            },
+                            onMarkAllRead = onInboxAllRead,
+                        )
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "메뉴")
                         }

@@ -86,6 +86,9 @@ object MainExtras {
     const val ADD_EVENT = "add_event"
     /** 지도 앱에서 장소를 공유받아 돌아온 경우 */
     const val PLACE_SHARED = "place_shared"
+    /** 알림을 눌러 열린 경우: 열 일정, 읽음 처리할 앱 안 알림 */
+    const val EVENT_ID = "open_event"
+    const val INBOX_ID = "inbox_id"
 }
 
 /**

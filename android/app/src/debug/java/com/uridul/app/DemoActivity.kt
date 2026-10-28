@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -141,6 +142,15 @@ class DemoActivity : ComponentActivity() {
                     if (i >= 0) events[i] = events[i].copy(skip = if (skipped) events[i].skip + day else events[i].skip - day)
                 }
                 val range = CalendarMath.queryRange(month)
+                // 알림 보관함 점검용 예시 (데모에서만)
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    val ctx = applicationContext
+                    val inboxNow = System.currentTimeMillis()
+                    com.uridul.app.data.NotificationInbox.add(ctx, com.uridul.app.data.InboxItem("demo-1", "오늘 일정 2개 💕", "오후 6:30  토끼 회식\n오후 7:00  저녁 데이트", today, null, inboxNow - 3 * 3_600_000L, read = true))
+                    com.uridul.app.data.NotificationInbox.add(ctx, com.uridul.app.data.InboxItem("demo-2", "30분 뒤 일정이 있어요 ⏰", "오후 7:00  저녁 데이트", today, "1", inboxNow - 20 * 60_000L))
+                    com.uridul.app.data.NotificationInbox.add(ctx, com.uridul.app.data.InboxItem("demo-3", "내일 이 시간에 일정이 있어요 ⏰", "오후 8:10  영화 보기", today.plusDays(1), "3", inboxNow - 2 * 60_000L))
+                }
+                val inbox by com.uridul.app.data.NotificationInbox.items.collectAsState()
                 val reviews = remember { mutableStateMapOf<String, com.uridul.app.data.DateReview>() }
                 val hooks = com.uridul.app.ui.ReviewHooks(
                     reviews = reviews.toMap(),
@@ -209,6 +219,9 @@ class DemoActivity : ComponentActivity() {
                     onUpdateProfile = { _, _, _ -> },
                     onSignOut = {},
                     memories = com.uridul.app.domain.Memories.slides(today, events.toList()),
+                    inbox = inbox,
+                    onInboxRead = { com.uridul.app.data.NotificationInbox.markRead(applicationContext, it) },
+                    onInboxAllRead = { com.uridul.app.data.NotificationInbox.markAllRead(applicationContext) },
                 )
                 }
             }

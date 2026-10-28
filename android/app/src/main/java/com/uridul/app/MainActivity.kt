@@ -72,7 +72,10 @@ class MainActivity : ComponentActivity() {
         val tab = intent.getStringExtra(MainExtras.TAB) ?: return
         val date = intent.getStringExtra(MainExtras.DATE)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         val add = intent.getBooleanExtra(MainExtras.ADD_EVENT, false)
-        viewModel.onOpenRequest(OpenRequest(tab = tab, date = date, addEvent = add))
+        // 폰 알림을 눌러 열었으면 앱 안 알림도 읽음으로
+        intent.getStringExtra(MainExtras.INBOX_ID)?.let { com.uridul.app.data.NotificationInbox.markRead(applicationContext, it) }
+        val focus = intent.getStringExtra(MainExtras.EVENT_ID)?.takeIf { it.isNotBlank() }
+        viewModel.onOpenRequest(OpenRequest(tab = tab, date = date, addEvent = add, focusEventId = focus))
     }
 }
 
@@ -93,6 +96,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val importPreview by viewModel.importPreview.collectAsStateWithLifecycle()
     val reviews by viewModel.reviews.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
+    val inbox by viewModel.inbox.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResumeAfterPermission() }
@@ -178,6 +182,9 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onCancelImport = viewModel::cancelImport,
             memories = memories,
             onLoadMemories = viewModel::loadMemories,
+            inbox = inbox,
+            onInboxRead = { viewModel.markInboxRead(it) },
+            onInboxAllRead = { viewModel.markAllInboxRead() },
             onSetNotify = { enabled ->
                 viewModel.setNotifyEnabled(enabled)
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
