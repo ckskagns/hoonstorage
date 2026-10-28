@@ -14,6 +14,12 @@ import com.uridul.app.data.Character
 import com.uridul.app.data.Couple
 import com.uridul.app.data.DeletedEvent
 import com.uridul.app.data.DeletedEvents
+import com.uridul.app.data.UndoItem
+import com.uridul.app.data.WishPlace
+import com.uridul.app.data.Backup
+import com.uridul.app.data.ImportPreview
+import com.uridul.app.data.toSeriesDates
+import com.uridul.app.domain.Recurrence
 import com.uridul.app.data.EventDraft
 import com.uridul.app.data.Place
 import com.uridul.app.data.toDraft
@@ -133,7 +139,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             combine(readyCoupleId, _visibleMonth) { id, month -> id to month }
                 .flatMapLatest { (id, month) ->
-                    if (id == null) flowOf(emptyList()) else repo.observeRange(id, CalendarMath.queryRange(month))
+                    if (id == null) {
+                        flowOf(emptyList())
+                    } else {
+                        // 그 달 범위 일정 + 반복 일정(날짜별로 펼침)
+                        val range = CalendarMath.queryRange(month)
+                        combine(repo.observeRange(id, range), repo.observeRecurring(id)) { plain, recurring ->
+                            Recurrence.merge(plain, recurring, range.start, range.endInclusive)
+                        }
+                    }
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
         }
@@ -156,7 +170,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _visibleMonth.value = month
     }
 
-    fun saveEvent(draft: EventDraft): Boolean {
+    fun saveEvent(input: EventDraft): Boolean {
+        // 반복 일정의 어느 날을 고쳤으면 원래 첫 날 기준으로 저장 (반복 전체가 함께 바뀐다)
+        val draft = input.toSeriesDates()
         CalendarMath.validate(draft)?.let {
             _message.value = it
             return false
@@ -190,30 +206,52 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteEvent(eventId: String) {
         val ready = state.value as? AppState.Ready ?: return
         // 되돌릴 수 있도록 지우기 전 내용을 기억해 둔다
-        val event = monthEvents.value.firstOrNull { it.id == eventId } ?: searchCache.firstOrNull { it.id == eventId }
+        // 반복 일정은 원본(첫 날 기준)으로 보관
+        val event = (monthEvents.value.firstOrNull { it.id == eventId } ?: searchCache.firstOrNull { it.id == eventId })?.asSeries()
         container.events?.delete(ready.couple.id, eventId) { e ->
             _undo.value = null
             _message.value = e.toUserMessage() ?: "삭제하지 못했어요."
         }
         if (event != null) {
             DeletedEvents.add(getApplication(), event)
-            _undo.value = event
+            _undo.value = UndoItem(event)
         }
+    }
+
+    /** 반복 일정에서 이 날만 빼기 ([day] 는 그 날의 시작일) */
+    fun skipOccurrence(eventId: String, day: LocalDate) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.events ?: return
+        val event = monthEvents.value.firstOrNull { it.id == eventId }?.asSeries() ?: return
+        repo.setSkipped(ready.couple.id, ready.myUid, eventId, day, skipped = true) { e ->
+            _undo.value = null
+            _message.value = e.toUserMessage() ?: "빼지 못했어요."
+        }
+        _undo.value = UndoItem(event, day)
     }
 
     // ── 지운 일정 되돌리기 ─────────────────────────────────
 
-    private val _undo = MutableStateFlow<CalendarEvent?>(null)
-    /** 방금 지운 일정 ("되돌리기" 안내를 잠깐 보여준다) */
-    val undo: StateFlow<CalendarEvent?> = _undo.asStateFlow()
+    private val _undo = MutableStateFlow<UndoItem?>(null)
+    /** 방금 지운 일정·뺀 날 ("되돌리기" 안내를 잠깐 보여준다) */
+    val undo: StateFlow<UndoItem?> = _undo.asStateFlow()
 
     /** 최근 지운 일정 (이 폰에 30일 보관) */
     val deletedEvents: StateFlow<List<DeletedEvent>> = DeletedEvents.items
 
     fun undoDelete() {
-        val event = _undo.value ?: return
+        val item = _undo.value ?: return
         _undo.value = null
-        restoreDeleted(event)
+        val day = item.skippedDay
+        if (day == null) {
+            restoreDeleted(item.event)
+            return
+        }
+        val ready = state.value as? AppState.Ready ?: return
+        container.events?.setSkipped(ready.couple.id, ready.myUid, item.event.id, day, skipped = false) { e ->
+            _message.value = e.toUserMessage() ?: "되돌리지 못했어요."
+        }
+        _message.value = "${day.monthValue}월 ${day.dayOfMonth}일 일정을 되돌렸어요"
     }
 
     fun dismissUndo() {
@@ -227,8 +265,122 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = e.toUserMessage() ?: "되돌리지 못했어요."
         }
         DeletedEvents.remove(getApplication(), event.id)
-        if (_undo.value?.id == event.id) _undo.value = null
+        if (_undo.value?.event?.id == event.id) _undo.value = null
         _message.value = "\"${event.title}\" 일정을 되돌렸어요 (${event.date.monthValue}월 ${event.date.dayOfMonth}일)"
+    }
+
+    // ── 가고 싶은 곳 ──────────────────────────────────────
+
+    /** 가고 싶은 곳 목록 (최근에 담은 것부터) */
+    val wishes: StateFlow<List<WishPlace>> = run {
+        val repo = container.wishes
+        if (repo == null) {
+            MutableStateFlow(emptyList())
+        } else {
+            readyCoupleId
+                .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repo.observe(id) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }
+    }
+
+    fun addWish(place: Place) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.wishes ?: return
+        if (wishes.value.any { it.place.name == place.name && !it.visited }) {
+            _message.value = "📍 ${place.name} 은(는) 이미 가고 싶은 곳에 있어요"
+            return
+        }
+        if (wishes.value.size >= WishPlace.MAX_ITEMS) {
+            _message.value = "가고 싶은 곳은 ${WishPlace.MAX_ITEMS}개까지 담을 수 있어요"
+            return
+        }
+        repo.add(ready.couple.id, ready.myUid, place) { e -> _message.value = e.toUserMessage() ?: "담지 못했어요." }
+        _message.value = "📍 ${place.name} 을(를) 가고 싶은 곳에 담았어요 💕"
+    }
+
+    fun setWishVisited(id: String, visited: Boolean) {
+        val ready = state.value as? AppState.Ready ?: return
+        container.wishes?.setVisited(ready.couple.id, ready.myUid, id, visited) { e ->
+            _message.value = e.toUserMessage() ?: "바꾸지 못했어요."
+        }
+    }
+
+    fun setWishMemo(id: String, memo: String) {
+        val ready = state.value as? AppState.Ready ?: return
+        container.wishes?.setMemo(ready.couple.id, ready.myUid, id, memo) { e ->
+            _message.value = e.toUserMessage() ?: "메모를 저장하지 못했어요."
+        }
+    }
+
+    fun deleteWish(id: String) {
+        val ready = state.value as? AppState.Ready ?: return
+        container.wishes?.delete(ready.couple.id, id) { e -> _message.value = e.toUserMessage() ?: "지우지 못했어요." }
+    }
+
+    // ── 백업 파일 ─────────────────────────────────────────
+
+    private val _importPreview = MutableStateFlow<ImportPreview?>(null)
+    /** 불러올 백업 파일 요약 (확인 창) */
+    val importPreview: StateFlow<ImportPreview?> = _importPreview.asStateFlow()
+
+    /** 전체 일정·가고 싶은 곳을 파일로 저장 (파일 위치는 사용자가 고른다) */
+    fun exportBackup(uri: android.net.Uri) = launchBusy {
+        val ready = state.value as? AppState.Ready ?: return@launchBusy
+        val events = container.events?.fetchAll(ready.couple.id).orEmpty()
+        val wishList = container.wishes?.fetchAll(ready.couple.id).orEmpty()
+        val text = Backup.encode(
+            events = events,
+            wishes = wishList,
+            startDate = ready.couple.startDate,
+            countFromOne = ready.couple.countFromOne,
+            names = ready.couple.names,
+            exportedAt = java.time.LocalDateTime.now().withNano(0).toString(),
+        )
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val out = getApplication<Application>().contentResolver.openOutputStream(uri, "wt")
+                ?: throw UserFacingException("파일을 만들지 못했어요.")
+            out.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+        }
+        _message.value = "백업 파일을 저장했어요 (일정 ${events.size}개 · 가고 싶은 곳 ${wishList.size}곳)"
+    }
+
+    /** 백업 파일을 읽고, 지금 없는 것만 골라 확인 창을 띄운다 */
+    fun readBackup(uri: android.net.Uri) = launchBusy {
+        val ready = state.value as? AppState.Ready ?: return@launchBusy
+        val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val input = getApplication<Application>().contentResolver.openInputStream(uri)
+                ?: throw UserFacingException("파일을 열지 못했어요.")
+            input.use { stream ->
+                val bytes = stream.readBytes()
+                if (bytes.size > Backup.MAX_BYTES) throw UserFacingException("파일이 너무 커요. 우리둘 백업 파일인지 확인해 주세요.")
+                bytes.toString(Charsets.UTF_8)
+            }
+        }
+        val data = Backup.decode(text)
+        val eventIds = container.events?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()
+        val wishIds = container.wishes?.fetchAll(ready.couple.id).orEmpty().map { it.id }.toSet()
+        _importPreview.value = Backup.preview(data, eventIds, wishIds)
+    }
+
+    fun cancelImport() {
+        _importPreview.value = null
+    }
+
+    /** 지금 없는 일정·장소만 더한다 (만든 사람이 지금 커플이 아니면 나로) */
+    fun confirmImport() {
+        val preview = _importPreview.value ?: return
+        _importPreview.value = null
+        val ready = state.value as? AppState.Ready ?: return
+        val members = ready.couple.members.toSet()
+        preview.newEvents.forEach { e ->
+            val owner = e.createdBy.takeIf { it in members } ?: ready.myUid
+            container.events?.restore(ready.couple.id, ready.myUid, e.copy(createdBy = owner)) { _message.value = "일부 일정을 더하지 못했어요. 다시 불러와 주세요." }
+        }
+        preview.newWishes.forEach { w ->
+            val owner = w.createdBy.takeIf { it in members } ?: ready.myUid
+            container.wishes?.restore(ready.couple.id, ready.myUid, w, owner) { _message.value = "일부 장소를 더하지 못했어요. 다시 불러와 주세요." }
+        }
+        _message.value = "백업에서 일정 ${preview.newEvents.size}개 · 가고 싶은 곳 ${preview.newWishes.size}곳을 더했어요"
     }
 
     // ── 일정 검색 ─────────────────────────────────────────
@@ -360,7 +512,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch {
                 readyCoupleId
                     .flatMapLatest { id ->
-                        if (id == null) flowOf(null) else repo.observeUpcoming(id, LocalDate.now())
+                        if (id == null) {
+                            flowOf(null)
+                        } else {
+                            // 다가오는 일정 + 반복 일정(앞으로 두 달, 날짜별로 펼침)
+                            val today = LocalDate.now()
+                            combine(repo.observeUpcoming(id, today), repo.observeRecurring(id)) { upcoming, recurring ->
+                                CalendarMath.upcoming(Recurrence.merge(upcoming, recurring, today, today.plusDays(60)), today, 40)
+                            }
+                        }
                     }
                     .filterNotNull()
                     .distinctUntilChanged()

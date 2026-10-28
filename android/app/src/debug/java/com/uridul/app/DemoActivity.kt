@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.uridul.app.data.CalendarEvent
+import com.uridul.app.data.toSeriesDates
 import androidx.lifecycle.lifecycleScope
 import com.uridul.app.data.Couple
 import com.uridul.app.data.WidgetSnapshot
@@ -67,6 +68,8 @@ class DemoActivity : ComponentActivity() {
             ev("6", 3, "렌터카", "11:00", me),
             ev("7", 9, "엄마 생신", null, partner),
             ev("8", -4, "카페 투어", "14:00", me),
+            // 반복 일정: 매주 같은 요일 운동 (열흘 전부터)
+            ev("9", -10, "같이 운동", "07:30", partner).copy(repeat = com.uridul.app.data.Repeat.WEEKLY),
         )
 
         // 에뮬레이터에서 위젯 모양을 점검할 때만: --ez seedWidgets true
@@ -91,46 +94,73 @@ class DemoActivity : ComponentActivity() {
                 var month by remember { mutableStateOf(YearMonth.now()) }
                 var request by remember { mutableStateOf<OpenRequest?>(OpenRequest(tab = startTab)) }
                 val snackbar = remember { SnackbarHostState() }
-                var undo by remember { mutableStateOf<CalendarEvent?>(null) }
+                var undo by remember { mutableStateOf<com.uridul.app.data.UndoItem?>(null) }
                 val deleted = remember { mutableStateListOf<com.uridul.app.data.DeletedEvent>() }
+                val wishes = remember {
+                    mutableStateListOf(
+                        com.uridul.app.data.WishPlace("w1", com.uridul.app.data.Place("선릉감자탕", null, com.uridul.app.data.MapApp.NAVER), "웨이팅 길대요", me, false),
+                        com.uridul.app.data.WishPlace("w2", com.uridul.app.data.Place("성수 카페거리", null, com.uridul.app.data.MapApp.KAKAO), "", partner, false),
+                        com.uridul.app.data.WishPlace("w3", com.uridul.app.data.Place("남산타워", null, com.uridul.app.data.MapApp.GOOGLE), "", me, true),
+                    )
+                }
                 fun restore(e: CalendarEvent) {
                     events.removeAll { it.id == e.id }
                     events += e
                     deleted.removeAll { it.event.id == e.id }
                     undo = null
                 }
+                fun setSkip(id: String, day: LocalDate, skipped: Boolean) {
+                    val i = events.indexOfFirst { it.id == id }
+                    if (i >= 0) events[i] = events[i].copy(skip = if (skipped) events[i].skip + day else events[i].skip - day)
+                }
+                val range = CalendarMath.queryRange(month)
                 ReadyScreen(
                     undo = undo,
-                    onUndo = { undo?.let(::restore) },
+                    onUndo = {
+                        undo?.let { u -> if (u.skippedDay != null) setSkip(u.event.id, u.skippedDay!!, false) else restore(u.event) }
+                        undo = null
+                    },
                     onDismissUndo = { undo = null },
                     deletedEvents = deleted.toList(),
                     onRestoreDeleted = ::restore,
                     onLoadAllEvents = { events.toList() },
+                    onSkipOccurrence = { id, day ->
+                        events.firstOrNull { it.id == id }?.let { undo = com.uridul.app.data.UndoItem(it, day) }
+                        setSkip(id, day, true)
+                    },
+                    wishes = wishes.toList(),
+                    onAddWish = { p -> wishes.add(0, com.uridul.app.data.WishPlace("w${wishes.size + 10}", p, "", me, false)) },
+                    onWishVisited = { id, v -> wishes.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { wishes[it] = wishes[it].copy(visited = v) } },
+                    onWishMemo = { id, m -> wishes.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { wishes[it] = wishes[it].copy(memo = m) } },
+                    onDeleteWish = { id -> wishes.removeAll { it.id == id } },
                     couple = couple,
                     myUid = me,
                     busy = false,
                     snackbar = snackbar,
                     month = month,
-                    monthEvents = events.toList(),
+                    monthEvents = com.uridul.app.domain.Recurrence.merge(events.toList(), events.toList(), range.start, range.endInclusive),
                     openRequest = request,
                     onOpenRequestHandled = { request = null },
                     onMonthChange = { month = it },
-                    onSaveEvent = { draft ->
+                    onSaveEvent = { input ->
+                        val draft = input.toSeriesDates()
                         if (CalendarMath.validate(draft) != null) {
                             false
                         } else {
                             val id = draft.id ?: "new${events.size + 1}"
+                            val old = events.firstOrNull { it.id == id }
                             events.removeAll { it.id == id }
                             events += CalendarEvent(
-                                id, draft.title.trim(), draft.date, draft.endDate, draft.time, draft.memo, me,
+                                id, draft.title.trim(), draft.date, draft.endDate, draft.time, draft.memo, old?.createdBy ?: me,
                                 place = draft.place, timeline = draft.timeline, remind = draft.remind,
+                                repeat = draft.repeat, skip = old?.skip.orEmpty(),
                             )
                             true
                         }
                     },
                     onDeleteEvent = { id ->
                         events.firstOrNull { it.id == id }?.let { e ->
-                            undo = e
+                            undo = com.uridul.app.data.UndoItem(e)
                             deleted.add(0, com.uridul.app.data.DeletedEvent(e, System.currentTimeMillis()))
                         }
                         events.removeAll { it.id == id }

@@ -80,6 +80,7 @@ import com.uridul.app.data.EventDraft
 import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
 import com.uridul.app.data.Remind
+import com.uridul.app.data.Repeat
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.toDraft
 import com.uridul.app.domain.CalendarMath
@@ -118,7 +119,9 @@ fun DayTimelinePage(
     onIncomingPlaceConsumed: () -> Unit,
     onAttachPlace: (eventId: String, slot: Int, place: Place) -> Unit,
     /** 방금 지운 일정 (아래에 "되돌리기" 안내) */
-    undo: CalendarEvent? = null,
+    undo: com.uridul.app.data.UndoItem? = null,
+    /** 반복 일정에서 이 날만 빼기 (일정 ID, 그 날의 시작일) */
+    onSkip: (String, LocalDate) -> Unit = { _, _ -> },
     onUndo: () -> Unit = {},
     onDismissUndo: () -> Unit = {},
 ) {
@@ -322,16 +325,36 @@ fun DayTimelinePage(
     }
     if (confirmDelete) {
         val e = edit
+        // 반복 일정이면 "이 날만 빼기" / "반복 전체 삭제" 중에서 고른다
+        val occurrence = e?.original?.takeIf { it.repeat != null }?.let { it.occurrence ?: it.date }
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("일정을 삭제할까요?") },
-            text = { Text("\"${e?.draft?.title.orEmpty()}\" 일정 전체가 상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요.") },
+            title = { Text(if (occurrence != null) "반복 일정을 삭제할까요?" else "일정을 삭제할까요?") },
+            text = {
+                Text(
+                    if (occurrence != null) {
+                        "\"${e.draft.title}\" 은(는) ${e.original.repeat?.label(e.original.date)} 반복 일정이에요.\n" +
+                            "이 날(${occurrence.monthValue}월 ${occurrence.dayOfMonth}일)만 뺄 수도, 반복 전체를 지울 수도 있어요. 상대 폰에서도 똑같이 바뀌어요."
+                    } else {
+                        "\"${e?.draft?.title.orEmpty()}\" 일정 전체가 상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요."
+                    },
+                )
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    e?.draft?.id?.let(onDelete)
-                    setEdit(null)
-                }) { Text("삭제", color = MaterialTheme.colorScheme.error) }
+                Row {
+                    if (occurrence != null) {
+                        TextButton(onClick = {
+                            confirmDelete = false
+                            e.draft.id?.let { onSkip(it, occurrence) }
+                            setEdit(null)
+                        }) { Text("이 날만 빼기") }
+                    }
+                    TextButton(onClick = {
+                        confirmDelete = false
+                        e?.draft?.id?.let(onDelete)
+                        setEdit(null)
+                    }) { Text(if (occurrence != null) "반복 전체 삭제" else "삭제", color = MaterialTheme.colorScheme.error) }
+                }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
         )
@@ -356,6 +379,7 @@ private fun AllDayRow(events: List<CalendarEvent>, myUid: String, editingId: Str
             val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
             val strong = if (mine) CoupleColors.mine else CoupleColors.partner
             val label = buildString {
+                if (e.repeat != null) append("🔁 ")
                 append(e.title)
                 if (e.isMultiDay) append(" (${e.date.monthValue}.${e.date.dayOfMonth}~${e.endDate.monthValue}.${e.endDate.dayOfMonth})")
                 (e.place ?: e.slots.firstOrNull()?.place)?.let { append("  📍${it.name}") }
@@ -494,7 +518,7 @@ private fun TimelineBlock(
             )
             if (lengthMin >= 40) {
                 Text(
-                    block.title,
+                    (if (block.event.repeat != null) "🔁 " else "") + block.title,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = CoupleColors.onFill,
@@ -624,6 +648,19 @@ private fun EditPanel(
                 }
             }
 
+            RepeatRow(
+                repeat = d.repeat,
+                date = d.date,
+                seriesStart = d.seriesStart,
+                onPick = { onChange(edit.copy(draft = d.copy(repeat = it))) },
+            )
+            if (edit.original?.repeat != null) {
+                Text(
+                    "🔁 반복 일정이에요. 여기서 고치면 모든 날에 함께 바뀌어요 (이 날만 없애려면 [일정 삭제] → 이 날만 빼기).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             RemindRow(
                 remind = d.remind,
                 allDay = allDay,
@@ -771,6 +808,56 @@ private fun TimeCell(label: String, time: LocalTime?, enabled: Boolean, onPick: 
     }
 }
 
+/** 반복 고르기: [🔁 반복   매주 수요일 ▾] */
+@Composable
+private fun RepeatRow(repeat: Repeat?, date: LocalDate, seriesStart: LocalDate?, onPick: (Repeat?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val line = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+    val noneLabel = if (seriesStart != null && seriesStart != date) "반복 안 함 (첫 날 ${seriesStart.monthValue}월 ${seriesStart.dayOfMonth}일만 남아요)" else "반복 안 함"
+    val current = repeat?.label(date) ?: "반복 안 함"
+    Box {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .border(1.dp, line, RoundedCornerShape(14.dp))
+                .clickable { open = true }
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .semantics { contentDescription = "반복 $current, 눌러서 바꾸기" },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("🔁")
+            Spacer(Modifier.width(8.dp))
+            Text("반복", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(
+                current,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (repeat == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+            )
+            Text("  ▾", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            (listOf<Repeat?>(null) + Repeat.entries).forEach { r ->
+                val selected = r == repeat
+                androidx.compose.material3.DropdownMenuItem(
+                    text = {
+                        Text(
+                            r?.label(date) ?: noneLabel,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onPick(r)
+                    },
+                )
+            }
+        }
+    }
+}
+
 /** 알림 시간 고르기: [🔔 알림   30분 전 ▾] */
 @Composable
 private fun RemindRow(remind: Int?, allDay: Boolean, onPick: (Int) -> Unit) {
@@ -882,7 +969,11 @@ private data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Boo
         copy(draft = draft.copy(timeline = list), slot = 0)
     }
 
-    fun withPlace(p: Place): SlotEdit = if (slot < 0) copy(draft = draft.copy(place = p)) else updateSlot { it.copy(place = p) }
+    /** 장소 넣기. 새 일정이고 제목이 비어 있으면 장소 이름을 제목으로 */
+    fun withPlace(p: Place): SlotEdit {
+        val titled = if (isNew && draft.title.isBlank()) copy(draft = draft.copy(title = p.name.take(CalendarEvent.TITLE_MAX))) else this
+        return if (slot < 0) titled.copy(draft = titled.draft.copy(place = p)) else titled.updateSlot { it.copy(place = p) }
+    }
 }
 
 private fun editOf(event: CalendarEvent, slot: Int = 0): SlotEdit {
@@ -963,6 +1054,9 @@ private object EditCodec {
         .put("memo", d.memo)
         .put("place", placeJson(d.place))
         .put("remind", d.remind ?: JSONObject.NULL)
+        .put("repeat", d.repeat?.key ?: JSONObject.NULL)
+        .put("seriesStart", d.seriesStart?.toString() ?: JSONObject.NULL)
+        .put("occurrence", d.occurrence?.toString() ?: JSONObject.NULL)
         .put("timeline", JSONArray().also { arr ->
             d.timeline.forEach { s ->
                 arr.put(
@@ -986,6 +1080,9 @@ private object EditCodec {
             memo = o.getString("memo"),
             place = parsePlace(o, "place"),
             remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
+            repeat = Repeat.from(if (!o.has("repeat") || o.isNull("repeat")) null else o.getString("repeat")),
+            seriesStart = if (!o.has("seriesStart") || o.isNull("seriesStart")) null else LocalDate.parse(o.getString("seriesStart")),
+            occurrence = if (!o.has("occurrence") || o.isNull("occurrence")) null else LocalDate.parse(o.getString("occurrence")),
             timeline = (0 until arr.length()).map { i ->
                 val s = arr.getJSONObject(i)
                 TimeSlot(

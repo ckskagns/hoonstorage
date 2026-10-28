@@ -125,6 +125,10 @@ fun EventEditorDialog(
             place = if (allDay) dayPlace else null,
             timeline = timeline,
             // 알림 시간은 하루 페이지에서 고른 값을 그대로 (하루 종일에 없는 값이면 기본값)
+            // 반복 정보는 하루 페이지에서 고른 값을 그대로 (반복 일정의 어느 날인지도)
+            repeat = initial.repeat,
+            seriesStart = initial.seriesStart,
+            occurrence = initial.occurrence,
             remind = initial.remind?.takeIf { r ->
                 if (allDay) com.uridul.app.data.Remind.allDayOptions.any { it.minutes == r } else true
             },

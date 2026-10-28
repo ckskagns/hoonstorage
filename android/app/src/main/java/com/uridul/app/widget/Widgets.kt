@@ -45,7 +45,13 @@ object Widgets {
         if (FirebaseAuth.getInstance().currentUser == null) return null
         val events = withTimeoutOrNull(6_000) {
             runCatching {
-                EventRepository(FirebaseFirestore.getInstance()).fetchUpcoming(coupleId, LocalDate.now())
+                val repo = EventRepository(FirebaseFirestore.getInstance())
+                val today = LocalDate.now()
+                // 반복 일정은 앞으로 두 달 동안 날짜별로 펼쳐서 함께
+                val merged = com.uridul.app.domain.Recurrence.merge(
+                    repo.fetchUpcoming(coupleId, today), repo.fetchRecurring(coupleId), today, today.plusDays(60),
+                )
+                CalendarMath.upcoming(merged, today, 40)
             }.getOrNull()
         } ?: return null
         WidgetStore.saveEvents(context, events)
@@ -61,7 +67,11 @@ object Widgets {
         if (FirebaseAuth.getInstance().currentUser == null) return null
         val events = withTimeoutOrNull(6_000) {
             runCatching {
-                EventRepository(FirebaseFirestore.getInstance()).fetchRange(coupleId, CalendarMath.queryRange(month))
+                val repo = EventRepository(FirebaseFirestore.getInstance())
+                val range = CalendarMath.queryRange(month)
+                com.uridul.app.domain.Recurrence.merge(
+                    repo.fetchRange(coupleId, range), repo.fetchRecurring(coupleId), range.start, range.endInclusive,
+                )
             }.getOrNull()
         } ?: return null
         WidgetStore.saveMonthEvents(context, month, events)

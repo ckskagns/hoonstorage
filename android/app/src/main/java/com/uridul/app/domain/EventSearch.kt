@@ -33,7 +33,8 @@ object EventSearch {
 
     /** 다가오는 일정(끝나는 날이 오늘 이후)은 가까운 순, 지난 일정은 최근 순 */
     fun search(events: List<CalendarEvent>, query: String, today: LocalDate, limit: Int = 100): Result {
-        val found = events.filter { matches(it, query) }
+        // 반복 일정은 다음에 오는 날로 보여준다 (앞으로 없으면 원래 첫 날)
+        val found = events.filter { matches(it, query) }.map { e -> if (e.repeat != null) Recurrence.next(e, today) ?: e else e }
         val upcoming = found.filter { !it.endDate.isBefore(today) }.sortedWith(compareBy({ it.date }, { it.time }))
         val past = found.filter { it.endDate.isBefore(today) }.sortedWith(compareByDescending<CalendarEvent> { it.date }.thenBy { it.time })
         return Result(upcoming.take(limit), past.take(limit))

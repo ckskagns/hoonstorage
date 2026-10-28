@@ -38,7 +38,7 @@ private const val UNDO_SHOW_MILLIS = 8_000L
  * 시간이 지나면 저절로 사라진다 (메뉴 "최근 지운 일정" 에서 30일 동안 다시 되돌릴 수 있다).
  */
 @Composable
-fun UndoBar(event: CalendarEvent?, onUndo: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun UndoBar(event: com.uridul.app.data.UndoItem?, onUndo: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     // 사라지는 애니메이션 동안에도 글자가 남아 있도록 마지막 일정을 기억한다
     var last by remember { mutableStateOf(event) }
     val dismiss by rememberUpdatedState(onDismiss)
@@ -65,7 +65,7 @@ fun UndoBar(event: CalendarEvent?, onUndo: () -> Unit, onDismiss: () -> Unit, mo
             ) {
                 Row(Modifier.padding(start = 18.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "🗑 \"${shown.title}\" 일정을 지웠어요",
+                        (if (shown.skippedDay != null) "🗓 " else "🗑 ") + shown.message,
                         color = MaterialTheme.colorScheme.inverseOnSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,

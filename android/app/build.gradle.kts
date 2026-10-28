@@ -89,4 +89,6 @@ dependencies {
     implementation(libs.googleid)
 
     testImplementation(libs.junit)
+    // 단위 테스트에서 org.json 을 실제로 쓰기 위해 (안드로이드 기본 org.json 은 테스트에서 동작하지 않음)
+    testImplementation("org.json:json:20240303")
 }

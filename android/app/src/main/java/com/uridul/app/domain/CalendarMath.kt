@@ -107,6 +107,8 @@ object CalendarMath {
             draft.endDate.isBefore(draft.date) -> "끝나는 날이 시작하는 날보다 빨라요."
             ChronoUnit.DAYS.between(draft.date, draft.endDate) >= CalendarEvent.MAX_SPAN_DAYS ->
                 "여러 날 일정은 ${CalendarEvent.MAX_SPAN_DAYS}일까지 만들 수 있어요."
+            draft.repeat != null && ChronoUnit.DAYS.between(draft.date, draft.endDate) > draft.repeat.maxSpanDays ->
+                "${draft.repeat.short} 반복은 ${draft.repeat.maxSpanDays + 1}일보다 짧은 일정만 만들 수 있어요."
             draft.time != null && draft.timeline.size > TimeSlot.MAX_SLOTS ->
                 "시간대는 ${TimeSlot.MAX_SLOTS}개까지 넣을 수 있어요."
             draft.time != null && draft.date != draft.endDate && draft.timeline.size > 1 ->

@@ -112,6 +112,9 @@ object WidgetStore {
                     .put("createdBy", e.createdBy)
                     .put("memo", e.memo)
                     .put("remind", e.remind ?: JSONObject.NULL)
+                    .put("repeat", e.repeat?.key ?: JSONObject.NULL)
+                    .put("skip", JSONArray(e.skip.sorted().map { it.toString() }))
+                    .put("seriesStart", e.seriesStart?.toString() ?: JSONObject.NULL)
                     .put("placeName", e.place?.name ?: JSONObject.NULL)
                     .put("placeUrl", e.place?.url ?: JSONObject.NULL)
                     .put("placeApp", e.place?.app?.key ?: JSONObject.NULL)
@@ -148,6 +151,12 @@ object WidgetStore {
                         time = if (o.isNull("time")) null else LocalTime.parse(o.getString("time")),
                         memo = o.optString("memo"),
                         remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
+                        repeat = Repeat.from(if (o.isNull("repeat")) null else o.optString("repeat")),
+                        skip = o.optJSONArray("skip")?.let { arr ->
+                            (0 until arr.length()).mapNotNull { k -> runCatching { LocalDate.parse(arr.getString(k)) }.getOrNull() }.toSet()
+                        }.orEmpty(),
+                        seriesStart = if (!o.has("seriesStart") || o.isNull("seriesStart")) null
+                        else runCatching { LocalDate.parse(o.getString("seriesStart")) }.getOrNull(),
                         createdBy = o.optString("createdBy"),
                         place = if (o.isNull("placeName") || !o.has("placeName")) null else Place(
                             o.getString("placeName"),

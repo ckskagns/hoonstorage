@@ -60,4 +60,9 @@ class AppContainer(context: Context) {
     val events: EventRepository? by lazy {
         if (firebaseReady) EventRepository(FirebaseFirestore.getInstance()) else null
     }
+
+    /** 가고 싶은 곳 목록 */
+    val wishes: com.uridul.app.data.WishRepository? by lazy {
+        if (firebaseReady) com.uridul.app.data.WishRepository(FirebaseFirestore.getInstance()) else null
+    }
 }

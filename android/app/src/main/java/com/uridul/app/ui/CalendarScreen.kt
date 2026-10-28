@@ -645,6 +645,13 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    event.repeat?.let { r ->
+                        Text(
+                            "🔁 ${r.label(event.seriesStart ?: event.date)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 // 누가 등록했는지: 캐릭터 얼굴 + 이름

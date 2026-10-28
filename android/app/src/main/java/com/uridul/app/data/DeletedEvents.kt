@@ -7,6 +7,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** 되돌릴 수 있는 일: 일정 지우기 / 반복 일정에서 하루 빼기 */
+data class UndoItem(val event: CalendarEvent, val skippedDay: java.time.LocalDate? = null) {
+    val message: String
+        get() = if (skippedDay != null) "\"${event.title}\" ${skippedDay.monthValue}월 ${skippedDay.dayOfMonth}일만 뺐어요"
+        else "\"${event.title}\" 일정을 지웠어요"
+}
+
 /** 지운 일정 하나 + 지운 시각 */
 data class DeletedEvent(val event: CalendarEvent, val deletedAtMillis: Long)
 

@@ -39,8 +39,22 @@ data class CalendarEvent(
     val timeline: List<TimeSlot> = emptyList(),
     /** 알림: 몇 분 전 (null = 기본값, [Remind.OFF] = 끄기) */
     val remind: Int? = null,
+    /** 반복 (null = 반복 안 함) */
+    val repeat: Repeat? = null,
+    /** 반복 중 뺀 날 (그 날의 시작일) */
+    val skip: Set<LocalDate> = emptySet(),
+    /**
+     * 반복 일정을 날짜별로 펼친 것이면 원래(첫) 시작일. 저장된 원본이면 null.
+     * (펼친 일정의 date·endDate 는 그 날 기준이다)
+     */
+    val seriesStart: LocalDate? = null,
 ) {
     val allDay: Boolean get() = time == null
+    /** 펼친 반복 일정이면 원본(첫 날 기준)으로 되돌린다 */
+    fun asSeries(): CalendarEvent {
+        val start = seriesStart ?: return this
+        return copy(date = start, endDate = start.plusDays(java.time.temporal.ChronoUnit.DAYS.between(date, endDate)), seriesStart = null)
+    }
     /** 실제로 쓸 알림 값 */
     val remindValue: Int get() = Remind.effective(remind, allDay)
     val isMultiDay: Boolean get() = endDate.isAfter(date)
@@ -70,11 +84,64 @@ data class EventDraft(
     val place: Place? = null,
     val timeline: List<TimeSlot> = emptyList(),
     val remind: Int? = null,
+    val repeat: Repeat? = null,
+    /** 반복 일정의 어느 날을 고치는 중이면: 원래 첫 시작일 / 고치기 시작한 그 날의 시작일 */
+    val seriesStart: LocalDate? = null,
+    val occurrence: LocalDate? = null,
 )
 
-/** 저장된 일정을 수정용 입력값으로 */
+/** 저장된 일정을 수정용 입력값으로 (펼친 반복 일정이면 그 날 기준 + 원래 첫 날을 함께 기억) */
 fun CalendarEvent.toDraft(): EventDraft =
-    EventDraft(id, title, date, endDate, time, memo, if (time == null) place else null, slots, remind)
+    EventDraft(
+        id, title, date, endDate, time, memo, if (time == null) place else null, slots, remind,
+        repeat = repeat,
+        seriesStart = seriesStart,
+        occurrence = if (seriesStart != null) date else null,
+    )
+
+/**
+ * 반복 일정을 고친 입력값을 저장할 모양으로: 그 날 기준 날짜를 원래 첫 날 기준으로 바꾼다.
+ * (그 날에서 날짜를 옮겼으면 반복 전체가 같은 만큼 옮겨진다)
+ */
+fun EventDraft.toSeriesDates(): EventDraft {
+    val start = seriesStart ?: return this
+    val occ = occurrence ?: return this
+    val shift = java.time.temporal.ChronoUnit.DAYS.between(occ, date)
+    val span = java.time.temporal.ChronoUnit.DAYS.between(date, endDate)
+    val newStart = start.plusDays(shift)
+    return copy(date = newStart, endDate = newStart.plusDays(span), seriesStart = null, occurrence = null)
+}
+
+/** 반복 주기 */
+enum class Repeat(val key: String) {
+    WEEKLY("weekly"),
+    MONTHLY("monthly"),
+    YEARLY("yearly");
+
+    /** "매주 수요일", "매달 14일", "매년 10월 28일" */
+    fun label(date: LocalDate): String = when (this) {
+        WEEKLY -> "매주 ${date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.KOREAN)}"
+        MONTHLY -> "매달 ${date.dayOfMonth}일"
+        YEARLY -> "매년 ${date.monthValue}월 ${date.dayOfMonth}일"
+    }
+
+    val short: String get() = when (this) {
+        WEEKLY -> "매주"
+        MONTHLY -> "매달"
+        YEARLY -> "매년"
+    }
+
+    /** 반복으로 만들 수 있는 가장 긴 일정 (다음 반복과 겹치지 않게) */
+    val maxSpanDays: Long get() = when (this) {
+        WEEKLY -> 6
+        MONTHLY -> 27
+        YEARLY -> 30
+    }
+
+    companion object {
+        fun from(key: String?): Repeat? = entries.firstOrNull { it.key == key }
+    }
+}
 
 /**
  * 일정 알림 시간.

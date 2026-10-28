@@ -181,6 +181,7 @@ private fun ResultRow(e: CalendarEvent, myUid: String, today: LocalDate, onOpen:
         add(e.slots.firstOrNull()?.start?.format(KoreanTime) ?: "하루 종일")
         (e.place ?: e.slots.firstOrNull { it.place != null }?.place)?.let { add("📍${it.name}") }
         if (e.slots.size > 1) add("시간대 ${e.slots.size}개")
+        e.repeat?.let { add("🔁 ${it.label(e.seriesStart ?: e.date)}") }
     }.joinToString("  ·  ")
     Surface(
         shape = RoundedCornerShape(18.dp),

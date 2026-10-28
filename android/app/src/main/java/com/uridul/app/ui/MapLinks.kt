@@ -139,12 +139,27 @@ object PlaceInbox {
     /** 입력 창에서 장소 찾기를 시작함 (받은 장소는 입력 창이 가져간다) */
     fun expectEditor() {
         target = null
+        wishAt = 0L
+    }
+
+    @Volatile
+    private var wishAt = 0L
+
+    /** "가고 싶은 곳" 에서 장소 담기를 시작했는지 (10분 동안) */
+    val wishTarget: Boolean
+        get() = System.currentTimeMillis() - wishAt < TARGET_TTL_MS
+
+    /** 가고 싶은 곳 목록에서 장소 찾기를 시작함 (받은 장소를 목록에 바로 담는다) */
+    fun expectWishlist() {
+        target = null
+        wishAt = System.currentTimeMillis()
     }
 
     /** 저장된 일정 카드에서 장소 찾기를 시작함 (받은 장소를 그 일정에 바로 저장) */
     fun expectEvent(eventId: String, slot: Int) {
         target = EventSlot(eventId, slot)
         targetAt = System.currentTimeMillis()
+        wishAt = 0L
     }
 
     fun offer(place: Place) {
@@ -154,5 +169,6 @@ object PlaceInbox {
     fun consume() {
         _place.value = null
         target = null
+        wishAt = 0L
     }
 }

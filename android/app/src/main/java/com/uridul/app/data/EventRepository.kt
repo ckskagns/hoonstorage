@@ -74,6 +74,23 @@ class EventRepository(private val db: FirebaseFirestore) {
         task.addOnFailureListener(onError)
     }
 
+    /** 반복 일정 원본 목록 (달력·위젯에서 날짜별로 펼친다) */
+    fun observeRecurring(coupleId: String): Flow<List<CalendarEvent>> = listen(recurringQuery(coupleId))
+
+    suspend fun fetchRecurring(coupleId: String): List<CalendarEvent> =
+        recurringQuery(coupleId).get().await().documents.mapNotNull { it.toEvent() }
+
+    private fun recurringQuery(coupleId: String) =
+        events(coupleId).whereIn("repeat", Repeat.entries.map { it.key })
+
+    /** 반복 일정에서 이 날만 빼기 / 다시 넣기 (날짜는 그 날의 시작일) */
+    fun setSkipped(coupleId: String, uid: String, eventId: String, day: LocalDate, skipped: Boolean, onError: (Exception) -> Unit) {
+        val value = if (skipped) FieldValue.arrayUnion(day.toString()) else FieldValue.arrayRemove(day.toString())
+        events(coupleId).document(eventId)
+            .update(mapOf("skip" to value, "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()))
+            .addOnFailureListener(onError)
+    }
+
     /** 일정 전체 목록 (검색용). 오프라인이면 폰에 남아 있는 것만. */
     suspend fun fetchAll(coupleId: String): List<CalendarEvent> =
         events(coupleId).orderBy("date").get().await().documents.mapNotNull { it.toEvent() }
@@ -83,10 +100,12 @@ class EventRepository(private val db: FirebaseFirestore) {
      * 상대가 만든 일정도 되돌릴 수 있도록 규칙에서 createdBy 가 커플 멤버이면 허용한다.
      */
     fun restore(coupleId: String, uid: String, event: CalendarEvent, onError: (Exception) -> Unit) {
-        val data = dataOf(event.toDraft(), uid)
-        data["createdBy"] = event.createdBy.ifEmpty { uid }
+        val series = event.asSeries()
+        val data = dataOf(series.toDraft(), uid)
+        data["skip"] = series.skip.sorted().map { it.toString() }.takeIf { it.isNotEmpty() }
+        data["createdBy"] = series.createdBy.ifEmpty { uid }
         data["createdAt"] = FieldValue.serverTimestamp()
-        events(coupleId).document(event.id).set(data).addOnFailureListener(onError)
+        events(coupleId).document(series.id).set(data).addOnFailureListener(onError)
     }
 
     private fun dataOf(draft: EventDraft, uid: String): MutableMap<String, Any?> {
@@ -109,6 +128,8 @@ class EventRepository(private val db: FirebaseFirestore) {
             },
             // 알림 시간 (몇 분 전, 끄기 -1). 기본값이면 비워 둔다
             "remind" to draft.remind?.takeIf { it in Remind.allowed },
+            // 반복 (뺀 날 목록 skip 은 따로 고친다: 일정을 고쳐도 뺀 날은 그대로)
+            "repeat" to draft.repeat?.key,
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
         )
@@ -168,6 +189,8 @@ class EventRepository(private val db: FirebaseFirestore) {
                 )
             },
             remind = (get("remind") as? Number)?.toInt()?.takeIf { it in Remind.allowed },
+            repeat = Repeat.from(getString("repeat")),
+            skip = (get("skip") as? List<*>).orEmpty().mapNotNull { (it as? String)?.let { s -> runCatching { LocalDate.parse(s) }.getOrNull() } }.toSet(),
         )
     }
 

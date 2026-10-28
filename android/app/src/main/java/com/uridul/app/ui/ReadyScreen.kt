@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.uridul.app.data.DeletedEvent
 import androidx.compose.material3.Checkbox
@@ -68,6 +70,7 @@ import java.time.YearMonth
 private enum class Tab(val key: String, val label: String, val icon: ImageVector) {
     Home("home", "디데이", Icons.Filled.Favorite),
     Calendar("calendar", "캘린더", Icons.Filled.DateRange),
+    Wish("wish", "가고 싶은 곳", Icons.Filled.Place),
 }
 
 /**
@@ -101,7 +104,7 @@ fun ReadyScreen(
     onColorsChanged: () -> Unit = {},
     onSetNotify: (Boolean) -> Unit = {},
     /** 방금 지운 일정 ("되돌리기" 안내) */
-    undo: CalendarEvent? = null,
+    undo: com.uridul.app.data.UndoItem? = null,
     onUndo: () -> Unit = {},
     onDismissUndo: () -> Unit = {},
     /** 최근 지운 일정 (이 폰에 30일 보관) */
@@ -109,7 +112,29 @@ fun ReadyScreen(
     onRestoreDeleted: (CalendarEvent) -> Unit = {},
     /** 검색용 전체 일정 불러오기 */
     onLoadAllEvents: suspend () -> List<CalendarEvent>? = { null },
+    /** 반복 일정에서 이 날만 빼기 */
+    onSkipOccurrence: (String, LocalDate) -> Unit = { _, _ -> },
+    /** 가고 싶은 곳 */
+    wishes: List<com.uridul.app.data.WishPlace> = emptyList(),
+    onAddWish: (Place) -> Unit = {},
+    onWishVisited: (String, Boolean) -> Unit = { _, _ -> },
+    onWishMemo: (String, String) -> Unit = { _, _ -> },
+    onDeleteWish: (String) -> Unit = {},
+    /** 백업 파일 */
+    onExportBackup: (android.net.Uri) -> Unit = {},
+    onImportBackup: (android.net.Uri) -> Unit = {},
+    importPreview: com.uridul.app.data.ImportPreview? = null,
+    onConfirmImport: () -> Unit = {},
+    onCancelImport: () -> Unit = {},
 ) {
+    // 공유받은 장소를 어디에 담을지 묻는 창
+    var placeChoice by remember { mutableStateOf<Place?>(null) }
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> uri?.let(onExportBackup) }
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(onImportBackup) }
     var searching by rememberSaveable { mutableStateOf(false) }
     var showingDeleted by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf(false) }
@@ -143,14 +168,25 @@ fun ReadyScreen(
     LaunchedEffect(sharedPlace) {
         val place = sharedPlace ?: return@LaunchedEffect
         if (editing != null || dayPage != null) return@LaunchedEffect
-        tabKey = Tab.Calendar.key
         val target = PlaceInbox.eventTarget
-        if (target != null) {
+        when {
+            // 가고 싶은 곳에서 [+ 장소 담기] 로 시작했으면 목록에 바로 담기
+            PlaceInbox.wishTarget -> {
+                tabKey = Tab.Wish.key
+                onAddWish(place)
+                PlaceInbox.consume()
+            }
             // 일정 카드의 [장소 찾기] 에서 시작했으면 그 일정·시간대에 바로 저장
-            onAttachPlace(target.eventId, target.slot, place)
-            PlaceInbox.consume()
-        } else {
-            openDay(selected, new = true)
+            target != null -> {
+                tabKey = Tab.Calendar.key
+                onAttachPlace(target.eventId, target.slot, place)
+                PlaceInbox.consume()
+            }
+            // 지도 앱에서 그냥 공유했으면 어디에 담을지 묻는다
+            else -> {
+                placeChoice = place
+                PlaceInbox.consume()
+            }
         }
     }
 
@@ -170,7 +206,14 @@ fun ReadyScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(if (tab == Tab.Home) "우리둘" else "우리 캘린더", fontWeight = FontWeight.Bold)
+                        Text(
+                            when (tab) {
+                                Tab.Home -> "우리둘"
+                                Tab.Calendar -> "우리 캘린더"
+                                Tab.Wish -> "가고 싶은 곳"
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
                     },
                     actions = {
                         if (tab == Tab.Calendar) {
@@ -228,6 +271,14 @@ fun ReadyScreen(
                             DropdownMenuItem(
                                 text = { Text(if (deletedEvents.isEmpty()) "최근 지운 일정" else "최근 지운 일정 (${deletedEvents.size})") },
                                 onClick = { menuOpen = false; showingDeleted = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("백업 파일 저장") },
+                                onClick = { menuOpen = false; exportLauncher.launch(com.uridul.app.data.Backup.fileName(LocalDate.now())) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("백업 불러오기") },
+                                onClick = { menuOpen = false; importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
                             )
                             DropdownMenuItem(
                                 text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
@@ -314,6 +365,22 @@ fun ReadyScreen(
                         onEdit = { e -> openDay(if (e.occursOn(selected)) selected else e.date, focus = e.id) },
                         modifier = content,
                     )
+                    Tab.Wish -> WishlistContent(
+                        wishes = wishes,
+                        couple = couple,
+                        myUid = myUid,
+                        // 날짜를 고르면 그 날 하루 페이지에서 이 장소로 새 일정
+                        onPlan = { w, date ->
+                            select(date)
+                            openDay(date, new = true)
+                            PlaceInbox.expectEditor()
+                            PlaceInbox.offer(w.place)
+                        },
+                        onVisited = { w, v -> onWishVisited(w.id, v) },
+                        onMemo = { w, m -> onWishMemo(w.id, m) },
+                        onDelete = { w -> onDeleteWish(w.id) },
+                        modifier = content,
+                    )
                 }
                 }
             }
@@ -341,6 +408,61 @@ fun ReadyScreen(
                 openDay(day, focus = e.id)
             },
             onDismiss = { searching = false },
+        )
+    }
+
+    placeChoice?.let { place ->
+        AlertDialog(
+            onDismissRequest = { placeChoice = null },
+            title = { Text("📍 ${place.name}") },
+            text = { Text("이 장소를 어디에 담을까요?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    placeChoice = null
+                    tabKey = Tab.Wish.key
+                    onAddWish(place)
+                }) { Text("가고 싶은 곳에 담기") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    placeChoice = null
+                    // 고른 날 하루 페이지에서 이 장소로 새 일정
+                    openDay(selected, new = true)
+                    PlaceInbox.expectEditor()
+                    PlaceInbox.offer(place)
+                }) { Text("${selected.monthValue}월 ${selected.dayOfMonth}일 일정에 넣기") }
+            },
+        )
+    }
+
+    importPreview?.let { p ->
+        AlertDialog(
+            onDismissRequest = onCancelImport,
+            title = { Text("백업 불러오기") },
+            text = {
+                Text(
+                    buildString {
+                        append("파일: 일정 ${p.data.events.size}개 · 가고 싶은 곳 ${p.data.wishes.size}곳")
+                        if (p.data.exportedAt.isNotBlank()) append("\n저장한 때: ${p.data.exportedAt.replace('T', ' ')}")
+                        append("\n\n")
+                        if (p.newEvents.isEmpty() && p.newWishes.isEmpty()) {
+                            append("지금 달력에 모두 있어서 더할 것이 없어요.")
+                        } else {
+                            append("지금 없는 일정 ${p.newEvents.size}개 · 장소 ${p.newWishes.size}곳을 더해요.\n이미 있는 것은 바꾸지 않아요.")
+                        }
+                    },
+                )
+            },
+            confirmButton = {
+                if (p.newEvents.isNotEmpty() || p.newWishes.isNotEmpty()) {
+                    TextButton(onClick = onConfirmImport) { Text("더하기") }
+                } else {
+                    TextButton(onClick = onCancelImport) { Text("확인") }
+                }
+            },
+            dismissButton = {
+                if (p.newEvents.isNotEmpty() || p.newWishes.isNotEmpty()) TextButton(onClick = onCancelImport) { Text("취소") }
+            },
         )
     }
 
@@ -382,6 +504,7 @@ fun ReadyScreen(
                 undo = if (editing == null) undo else null,
                 onUndo = onUndo,
                 onDismissUndo = onDismissUndo,
+                onSkip = onSkipOccurrence,
             )
         }
     }

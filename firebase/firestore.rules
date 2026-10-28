@@ -118,7 +118,10 @@ service cloud.firestore {
 
         function validEvent(d) {
           return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo', 'place', 'timeline',
-                                   'remind', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+                                   'remind', 'repeat', 'skip', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+            // 반복: 매주·매달·매년, 뺀 날 목록은 200개까지
+            && (!('repeat' in d) || d.repeat == null || d.repeat in ['weekly', 'monthly', 'yearly'])
+            && (!('skip' in d) || d.skip == null || (d.skip is list && d.skip.size() <= 200))
             && (!('place' in d) || d.place == null || validPlace(d.place))
             // 알림: 몇 분 전 (-1 끄기 ~ 1440 하루 전)
             && (!('remind' in d) || d.remind == null || (d.remind is int && d.remind >= -1 && d.remind <= 1440))
@@ -143,6 +146,33 @@ service cloud.firestore {
           && validEvent(request.resource.data)
           && request.resource.data.createdBy == resource.data.createdBy;
         allow delete: if isCoupleMember();
+      }
+
+      // 가고 싶은 곳: 지도 앱에서 공유받은 장소 목록 (두 사람만)
+      match /wishes/{wishId} {
+        function isWishMember() {
+          return signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+
+        function validWish(d) {
+          return d.keys().hasOnly(['name', 'url', 'app', 'memo', 'visited', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+            && d.name is string && d.name.size() > 0 && d.name.size() <= 100
+            && (!('url' in d) || d.url == null || (d.url is string && d.url.size() <= 500 && d.url.matches('^https?://.*')))
+            && (!('app' in d) || d.app == null || d.app in ['naver', 'kakao', 'google'])
+            && d.memo is string && d.memo.size() <= 200
+            && d.visited is bool
+            && d.updatedBy == request.auth.uid;
+        }
+
+        allow read: if isWishMember();
+        allow create: if isWishMember()
+          && validWish(request.resource.data)
+          && request.resource.data.createdBy in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        allow update: if isWishMember()
+          && validWish(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isWishMember();
       }
     }
   }
