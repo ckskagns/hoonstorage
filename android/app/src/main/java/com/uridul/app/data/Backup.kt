@@ -79,7 +79,8 @@ object Backup {
         if (root.optString("format") != FORMAT) throw UserFacingException("우리둘 백업 파일이 아니에요.")
         if (root.optInt("version", 0) > VERSION) throw UserFacingException("더 새 버전 앱에서 만든 백업이에요. 앱을 업데이트한 뒤 불러와 주세요.")
         val events = root.optJSONArray("events")?.let { WidgetStore.decode(it.toString()) }.orEmpty()
-            .filter { it.id.matches(SafeId) && it.title.isNotBlank() && it.title.length <= CalendarEvent.TITLE_MAX }
+            // 서버 규칙에 맞지 않는 일정(너무 긴 메모·시간대 등)은 건너뛴다
+            .filter { it.id.matches(SafeId) && com.uridul.app.domain.CalendarMath.validate(it.toDraft()) == null }
         val wishes = root.optJSONArray("wishes")?.let { arr ->
             (0 until arr.length()).mapNotNull { i ->
                 val o = arr.optJSONObject(i) ?: return@mapNotNull null

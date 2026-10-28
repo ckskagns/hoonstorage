@@ -405,8 +405,13 @@ fun EventEditorDialog(
     if (confirmDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("일정을 삭제할까요?") },
-            text = { Text("상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요.") },
+            title = { Text(if (initial.repeat != null) "반복 일정 전체를 삭제할까요?" else "일정을 삭제할까요?") },
+            text = {
+                Text(
+                    (if (initial.repeat != null) "반복되는 모든 날이 함께 지워져요. 이 날만 빼려면 하루 페이지의 [일정 삭제] → 이 날만 빼기 를 눌러 주세요.\n" else "") +
+                        "상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요.",
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false

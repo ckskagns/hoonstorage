@@ -178,7 +178,7 @@ object Reminders {
             val lead = e.remindValue
             e.slots.mapIndexedNotNull { i, slot ->
                 val at = e.date.atTime(slot.start).minusMinutes(lead.toLong())
-                if (at.isAfter(now) && !at.isAfter(until)) Alarm("${e.id}#$i", at, e, slot, lead) else null
+                if (at.isAfter(now) && !at.isAfter(until)) Alarm("${e.id}@${e.date}#$i", at, e, slot, lead) else null
             }
         }
     }

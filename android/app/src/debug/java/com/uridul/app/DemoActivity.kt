@@ -45,6 +45,29 @@ class DemoActivity : ComponentActivity() {
             }
             return
         }
+        // 백업 점검: 실제 서버 데이터로 백업 파일을 앱 전용 폴더에 저장 → 다시 읽어 불러오기 요약 계산 (서버에 쓰지 않음)
+        //   adb shell am start -n com.uridul.app/.DemoActivity --ez backupProbe true
+        if (intent.getBooleanExtra("backupProbe", false)) {
+            lifecycleScope.launch {
+                val log = StringBuilder()
+                runCatching {
+                    val snap = WidgetStore.load(applicationContext) ?: error("연결 정보 없음")
+                    val coupleId = snap.coupleId ?: error("커플 ID 없음")
+                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val events = com.uridul.app.data.EventRepository(db).fetchAll(coupleId)
+                    val wishes = com.uridul.app.data.WishRepository(db).fetchAll(coupleId)
+                    val text = com.uridul.app.data.Backup.encode(events, wishes, snap.startDate, snap.countFromOne, emptyMap(), java.time.LocalDateTime.now().withNano(0).toString())
+                    val file = java.io.File(getExternalFilesDir("backup"), "probe.json")
+                    file.writeText(text)
+                    val back = com.uridul.app.data.Backup.decode(file.readText())
+                    val preview = com.uridul.app.data.Backup.preview(back, events.map { it.id }.toSet(), wishes.map { it.id }.toSet())
+                    log.append("events=${events.size} wishes=${wishes.size} bytes=${file.length()} decodedEvents=${back.events.size} decodedWishes=${back.wishes.size} new=${preview.newEvents.size}/${preview.newWishes.size} recurring=${events.count { it.repeat != null }}")
+                }.onFailure { log.append("FAIL ${it.message}") }
+                android.util.Log.i("UridulProbe", log.toString())
+                finish()
+            }
+            return
+        }
         val startTab = intent.getStringExtra("tab") ?: "home"
         val today = LocalDate.now()
         val me = "me"

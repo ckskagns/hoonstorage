@@ -55,13 +55,16 @@ object Holidays {
     private class Group(val days: List<Holiday>, val rule: Rule)
 
     private val cache = ConcurrentHashMap<Int, List<Holiday>>()
+    /** 달력 칸마다 빨간 날인지 물어보므로 날짜 집합도 따로 둔다 */
+    private val dateCache = ConcurrentHashMap<Int, Set<LocalDate>>()
 
     /** 그 해의 공휴일 (날짜순, 대체공휴일 포함) */
     fun ofYear(year: Int): List<Holiday> = cache.getOrPut(year) { build(year) }
 
     fun on(date: LocalDate): List<Holiday> = ofYear(date.year).filter { it.date == date }
 
-    fun isHoliday(date: LocalDate): Boolean = ofYear(date.year).any { it.date == date }
+    fun isHoliday(date: LocalDate): Boolean =
+        date in dateCache.getOrPut(date.year) { ofYear(date.year).map { it.date }.toSet() }
 
     fun between(from: LocalDate, to: LocalDate): List<Holiday> {
         if (to.isBefore(from)) return emptyList()

@@ -131,24 +131,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** 캘린더 화면에 보이는 달 */
     val visibleMonth: StateFlow<YearMonth> = _visibleMonth.asStateFlow()
 
-    /** 보이는 달(앞뒤 달 포함)의 일정 */
+    /**
+     * 반복 일정 원본 목록: 커플 공간마다 한 번만 듣고 달력·위젯·알림이 함께 쓴다
+     * (달을 넘길 때마다 다시 받지 않도록)
+     */
+    private val recurringEvents: StateFlow<List<CalendarEvent>> = run {
+        val repo = container.events
+        if (repo == null) {
+            MutableStateFlow(emptyList())
+        } else {
+            readyCoupleId
+                .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repo.observeRecurring(id) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }
+    }
+
+    /** 보이는 달(앞뒤 달 포함)의 일정 + 반복 일정(날짜별로 펼침) */
     val monthEvents: StateFlow<List<CalendarEvent>> = run {
         val repo = container.events
         if (repo == null) {
             MutableStateFlow(emptyList())
         } else {
-            combine(readyCoupleId, _visibleMonth) { id, month -> id to month }
+            val ranged = combine(readyCoupleId, _visibleMonth) { id, month -> id to month }
                 .flatMapLatest { (id, month) ->
-                    if (id == null) {
-                        flowOf(emptyList())
-                    } else {
-                        // 그 달 범위 일정 + 반복 일정(날짜별로 펼침)
-                        val range = CalendarMath.queryRange(month)
-                        combine(repo.observeRange(id, range), repo.observeRecurring(id)) { plain, recurring ->
-                            Recurrence.merge(plain, recurring, range.start, range.endInclusive)
-                        }
-                    }
+                    val range = CalendarMath.queryRange(month)
+                    if (id == null) flowOf(range to emptyList()) else repo.observeRange(id, range).map { range to it }
                 }
+            combine(ranged, recurringEvents) { (range, plain), recurring ->
+                Recurrence.merge(plain, recurring, range.start, range.endInclusive)
+            }
+                .distinctUntilChanged()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
         }
     }
@@ -517,7 +529,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         } else {
                             // 다가오는 일정 + 반복 일정(앞으로 두 달, 날짜별로 펼침)
                             val today = LocalDate.now()
-                            combine(repo.observeUpcoming(id, today), repo.observeRecurring(id)) { upcoming, recurring ->
+                            combine(repo.observeUpcoming(id, today), recurringEvents) { upcoming, recurring ->
                                 CalendarMath.upcoming(Recurrence.merge(upcoming, recurring, today, today.plusDays(60)), today, 40)
                             }
                         }
