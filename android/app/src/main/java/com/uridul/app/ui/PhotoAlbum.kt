@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -83,10 +84,27 @@ class PhotoHooks(
 
 val LocalPhotos = compositionLocalOf { PhotoHooks() }
 
-/** JPEG 바이트 → 화면 그림 (같은 사진은 다시 풀지 않음) */
+/** 풀어 둔 작은 사진 (최대 16MB, 오래 안 본 것부터 버림) */
+private val photoCache = object : android.util.LruCache<String, ImageBitmap>(16 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int = (value.asAndroidBitmap().byteCount / 1024).coerceAtLeast(1)
+}
+
+/**
+ * JPEG 바이트 → 화면 그림. 화면을 그리는 줄에서 풀지 않고 뒤에서 풀어서 넘길 때 끊기지 않게 하고,
+ * 한 번 푼 사진은 기억해 둔다.
+ */
 @Composable
-fun rememberPhotoBitmap(key: String, bytes: ByteArray?): ImageBitmap? =
-    remember(key, bytes?.size) { bytes?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() } }
+fun rememberPhotoBitmap(key: String, bytes: ByteArray?): ImageBitmap? {
+    val cacheKey = "$key:${bytes?.size}"
+    val state = produceState(initialValue = bytes?.let { photoCache.get(cacheKey) }, cacheKey) {
+        if (value == null && bytes != null) {
+            value = withContext(Dispatchers.Default) {
+                runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+            }?.also { photoCache.put(cacheKey, it) }
+        }
+    }
+    return state.value
+}
 
 /**
  * 일정 카드의 사진첩 줄: [사진들…] [+ 사진]  ·  이번 주 7/25장
@@ -196,7 +214,8 @@ fun PhotoViewerDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                val meta = photos[page]
+                // 지운 직후 한 순간 장수가 줄어든 상태일 수 있어서 없는 장이면 그리지 않는다
+                val meta = photos.getOrNull(page) ?: return@HorizontalPager
                 // 큰 사진은 볼 때 받아온다 (받는 동안은 작은 사진)
                 val full by produceState<ImageBitmap?>(null, meta.id) {
                     value = withContext(Dispatchers.Default) {

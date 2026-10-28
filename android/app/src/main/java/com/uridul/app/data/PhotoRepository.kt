@@ -117,7 +117,12 @@ class PhotoRepository(private val db: FirebaseFirestore) {
     fun observeAlbum(coupleId: String, eventId: String, date: LocalDate): Flow<List<PhotoMeta>> =
         listen(photos(coupleId).whereEqualTo("eventId", eventId).whereEqualTo("date", date.toString()))
 
-    /** 기간 안의 사진 (추억 슬라이드용) */
+    /** 그 날 사진첩의 사진 하나 (추억 슬라이드 배경용, 작은 사진만) */
+    suspend fun fetchFirst(coupleId: String, eventId: String, date: LocalDate): PhotoMeta? =
+        photos(coupleId).whereEqualTo("eventId", eventId).whereEqualTo("date", date.toString()).limit(1)
+            .get().await().documents.firstNotNullOfOrNull { it.toMeta() }
+
+    /** 기간 안의 사진 */
     suspend fun fetchRange(coupleId: String, from: LocalDate, to: LocalDate): List<PhotoMeta> =
         photos(coupleId).whereGreaterThanOrEqualTo("date", from.toString()).whereLessThanOrEqualTo("date", to.toString())
             .get().await().documents.mapNotNull { it.toMeta() }

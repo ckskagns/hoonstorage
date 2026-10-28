@@ -88,30 +88,30 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val month by viewModel.visibleMonth.collectAsStateWithLifecycle()
     val monthEvents by viewModel.monthEvents.collectAsStateWithLifecycle()
     val openRequest by viewModel.openRequest.collectAsStateWithLifecycle()
-    val update by viewModel.update.collectAsStateWithLifecycle()
+    val update by viewModel.updates.update.collectAsStateWithLifecycle()
     val notifyEnabled by viewModel.notifyEnabled.collectAsStateWithLifecycle()
     val undo by viewModel.undo.collectAsStateWithLifecycle()
     val deletedEvents by viewModel.deletedEvents.collectAsStateWithLifecycle()
     val wishes by viewModel.wishes.collectAsStateWithLifecycle()
-    val importPreview by viewModel.importPreview.collectAsStateWithLifecycle()
+    val importPreview by viewModel.backup.importPreview.collectAsStateWithLifecycle()
     val reviews by viewModel.reviews.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val inbox by viewModel.inbox.collectAsStateWithLifecycle()
-    val weekPhotos by viewModel.weekPhotoCount.collectAsStateWithLifecycle()
-    val photoUploading by viewModel.photoUploading.collectAsStateWithLifecycle()
-    val memoryPhotos by viewModel.memoryPhotos.collectAsStateWithLifecycle()
+    val weekPhotos by viewModel.photos.weekPhotoCount.collectAsStateWithLifecycle()
+    val photoUploading by viewModel.photos.photoUploading.collectAsStateWithLifecycle()
+    val memoryPhotos by viewModel.photos.memoryPhotos.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        viewModel.onResumeAfterPermission()
+        viewModel.updates.onResumeAfterPermission()
         // 앱으로 돌아오면 이번 주 사진 장수를 다시 센다 (상대가 올렸을 수 있음)
-        viewModel.refreshWeekPhotoCount()
+        viewModel.photos.refreshWeekPhotoCount()
     }
     UpdateDialog(
         state = update,
-        onUpdate = viewModel::startUpdate,
-        onOpenPermission = viewModel::openInstallPermission,
-        onDismiss = viewModel::dismissUpdate,
+        onUpdate = viewModel.updates::startUpdate,
+        onOpenPermission = viewModel.updates::openInstallPermission,
+        onDismiss = viewModel.updates::dismissUpdate,
     )
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -152,14 +152,14 @@ private fun UridulRoot(viewModel: AppViewModel) {
         is AppState.Ready -> androidx.compose.runtime.CompositionLocalProvider(
             com.uridul.app.ui.LocalReviews provides com.uridul.app.ui.ReviewHooks(reviews, viewModel::saveReview, viewModel::deleteMyReview),
             com.uridul.app.ui.LocalPhotos provides com.uridul.app.ui.PhotoHooks(
-                album = viewModel::albumFlow,
+                album = viewModel.photos::albumFlow,
                 weekUsed = weekPhotos,
                 uploading = photoUploading,
-                onUpload = viewModel::uploadPhotos,
-                onDelete = viewModel::deletePhoto,
-                loadFull = viewModel::loadPhoto,
+                onUpload = viewModel.photos::uploadPhotos,
+                onDelete = viewModel.photos::deletePhoto,
+                loadFull = viewModel.photos::loadPhoto,
                 memoryThumbs = memoryPhotos,
-                refreshWeek = viewModel::refreshWeekPhotoCount,
+                refreshWeek = viewModel.photos::refreshWeekPhotoCount,
             ),
         ) { ReadyScreen(
             couple = s.couple,
@@ -177,7 +177,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onChangeStartDate = viewModel::updateStartDate,
             onSetCountFromOne = viewModel::setCountFromOne,
             onUpdateProfile = viewModel::updateProfile,
-            onCheckUpdate = { viewModel.checkForUpdate(manual = true) },
+            onCheckUpdate = { viewModel.updates.checkForUpdate(manual = true) },
             notifyEnabled = notifyEnabled,
             onAttachPlace = viewModel::attachPlace,
             undo = undo,
@@ -192,11 +192,11 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onWishVisited = viewModel::setWishVisited,
             onWishMemo = viewModel::setWishMemo,
             onDeleteWish = viewModel::deleteWish,
-            onExportBackup = { viewModel.exportBackup(it) },
-            onImportBackup = { viewModel.readBackup(it) },
+            onExportBackup = { viewModel.backup.exportBackup(it) },
+            onImportBackup = { viewModel.backup.readBackup(it) },
             importPreview = importPreview,
-            onConfirmImport = viewModel::confirmImport,
-            onCancelImport = viewModel::cancelImport,
+            onConfirmImport = viewModel.backup::confirmImport,
+            onCancelImport = viewModel.backup::cancelImport,
             memories = memories,
             onLoadMemories = viewModel::loadMemories,
             inbox = inbox,
