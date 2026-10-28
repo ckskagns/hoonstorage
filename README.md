@@ -11,7 +11,7 @@
 |---|---|
 | [`android/`](android/) | Android Studio 프로젝트 |
 | [`firebase/`](firebase/) | Firestore 보안 규칙, 초대 링크 웹페이지 |
-| [`docs/`](docs/) | [개발 검토안](docs/커플앱_개발검토안.md), [MVP 설정 가이드](docs/MVP_설정가이드.md), [PowerShell 진행 가이드](docs/PowerShell_진행가이드.md), [배포 가이드](docs/배포_가이드.md), [시장조사](docs/커플앱_시장조사_및_기능제안.md), [사진 기능 검토](docs/사진기능_도입검토.md), [장소 등록 검토](docs/장소등록_네이버지도_검토.md) |
+| [`docs/`](docs/) | [개발 검토안](docs/커플앱_개발검토안.md), [MVP 설정 가이드](docs/MVP_설정가이드.md), [PowerShell 진행 가이드](docs/PowerShell_진행가이드.md), [배포 가이드](docs/배포_가이드.md), [시장조사](docs/커플앱_시장조사_및_기능제안.md), [기능 제안 2차](docs/기능제안_2차_편의성개선.md), [사진 기능 검토](docs/사진기능_도입검토.md), [장소 등록 검토](docs/장소등록_네이버지도_검토.md) |
 | [`scripts/`](scripts/) | `release.ps1`: 새 버전 배포 (빌드 → GitHub Releases → 업데이트 정보) |
 
 ## 진행 상황
