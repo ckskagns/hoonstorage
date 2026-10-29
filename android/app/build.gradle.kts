@@ -77,6 +77,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.glance.appwidget)
+    // 상대 일정 알림: 15분마다 서버 확인 (무료 요금제, 서버 함수 없이)
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation(libs.androidx.datastore.preferences)
 
     implementation(platform(libs.firebase.bom))

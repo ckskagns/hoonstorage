@@ -97,6 +97,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val reviews by viewModel.reviews.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val inbox by viewModel.inbox.collectAsStateWithLifecycle()
+    val partnerAlerts by viewModel.partnerAlertsEnabled.collectAsStateWithLifecycle()
     val weekPhotos by viewModel.photos.weekPhotoCount.collectAsStateWithLifecycle()
     val photoUploading by viewModel.photos.photoUploading.collectAsStateWithLifecycle()
     val memoryPhotos by viewModel.photos.memoryPhotos.collectAsStateWithLifecycle()
@@ -202,6 +203,12 @@ private fun UridulRoot(viewModel: AppViewModel) {
             inbox = inbox,
             onInboxRead = { viewModel.markInboxRead(it) },
             onInboxAllRead = { viewModel.markAllInboxRead() },
+            onSaveColors = viewModel::setEventColors,
+            partnerAlertsEnabled = partnerAlerts,
+            onSetPartnerAlerts = { enabled ->
+                viewModel.setPartnerAlerts(enabled)
+                if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+            },
             onSetNotify = { enabled ->
                 viewModel.setNotifyEnabled(enabled)
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)

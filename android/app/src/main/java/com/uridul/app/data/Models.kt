@@ -27,8 +27,17 @@ data class Couple(
     val countFromOne: Boolean,
     val characters: Map<String, String> = emptyMap(),
     val partnerDefaults: PartnerDefaults? = null,
+    /** 일정 색 (두 사람이 같은 색으로 보도록 서버에): "creator" = 만든 사람, "partner" = 들어온 사람 → 색 이름 */
+    val colors: Map<String, String> = emptyMap(),
 ) {
     val isPaired: Boolean get() = members.size >= 2
+
+    /** 내가 커플 공간을 만든 사람인지 (색 역할 구분) */
+    fun isCreator(myUid: String): Boolean = members.firstOrNull() == myUid
+
+    /** 내 일정 색 이름, 상대 일정 색 이름 (서버에 아직 없으면 null) */
+    fun colorKeys(myUid: String): Pair<String?, String?> =
+        if (isCreator(myUid)) colors["creator"] to colors["partner"] else colors["partner"] to colors["creator"]
 
     fun myName(myUid: String): String = names[myUid] ?: "나"
 

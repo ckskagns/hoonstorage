@@ -73,7 +73,12 @@ service cloud.firestore {
       allow update: if isMember()
         && request.resource.data.members == resource.data.members
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['startDate', 'countFromOne', 'names', 'characters', 'partnerDefaults'])
+             .hasOnly(['startDate', 'countFromOne', 'names', 'characters', 'partnerDefaults', 'colors'])
+        // 일정 색: 역할별(만든 사람·들어온 사람) 색 이름, 두 사람 모두 바꿀 수 있다
+        && (!('colors' in request.resource.data)
+            || (request.resource.data.colors is map
+                && request.resource.data.colors.keys().hasOnly(['creator', 'partner'])
+                && request.resource.data.colors.values().hasOnly(['pink', 'coral', 'peach', 'lemon', 'mint', 'sky', 'lavender', 'lilac', 'gray'])))
         && request.resource.data.names.diff(resource.data.names).affectedKeys()
              .hasOnly([request.auth.uid])
         && onlyMyCharacter()

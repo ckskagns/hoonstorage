@@ -37,6 +37,8 @@ class UridulApp : Application() {
         }
         Reminders.ensureChannel(this)
         Reminders.scheduleDaily(this)
+        // 상대 일정 알림: 15분마다 서버 확인 (켜져 있으면)
+        com.uridul.app.notify.PartnerAlerts.schedule(this)
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

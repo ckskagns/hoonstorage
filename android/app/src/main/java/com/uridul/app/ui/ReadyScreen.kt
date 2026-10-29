@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.uridul.app.data.DeletedEvent
@@ -70,6 +71,7 @@ import java.time.YearMonth
 private enum class Tab(val key: String, val label: String, val icon: ImageVector) {
     Home("home", "디데이", Icons.Filled.Favorite),
     Calendar("calendar", "캘린더", Icons.Filled.DateRange),
+    Diary("diary", "일기장", Icons.Filled.Edit),
     Wish("wish", "가고 싶은 곳", Icons.Filled.Place),
 }
 
@@ -133,6 +135,11 @@ fun ReadyScreen(
     inbox: List<com.uridul.app.data.InboxItem> = emptyList(),
     onInboxRead: (String) -> Unit = {},
     onInboxAllRead: () -> Unit = {},
+    /** 일정 색 저장 (내 색, 상대 색) — 기본은 이 폰에만 */
+    onSaveColors: ((com.uridul.app.data.EventColor, com.uridul.app.data.EventColor) -> Unit)? = null,
+    /** 상대 일정 알림 (추가·수정) */
+    partnerAlertsEnabled: Boolean = true,
+    onSetPartnerAlerts: (Boolean) -> Unit = {},
 ) {
     // 공유받은 장소를 어디에 담을지 묻는 창
     var placeChoice by remember { mutableStateOf<Place?>(null) }
@@ -220,6 +227,7 @@ fun ReadyScreen(
                                 Tab.Home -> "우리둘"
                                 Tab.Calendar -> "우리 캘린더"
                                 Tab.Wish -> "가고 싶은 곳"
+                                Tab.Diary -> "우리 일기장"
                             },
                             fontWeight = FontWeight.Bold,
                         )
@@ -251,6 +259,7 @@ fun ReadyScreen(
                             couple = couple,
                             myUid = myUid,
                             notifyEnabled = notifyEnabled,
+                            partnerAlertsEnabled = partnerAlertsEnabled,
                             themeLabel = uiSettings.theme.label,
                             deletedCount = deletedEvents.size,
                             onAction = { action ->
@@ -260,6 +269,7 @@ fun ReadyScreen(
                                     MenuAction.ToggleCountFromOne -> onSetCountFromOne(!couple.countFromOne)
                                     MenuAction.Invite -> onInvite()
                                     MenuAction.ToggleNotify -> onSetNotify(!notifyEnabled)
+                                    MenuAction.TogglePartnerAlerts -> onSetPartnerAlerts(!partnerAlertsEnabled)
                                     MenuAction.Theme -> pickingTheme = true
                                     MenuAction.Colors -> pickingColors = true
                                     MenuAction.Deleted -> showingDeleted = true
@@ -350,6 +360,13 @@ fun ReadyScreen(
                         // 날짜를 다시 누르거나 길게 누르면 / 일정 카드를 누르면 → 하루 페이지
                         onAdd = { openDay(it, new = true) },
                         onEdit = { e -> openDay(if (e.occursOn(selected)) selected else e.date, focus = e.id) },
+                        modifier = content,
+                    )
+                    Tab.Diary -> DiaryContent(
+                        couple = couple,
+                        myUid = myUid,
+                        // 일기를 누르면 그 날 하루 페이지에서 그 일정
+                        onOpenDay = { r -> select(r.date); openDay(r.date, focus = r.eventId) },
                         modifier = content,
                     )
                     Tab.Wish -> WishlistContent(
@@ -502,12 +519,13 @@ fun ReadyScreen(
             settings = uiSettings,
             myName = couple.myName(myUid),
             partnerName = couple.partnerName(myUid) ?: "상대",
+            // 고른 색은 서버에도 저장해서 상대 폰도 같은 색으로 본다
             onPickMine = { c ->
-                AppSettings.update(appContext) { it.copy(mine = c) }
+                onSaveColors?.invoke(c, uiSettings.partner) ?: AppSettings.update(appContext) { it.copy(mine = c) }
                 onColorsChanged()
             },
             onPickPartner = { c ->
-                AppSettings.update(appContext) { it.copy(partner = c) }
+                onSaveColors?.invoke(uiSettings.mine, c) ?: AppSettings.update(appContext) { it.copy(partner = c) }
                 onColorsChanged()
             },
             onDismiss = { pickingColors = false },

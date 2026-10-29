@@ -192,6 +192,11 @@ class CoupleRepository(private val db: FirebaseFirestore) {
         couples.document(coupleId).update("countFromOne", value).await()
     }
 
+    /** 일정 색 저장 (역할별: creator·partner → 색 이름). 두 사람 폰이 같은 색으로 본다 */
+    suspend fun updateColors(coupleId: String, colors: Map<String, String>) {
+        couples.document(coupleId).update("colors", colors).await()
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun DocumentSnapshot.toCouple(): Couple? {
         if (!exists()) return null
@@ -209,6 +214,7 @@ class CoupleRepository(private val db: FirebaseFirestore) {
             countFromOne = getBoolean("countFromOne") ?: true,
             characters = (get("characters") as? Map<String, String>).orEmpty(),
             partnerDefaults = partner,
+            colors = (get("colors") as? Map<String, String>).orEmpty(),
         )
     }
 }

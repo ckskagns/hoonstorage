@@ -27,7 +27,7 @@ import java.time.LocalDate
 /** 메뉴에서 고른 것 */
 internal enum class MenuAction {
     Profile, StartDate, ToggleCountFromOne, Invite,
-    ToggleNotify, Theme, Colors, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
+    ToggleNotify, TogglePartnerAlerts, Theme, Colors, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
 }
 
 /** 오른쪽 위 ⋮ 메뉴 */
@@ -38,6 +38,7 @@ internal fun MainMenu(
     couple: Couple,
     myUid: String,
     notifyEnabled: Boolean,
+    partnerAlertsEnabled: Boolean,
     themeLabel: String,
     deletedCount: Int,
     onAction: (MenuAction) -> Unit,
@@ -66,6 +67,11 @@ internal fun MainMenu(
             text = { Text("일정 알림 (아침 9시·일정 전)") },
             trailingIcon = { Checkbox(checked = notifyEnabled, onCheckedChange = null) },
             onClick = { pick(MenuAction.ToggleNotify) },
+        )
+        DropdownMenuItem(
+            text = { Text("상대 일정 알림 (추가·수정)") },
+            trailingIcon = { Checkbox(checked = partnerAlertsEnabled, onCheckedChange = null) },
+            onClick = { pick(MenuAction.TogglePartnerAlerts) },
         )
         DropdownMenuItem(text = { Text("화면 모드 ($themeLabel)") }, onClick = { pick(MenuAction.Theme) })
         DropdownMenuItem(

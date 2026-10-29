@@ -353,6 +353,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val backup = BackupController(features)
     val updates = UpdateController(features)
 
+    // ── 일정 색 (두 사람 같은 색) ─────────────────────────
+
+    /**
+     * 일정 색 바꾸기: 이 폰 설정 + 서버(역할별) 에 함께 저장 → 상대 폰도 같은 색으로 보인다.
+     * [mine] 은 내 일정 색, [partner] 는 상대 일정 색.
+     */
+    fun setEventColors(mine: com.uridul.app.data.EventColor, partner: com.uridul.app.data.EventColor) {
+        com.uridul.app.data.AppSettings.update(getApplication()) { it.copy(mine = mine, partner = partner) }
+        val ready = state.value as? AppState.Ready ?: return
+        uploadColors(ready.couple, ready.myUid, mine, partner)
+    }
+
+    private fun uploadColors(couple: Couple, myUid: String, mine: com.uridul.app.data.EventColor, partner: com.uridul.app.data.EventColor) {
+        val repo = container.couples ?: return
+        val map = if (couple.isCreator(myUid)) mapOf("creator" to mine.key, "partner" to partner.key)
+        else mapOf("creator" to partner.key, "partner" to mine.key)
+        if (couple.colors == map) return
+        viewModelScope.launch {
+            runCatching { repo.updateColors(couple.id, map) }
+                .onFailure { _message.value = (it as? Exception)?.toUserMessage() ?: "일정 색을 저장하지 못했어요." }
+        }
+    }
+
+    /** 서버의 일정 색을 이 폰 설정에 맞춘다. 서버에 아직 없으면 이 폰에서 고른 색을 올린다 (처음 한 번) */
+    private fun syncColors(couple: Couple, myUid: String) {
+        val settings = com.uridul.app.data.AppSettings.state.value
+        val (mineKey, partnerKey) = couple.colorKeys(myUid)
+        if (mineKey == null && partnerKey == null) {
+            uploadColors(couple, myUid, settings.mine, settings.partner)
+            return
+        }
+        val mine = com.uridul.app.data.EventColor.from(mineKey, settings.mine)
+        val partner = com.uridul.app.data.EventColor.from(partnerKey, settings.partner)
+        if (mine != settings.mine || partner != settings.partner) {
+            com.uridul.app.data.AppSettings.update(getApplication()) { it.copy(mine = mine, partner = partner) }
+        }
+    }
+
     // ── 앱 안 알림 (종 아이콘) ────────────────────────────
 
     /** 일정 알림 보관함 (최근 것부터) */
@@ -440,6 +478,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── 상대 일정 알림 ─────────────────────────────────────
+
+    private val _partnerAlerts = MutableStateFlow(com.uridul.app.notify.PartnerAlerts.isEnabled(app))
+    val partnerAlertsEnabled: StateFlow<Boolean> = _partnerAlerts.asStateFlow()
+
+    fun setPartnerAlerts(enabled: Boolean) {
+        com.uridul.app.notify.PartnerAlerts.setEnabled(getApplication(), enabled)
+        _partnerAlerts.value = enabled
+        _message.value = if (enabled) "상대가 일정을 추가·수정하면 알려드릴게요 (약 15분마다 확인)" else "상대 일정 알림을 껐어요"
+    }
+
     // ── 일정 알림 ─────────────────────────────────────────
 
     private val _notifyEnabled = MutableStateFlow(Reminders.isEnabled(app))
@@ -463,6 +512,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.uridul.app.data.NotificationInbox.load(app)
         // 앱을 열 때 새 버전이 있는지 한 번 확인한다
         updates.checkForUpdate(manual = false)
+        // 커플 공간의 일정 색이 바뀌면(상대가 바꾼 것 포함) 이 폰에도 같은 색으로
+        viewModelScope.launch {
+            state.collect { s -> if (s is AppState.Ready) syncColors(s.couple, s.myUid) }
+        }
         // 커플 정보가 바뀔 때마다 위젯용 데이터를 저장하고 위젯을 다시 그린다
         viewModelScope.launch {
             state
