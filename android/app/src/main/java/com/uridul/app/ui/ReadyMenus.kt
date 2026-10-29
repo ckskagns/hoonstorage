@@ -69,7 +69,7 @@ internal fun MainMenu(
             onClick = { pick(MenuAction.ToggleNotify) },
         )
         DropdownMenuItem(
-            text = { Text("상대 일정 알림 (추가·수정)") },
+            text = { Text("상대 소식 알림 (일정·가고 싶은 곳·후기)") },
             trailingIcon = { Checkbox(checked = partnerAlertsEnabled, onCheckedChange = null) },
             onClick = { pick(MenuAction.TogglePartnerAlerts) },
         )

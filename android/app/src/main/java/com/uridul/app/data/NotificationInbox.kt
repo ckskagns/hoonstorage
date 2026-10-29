@@ -19,6 +19,8 @@ data class InboxItem(
     val eventId: String?,
     val postedAtMillis: Long,
     val read: Boolean = false,
+    /** 누르면 열 탭 ("wish" 등, 없으면 캘린더) */
+    val tab: String? = null,
 )
 
 /**
@@ -86,7 +88,7 @@ object NotificationInbox {
                 JSONObject()
                     .put("id", i.id).put("title", i.title).put("text", i.text)
                     .put("date", i.date.toString()).put("eventId", i.eventId ?: JSONObject.NULL)
-                    .put("at", i.postedAtMillis).put("read", i.read),
+                    .put("at", i.postedAtMillis).put("read", i.read).put("tab", i.tab ?: JSONObject.NULL),
             )
         }
     }.toString()
@@ -106,6 +108,7 @@ object NotificationInbox {
                         eventId = if (o.isNull("eventId")) null else o.getString("eventId"),
                         postedAtMillis = o.getLong("at"),
                         read = o.optBoolean("read", false),
+                        tab = if (!o.has("tab") || o.isNull("tab")) null else o.getString("tab"),
                     )
                 }.getOrNull()
             }

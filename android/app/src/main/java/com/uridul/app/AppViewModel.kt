@@ -486,7 +486,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPartnerAlerts(enabled: Boolean) {
         com.uridul.app.notify.PartnerAlerts.setEnabled(getApplication(), enabled)
         _partnerAlerts.value = enabled
-        _message.value = if (enabled) "상대가 일정을 추가·수정하면 알려드릴게요 (약 15분마다 확인)" else "상대 일정 알림을 껐어요"
+        _message.value = if (enabled) "상대가 일정·가고 싶은 곳·후기를 남기면 알려드릴게요 (약 15분마다 확인)" else "상대 소식 알림을 껐어요"
     }
 
     // ── 일정 알림 ─────────────────────────────────────────

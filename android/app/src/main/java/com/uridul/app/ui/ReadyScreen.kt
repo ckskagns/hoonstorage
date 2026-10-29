@@ -207,7 +207,7 @@ fun ReadyScreen(
     // 위젯에서 열린 경우: 해당 탭/날짜로 이동, 필요하면 그 날 하루 페이지에서 새 일정
     LaunchedEffect(openRequest) {
         val request = openRequest ?: return@LaunchedEffect
-        tabKey = if (request.tab == Tab.Calendar.key) Tab.Calendar.key else Tab.Home.key
+        tabKey = Tab.entries.firstOrNull { it.key == request.tab }?.key ?: Tab.Home.key
         request.date?.let { selectedText = it.toString() }
         if (request.addEvent) openDay(request.date ?: selected, new = true)
         // 알림을 눌러 열었으면 그 일정을 연 채로 그 날 하루 페이지
@@ -244,9 +244,13 @@ fun ReadyScreen(
                             items = inbox,
                             onOpen = { item ->
                                 onInboxRead(item.id)
-                                select(item.date)
                                 val focus = item.eventId
-                                if (focus != null) openDay(item.date, focus = focus) else tabKey = Tab.Calendar.key
+                                when {
+                                    // 가고 싶은 곳 소식이면 그 탭
+                                    item.tab == Tab.Wish.key -> tabKey = Tab.Wish.key
+                                    focus != null -> { select(item.date); openDay(item.date, focus = focus) }
+                                    else -> { select(item.date); tabKey = Tab.Calendar.key }
+                                }
                             },
                             onMarkAllRead = onInboxAllRead,
                         )
