@@ -290,60 +290,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = "\"${event.title}\" 일정을 되돌렸어요 (${event.date.monthValue}월 ${event.date.dayOfMonth}일)"
     }
 
-    // ── 가고 싶은 곳 ──────────────────────────────────────
-
-    /** 가고 싶은 곳 목록 (최근에 담은 것부터) */
-    val wishes: StateFlow<List<WishPlace>> = run {
-        val repo = container.wishes
-        if (repo == null) {
-            MutableStateFlow(emptyList())
-        } else {
-            readyCoupleId
-                .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repo.observe(id) }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-        }
-    }
-
-    fun addWish(place: Place) {
-        val ready = state.value as? AppState.Ready ?: return
-        val repo = container.wishes ?: return
-        if (wishes.value.any { it.place.name == place.name && !it.visited }) {
-            _message.value = "📍 ${place.name} 은(는) 이미 가고 싶은 곳에 있어요"
-            return
-        }
-        if (wishes.value.size >= WishPlace.MAX_ITEMS) {
-            _message.value = "가고 싶은 곳은 ${WishPlace.MAX_ITEMS}개까지 담을 수 있어요"
-            return
-        }
-        repo.add(ready.couple.id, ready.myUid, place) { e -> _message.value = e.toUserMessage() ?: "담지 못했어요." }
-        _message.value = "📍 ${place.name} 을(를) 가고 싶은 곳에 담았어요 💕"
-    }
-
-    fun setWishVisited(id: String, visited: Boolean) {
-        val ready = state.value as? AppState.Ready ?: return
-        container.wishes?.setVisited(ready.couple.id, ready.myUid, id, visited) { e ->
-            _message.value = e.toUserMessage() ?: "바꾸지 못했어요."
-        }
-    }
-
-    fun setWishMemo(id: String, memo: String) {
-        val ready = state.value as? AppState.Ready ?: return
-        container.wishes?.setMemo(ready.couple.id, ready.myUid, id, memo) { e ->
-            _message.value = e.toUserMessage() ?: "메모를 저장하지 못했어요."
-        }
-    }
-
-    fun deleteWish(id: String) {
-        val ready = state.value as? AppState.Ready ?: return
-        container.wishes?.delete(ready.couple.id, id) { e -> _message.value = e.toUserMessage() ?: "지우지 못했어요." }
-    }
-
     // ── 기능별 관리 (사진첩·백업 파일·앱 업데이트는 FeatureControllers.kt) ──
 
     private val features = FeatureScope(
         app = app,
         scope = viewModelScope,
         container = container,
+        coupleId = readyCoupleId,
         readyState = { state.value as? AppState.Ready },
         say = { _message.value = it },
         errorText = { it.toUserMessage() },
@@ -352,44 +305,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val photos = PhotoController(features)
     val backup = BackupController(features)
     val updates = UpdateController(features)
-
-    // ── 일정 색 (두 사람 같은 색) ─────────────────────────
-
-    /**
-     * 일정 색 바꾸기: 이 폰 설정 + 서버(역할별) 에 함께 저장 → 상대 폰도 같은 색으로 보인다.
-     * [mine] 은 내 일정 색, [partner] 는 상대 일정 색.
-     */
-    fun setEventColors(mine: com.uridul.app.data.EventColor, partner: com.uridul.app.data.EventColor) {
-        com.uridul.app.data.AppSettings.update(getApplication()) { it.copy(mine = mine, partner = partner) }
-        val ready = state.value as? AppState.Ready ?: return
-        uploadColors(ready.couple, ready.myUid, mine, partner)
-    }
-
-    private fun uploadColors(couple: Couple, myUid: String, mine: com.uridul.app.data.EventColor, partner: com.uridul.app.data.EventColor) {
-        val repo = container.couples ?: return
-        val map = if (couple.isCreator(myUid)) mapOf("creator" to mine.key, "partner" to partner.key)
-        else mapOf("creator" to partner.key, "partner" to mine.key)
-        if (couple.colors == map) return
-        viewModelScope.launch {
-            runCatching { repo.updateColors(couple.id, map) }
-                .onFailure { _message.value = (it as? Exception)?.toUserMessage() ?: "일정 색을 저장하지 못했어요." }
-        }
-    }
-
-    /** 서버의 일정 색을 이 폰 설정에 맞춘다. 서버에 아직 없으면 이 폰에서 고른 색을 올린다 (처음 한 번) */
-    private fun syncColors(couple: Couple, myUid: String) {
-        val settings = com.uridul.app.data.AppSettings.state.value
-        val (mineKey, partnerKey) = couple.colorKeys(myUid)
-        if (mineKey == null && partnerKey == null) {
-            uploadColors(couple, myUid, settings.mine, settings.partner)
-            return
-        }
-        val mine = com.uridul.app.data.EventColor.from(mineKey, settings.mine)
-        val partner = com.uridul.app.data.EventColor.from(partnerKey, settings.partner)
-        if (mine != settings.mine || partner != settings.partner) {
-            com.uridul.app.data.AppSettings.update(getApplication()) { it.copy(mine = mine, partner = partner) }
-        }
-    }
+    val wishList = WishController(features)
+    val colors = ColorController(features)
 
     // ── 앱 안 알림 (종 아이콘) ────────────────────────────
 
@@ -514,7 +431,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         updates.checkForUpdate(manual = false)
         // 커플 공간의 일정 색이 바뀌면(상대가 바꾼 것 포함) 이 폰에도 같은 색으로
         viewModelScope.launch {
-            state.collect { s -> if (s is AppState.Ready) syncColors(s.couple, s.myUid) }
+            state.collect { s -> if (s is AppState.Ready) colors.syncColors(s.couple, s.myUid) }
         }
         // 커플 정보가 바뀔 때마다 위젯용 데이터를 저장하고 위젯을 다시 그린다
         viewModelScope.launch {

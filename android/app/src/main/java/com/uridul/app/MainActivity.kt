@@ -92,7 +92,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val notifyEnabled by viewModel.notifyEnabled.collectAsStateWithLifecycle()
     val undo by viewModel.undo.collectAsStateWithLifecycle()
     val deletedEvents by viewModel.deletedEvents.collectAsStateWithLifecycle()
-    val wishes by viewModel.wishes.collectAsStateWithLifecycle()
+    val wishes by viewModel.wishList.wishes.collectAsStateWithLifecycle()
     val importPreview by viewModel.backup.importPreview.collectAsStateWithLifecycle()
     val reviews by viewModel.reviews.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
@@ -189,10 +189,10 @@ private fun UridulRoot(viewModel: AppViewModel) {
             onLoadAllEvents = viewModel::loadAllEvents,
             onSkipOccurrence = viewModel::skipOccurrence,
             wishes = wishes,
-            onAddWish = viewModel::addWish,
-            onWishVisited = viewModel::setWishVisited,
-            onWishMemo = viewModel::setWishMemo,
-            onDeleteWish = viewModel::deleteWish,
+            onAddWish = viewModel.wishList::addWish,
+            onWishVisited = viewModel.wishList::setWishVisited,
+            onWishMemo = viewModel.wishList::setWishMemo,
+            onDeleteWish = viewModel.wishList::deleteWish,
             onExportBackup = { viewModel.backup.exportBackup(it) },
             onImportBackup = { viewModel.backup.readBackup(it) },
             importPreview = importPreview,
@@ -203,7 +203,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
             inbox = inbox,
             onInboxRead = { viewModel.markInboxRead(it) },
             onInboxAllRead = { viewModel.markAllInboxRead() },
-            onSaveColors = viewModel::setEventColors,
+            onSaveColors = viewModel.colors::setEventColors,
             partnerAlertsEnabled = partnerAlerts,
             onSetPartnerAlerts = { enabled ->
                 viewModel.setPartnerAlerts(enabled)

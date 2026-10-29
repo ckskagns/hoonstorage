@@ -17,6 +17,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import com.uridul.app.data.Couple
+import com.uridul.app.data.Place
+import com.uridul.app.data.WishPlace
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -29,6 +35,8 @@ class FeatureScope internal constructor(
     val app: Application,
     val scope: CoroutineScope,
     val container: AppContainer,
+    /** 지금 연결된 커플 공간 ID (바뀔 때마다) */
+    val coupleId: Flow<String?>,
     private val readyState: () -> AppState.Ready?,
     private val say: (String) -> Unit,
     val errorText: (Exception) -> String?,
@@ -302,6 +310,99 @@ class UpdateController internal constructor(private val f: FeatureScope) {
 
     fun dismissUpdate() {
         if (_update.value !is UpdateState.Downloading) _update.value = UpdateState.Idle
+    }
+
+}
+
+/** 가고 싶은 곳 목록 */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+class WishController internal constructor(private val f: FeatureScope) {
+
+    /** 가고 싶은 곳 목록 (최근에 담은 것부터) */
+    val wishes: StateFlow<List<WishPlace>> = run {
+        val repo = f.container.wishes
+        if (repo == null) {
+            MutableStateFlow(emptyList())
+        } else {
+            f.coupleId
+                .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repo.observe(id) }
+                .stateIn(f.scope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }
+    }
+
+    fun addWish(place: Place) {
+        val ready = f.ready() ?: return
+        val repo = f.container.wishes ?: return
+        if (wishes.value.any { it.place.name == place.name && !it.visited }) {
+            f.message = "📍 ${place.name} 은(는) 이미 가고 싶은 곳에 있어요"
+            return
+        }
+        if (wishes.value.size >= WishPlace.MAX_ITEMS) {
+            f.message = "가고 싶은 곳은 ${WishPlace.MAX_ITEMS}개까지 담을 수 있어요"
+            return
+        }
+        repo.add(ready.couple.id, ready.myUid, place) { e -> f.message = f.errorText(e) ?: "담지 못했어요." }
+        f.message = "📍 ${place.name} 을(를) 가고 싶은 곳에 담았어요 💕"
+    }
+
+    fun setWishVisited(id: String, visited: Boolean) {
+        val ready = f.ready() ?: return
+        f.container.wishes?.setVisited(ready.couple.id, ready.myUid, id, visited) { e ->
+            f.message = f.errorText(e) ?: "바꾸지 못했어요."
+        }
+    }
+
+    fun setWishMemo(id: String, memo: String) {
+        val ready = f.ready() ?: return
+        f.container.wishes?.setMemo(ready.couple.id, ready.myUid, id, memo) { e ->
+            f.message = f.errorText(e) ?: "메모를 저장하지 못했어요."
+        }
+    }
+
+    fun deleteWish(id: String) {
+        val ready = f.ready() ?: return
+        f.container.wishes?.delete(ready.couple.id, id) { e -> f.message = f.errorText(e) ?: "지우지 못했어요." }
+    }
+
+}
+
+/** 일정 색: 두 사람이 같은 색으로 보도록 커플 공간(역할별)과 이 폰 설정을 맞춘다 */
+class ColorController internal constructor(private val f: FeatureScope) {
+
+    /**
+     * 일정 색 바꾸기: 이 폰 설정 + 서버(역할별) 에 함께 저장 → 상대 폰도 같은 색으로 보인다.
+     * [mine] 은 내 일정 색, [partner] 는 상대 일정 색.
+     */
+    fun setEventColors(mine: com.uridul.app.data.EventColor, partner: com.uridul.app.data.EventColor) {
+        com.uridul.app.data.AppSettings.update(f.app) { it.copy(mine = mine, partner = partner) }
+        val ready = f.ready() ?: return
+        uploadColors(ready.couple, ready.myUid, mine, partner)
+    }
+
+    private fun uploadColors(couple: Couple, myUid: String, mine: com.uridul.app.data.EventColor, partner: com.uridul.app.data.EventColor) {
+        val repo = f.container.couples ?: return
+        val map = if (couple.isCreator(myUid)) mapOf("creator" to mine.key, "partner" to partner.key)
+        else mapOf("creator" to partner.key, "partner" to mine.key)
+        if (couple.colors == map) return
+        f.scope.launch {
+            runCatching { repo.updateColors(couple.id, map) }
+                .onFailure { f.message = (it as? Exception)?.let(f.errorText) ?: "일정 색을 저장하지 못했어요." }
+        }
+    }
+
+    /** 서버의 일정 색을 이 폰 설정에 맞춘다. 서버에 아직 없으면 이 폰에서 고른 색을 올린다 (처음 한 번) */
+    internal fun syncColors(couple: Couple, myUid: String) {
+        val settings = com.uridul.app.data.AppSettings.state.value
+        val (mineKey, partnerKey) = couple.colorKeys(myUid)
+        if (mineKey == null && partnerKey == null) {
+            uploadColors(couple, myUid, settings.mine, settings.partner)
+            return
+        }
+        val mine = com.uridul.app.data.EventColor.from(mineKey, settings.mine)
+        val partner = com.uridul.app.data.EventColor.from(partnerKey, settings.partner)
+        if (mine != settings.mine || partner != settings.partner) {
+            com.uridul.app.data.AppSettings.update(f.app) { it.copy(mine = mine, partner = partner) }
+        }
     }
 
 }

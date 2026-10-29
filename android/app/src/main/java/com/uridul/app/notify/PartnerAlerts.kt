@@ -46,6 +46,7 @@ object PartnerAlerts {
     private const val PREFS = "partner_alerts"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_LAST = "last_check_millis"
+    private const val KEY_VISITED = "visited_notified"
     private const val NOTIFICATION_ID = 2001
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -124,9 +125,18 @@ object PartnerAlerts {
         val events = changed("events")
         val wishes = changed("wishes")
         val reviews = changed("reviews")
+        // "다녀왔어요" 는 한 번만 알린다 (그 뒤 메모만 고쳐도 다시 알리지 않게): 알린 장소를 기억
+        val visitedSeen = prefs(context).getStringSet(KEY_VISITED, emptySet()).orEmpty().toMutableSet()
+        val wishChanges = wishes.mapNotNull { d ->
+            val visited = d.getBoolean("visited") == true
+            if (!visited) visitedSeen.remove(d.id)
+            wishChange(d, myUid, last)?.takeIf { c -> c.created || visitedSeen.add(c.id) }
+                ?.also { c -> if (visited) visitedSeen.add(c.id) }
+        }
+        prefs(context).edit().putStringSet(KEY_VISITED, visitedSeen.toSet()).apply()
         val changes = (
             events.mapNotNull { eventChange(it, myUid, last) } +
-                wishes.mapNotNull { wishChange(it, myUid, last) } +
+                wishChanges +
                 reviews.mapNotNull { reviewChange(it, myUid) }
             ).sortedBy { it.atMillis }
         // 다음에는 이번에 본 가장 늦은 시각 이후만
