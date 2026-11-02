@@ -66,8 +66,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -159,10 +161,11 @@ internal fun Modifier.pinchToZoom(): Modifier = composed {
         }
         .pointerInput(Unit) {
             awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
+                // 안쪽(사진 누르기)·바깥쪽(넘기기)보다 먼저 보고, 두 손가락이면 가로챈다 (손을 뗄 때 "누르기"로 잘못 열리지 않게)
+                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                 var zooming = false
                 do {
-                    val event = awaitPointerEvent()
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
                     if (event.changes.count { it.pressed } >= 2) {
                         zooming = true
                         val zoom = event.calculateZoom()
@@ -185,7 +188,7 @@ internal fun Modifier.pinchToZoom(): Modifier = composed {
 
 /** 사진이 없는 게시물의 그림: 일정 분위기 그림 + 제목 */
 @Composable
-private fun PostArt(post: FeedPost, modifier: Modifier) {
+internal fun PostArt(post: FeedPost, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     Box(
         modifier.background(Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer))),
@@ -208,7 +211,7 @@ private fun PostArt(post: FeedPost, modifier: Modifier) {
 
 /** 사진 아래 점: 지금 보는 장은 진하게 (인스타 넘기기 점) */
 @Composable
-private fun PageDots(pager: PagerState, count: Int, onDark: Boolean) {
+internal fun PageDots(pager: PagerState, count: Int, onDark: Boolean) {
     if (count < 2) return
     val on = if (onDark) Color.White else MaterialTheme.colorScheme.primary
     val off = if (onDark) Color.White.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant
@@ -222,7 +225,7 @@ private fun PageDots(pager: PagerState, count: Int, onDark: Boolean) {
 
 /** "3/5" 표시 (사진 오른쪽 위) */
 @Composable
-private fun PageBadge(pager: PagerState, count: Int, modifier: Modifier) {
+internal fun PageBadge(pager: PagerState, count: Int, modifier: Modifier) {
     if (count < 2) return
     Text(
         "${pager.currentPage + 1}/$count",
@@ -274,7 +277,7 @@ internal fun ReviewComment(uid: String, entry: ReviewEntry, couple: Couple, myUi
 
 /** 이 게시물에 사진을 더 올릴 수 있으면 사진 고르기를 여는 함수, 아니면 null (이번 주 25장 / 일정당 10장) */
 @Composable
-private fun rememberAddPhoto(post: FeedPost, photos: List<PhotoMeta>): (() -> Unit)? {
+internal fun rememberAddPhoto(post: FeedPost, photos: List<PhotoMeta>): (() -> Unit)? {
     val hooks = LocalPhotos.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(PhotoQuota.PER_EVENT_MAX)) { uris ->
         if (uris.isNotEmpty()) hooks.onUpload(post.asEvent(), uris, photos.size)
@@ -422,157 +425,55 @@ fun DiaryPost(
         }
     }
 
-    if (writing) {
-        ReviewDialog(
-            title = post.title,
-            event = post.asEvent(),
-            couple = couple,
-            myUid = myUid,
-            existing = mine,
-            onSave = { hearts, text -> writing = false; reviews.onSave(post.asEvent(), hearts, text) },
-            onDelete = review?.takeIf { mine != null }?.let { r -> { writing = false; reviews.onDelete(r) } },
-            onDismiss = { writing = false },
-        )
-    }
+    if (writing) ReviewWriter(post, couple, myUid) { writing = false }
 }
 
-/**
- * 크게 보기 (인스타그램 사진 보기): 검은 화면에 사진을 크게, 옆으로 넘기며 그 일정의 사진 모두.
- * 사진 밑에는 두 사람의 후기를 한 줄씩 (길면 "…", 누르면 글 전체를 크게). 두 손가락으로 확대.
- */
+/** 이 게시물(일정 하루)의 내 후기 쓰기·고치기 창 (게시물·크게 보기가 함께 쓴다) */
 @Composable
-fun FeedViewerDialog(
-    post: FeedPost,
-    couple: Couple,
-    myUid: String,
-    startPage: Int = 0,
-    onDismiss: () -> Unit,
-) {
-    val hooks = LocalPhotos.current
+internal fun ReviewWriter(post: FeedPost, couple: Couple, myUid: String, onDone: () -> Unit) {
     val reviews = LocalReviews.current
     val review = reviews.reviews[post.reviewId]
-    val photos by remember(post.reviewId) { hooks.album(post.asEvent()) }.collectAsState(initial = emptyList())
-    val pager = rememberPagerState(initialPage = startPage) { photos.size.coerceAtLeast(1) }
-    var deleting by remember { mutableStateOf<PhotoMeta?>(null) }
-    var writing by remember { mutableStateOf(false) }
-    val addPhoto = rememberAddPhoto(post, photos)
     val mine = review?.entries?.get(myUid)
-    // 사진이 늦게 불러와져도 처음 고른 장으로
-    LaunchedEffect(photos.size) {
-        if (startPage in 1 until photos.size && pager.currentPage == 0) pager.scrollToPage(startPage)
-    }
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                // 위: 닫기 · 제목/날짜 · 지우기
-                Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기", tint = Color.White) }
-                    Column(Modifier.weight(1f)) {
-                        Text(post.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val sub = buildString {
-                            append(post.date.format(KoreanMonthDay))
-                            post.place?.let { append(" · ${it.name}") }
-                            photos.getOrNull(pager.currentPage)?.let { p ->
-                                val who = if (p.uploadedBy == myUid) couple.myName(myUid) else (couple.names[p.uploadedBy] ?: "상대")
-                                append(" · ${who}가 올림")
-                            }
-                        }
-                        Text(sub, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (photos.isNotEmpty()) {
-                        IconButton(onClick = { deleting = photos.getOrNull(pager.currentPage) }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "사진 지우기", tint = Color.White)
-                        }
-                    }
-                }
-
-                // 가운데: 사진 크게 (옆으로 넘기기)
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    if (photos.isEmpty()) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            PostArt(post, Modifier.fillMaxWidth().aspectRatio(1f))
-                            if (addPhoto != null) {
-                                TextButton(onClick = addPhoto) { Text("📷 이 날 사진 올리기", color = Color.White) }
-                            }
-                        }
-                    } else {
-                        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                            val meta = photos.getOrNull(page) ?: return@HorizontalPager
-                            // 큰 사진은 볼 때 받아온다 (받는 동안은 작은 사진)
-                            val full by produceState<ImageBitmap?>(null, meta.id) {
-                                value = withContext(Dispatchers.Default) {
-                                    hooks.loadFull(meta.id)?.let { b -> runCatching { BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap() }.getOrNull() }
-                                }
-                            }
-                            val thumb = rememberPhotoBitmap(meta.id, meta.thumb)
-                            Box(Modifier.fillMaxSize().pinchToZoom(), contentAlignment = Alignment.Center) {
-                                (full ?: thumb)?.let { Image(it, contentDescription = "사진 ${page + 1}", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-                                if (full == null) CircularProgressIndicator(color = Color.White)
-                            }
-                        }
-                        PageBadge(pager, photos.size, Modifier.align(Alignment.TopEnd).padding(12.dp))
-                    }
-                }
-
-                // 아래: 점 · 후기 한 줄씩 (누르면 크게)
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 280.dp)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Box(Modifier.fillMaxWidth().padding(bottom = 6.dp), contentAlignment = Alignment.Center) { PageDots(pager, photos.size, onDark = true) }
-                    review?.entries?.entries?.sortedBy { if (it.key == myUid) 0 else 1 }?.forEach { (uid, e) ->
-                        ReviewComment(uid, e, couple, myUid, onDark = true)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            if (mine == null) "💗 내 후기 남기기…" else "내 후기 고치기",
-                            color = Color.White.copy(alpha = 0.7f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { writing = true }.padding(vertical = 6.dp),
-                        )
-                        Spacer(Modifier.weight(1f))
-                        if (photos.isNotEmpty() && addPhoto != null) {
-                            Text(
-                                "📷 사진 더하기",
-                                color = Color.White.copy(alpha = 0.7f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { addPhoto() }.padding(6.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    deleting?.let { p ->
-        val thisWeek = p.week == PhotoQuota.weekKey(LocalDate.now())
-        AlertDialog(
-            onDismissRequest = { deleting = null },
-            title = { Text("사진을 지울까요?") },
-            text = { Text("상대 폰에서도 함께 사라져요." + if (thisWeek) "\n이번 주에 올린 사진이라, 지우면 이번 주에 한 장 더 올릴 수 있어요." else "") },
-            confirmButton = {
-                TextButton(onClick = { deleting = null; hooks.onDelete(p) }) { Text("지우기", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("취소") } },
-        )
-    }
-    if (writing) {
-        ReviewDialog(
-            title = post.title,
-            event = post.asEvent(),
-            couple = couple,
-            myUid = myUid,
-            existing = mine,
-            onSave = { hearts, text -> writing = false; reviews.onSave(post.asEvent(), hearts, text) },
-            onDelete = review?.takeIf { mine != null }?.let { r -> { writing = false; reviews.onDelete(r) } },
-            onDismiss = { writing = false },
-        )
-    }
+    ReviewDialog(
+        title = post.title,
+        event = post.asEvent(),
+        couple = couple,
+        myUid = myUid,
+        existing = mine,
+        onSave = { hearts, text -> onDone(); reviews.onSave(post.asEvent(), hearts, text) },
+        onDelete = review?.takeIf { mine != null }?.let { r -> { onDone(); reviews.onDelete(r) } },
+        onDismiss = onDone,
+    )
 }
+
+/** 사진 지우기 확인 (이번 주 사진이면 한 장 더 올릴 수 있다고 알려준다) */
+@Composable
+internal fun PhotoDeleteDialog(photo: PhotoMeta, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val thisWeek = photo.week == PhotoQuota.weekKey(LocalDate.now())
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("사진을 지울까요?") },
+        text = { Text("상대 폰에서도 함께 사라져요." + if (thisWeek) "\n이번 주에 올린 사진이라, 지우면 이번 주에 한 장 더 올릴 수 있어요." else "") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("지우기", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
+}
+
+/** 풀어 둔 큰 사진 (최대 32MB, 오래 안 본 것부터 버림). 옆으로 넘겼다 돌아와도 다시 받지 않게 */
+private val fullPhotoCache = object : android.util.LruCache<String, ImageBitmap>(32 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int = (value.asAndroidBitmap().byteCount / 1024).coerceAtLeast(1)
+}
+
+/** 큰 사진: 볼 때 받아와서 풀어 둔다 (받는 동안은 null) */
+@Composable
+internal fun rememberFullPhoto(meta: PhotoMeta): ImageBitmap? {
+    val hooks = LocalPhotos.current
+    val full by produceState(fullPhotoCache.get(meta.id), meta.id) {
+        if (value != null) return@produceState
+        value = withContext(Dispatchers.Default) {
+            hooks.loadFull(meta.id)?.let { b -> runCatching { BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap() }.getOrNull() }
+        }?.also { fullPhotoCache.put(meta.id, it) }
+    }
+    return full
+}
+

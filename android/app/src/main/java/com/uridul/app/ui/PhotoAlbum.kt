@@ -118,6 +118,8 @@ fun AlbumStrip(
     startPadding: androidx.compose.ui.unit.Dp = 16.dp,
     thumbSize: androidx.compose.ui.unit.Dp = 64.dp,
     modifier: Modifier = Modifier,
+    /** 크게 보기에서 후기 줄을 보일지 (각자 일정·후기 창 안이면 false) */
+    allowReview: Boolean = event.category.together,
 ) {
     val hooks = LocalPhotos.current
     val photos by remember(event.id, event.date) { hooks.album(event) }.collectAsState(initial = emptyList())
@@ -190,86 +192,13 @@ fun AlbumStrip(
         }
     }
     viewing?.let { start ->
-        PhotoViewerDialog(
-            photos = photos,
-            start = start.coerceIn(0, (photos.size - 1).coerceAtLeast(0)),
+        FeedViewerDialog(
+            post = FeedPost.of(event),
             couple = couple,
             myUid = myUid,
-            onDelete = { p -> hooks.onDelete(p) },
+            startPage = start.coerceIn(0, (photos.size - 1).coerceAtLeast(0)),
             onDismiss = { viewing = null },
-        )
-    }
-}
-
-/** 크게 보기: 좌우로 넘기기, 누가 올렸는지, 지우기 */
-@Composable
-fun PhotoViewerDialog(
-    photos: List<PhotoMeta>,
-    start: Int,
-    couple: Couple,
-    myUid: String,
-    onDelete: (PhotoMeta) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    if (photos.isEmpty()) {
-        LaunchedEffect(Unit) { onDismiss() }
-        return
-    }
-    val hooks = LocalPhotos.current
-    val pager = rememberPagerState(initialPage = start) { photos.size }
-    var deleting by remember { mutableStateOf<PhotoMeta?>(null) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
-            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                // 지운 직후 한 순간 장수가 줄어든 상태일 수 있어서 없는 장이면 그리지 않는다
-                val meta = photos.getOrNull(page) ?: return@HorizontalPager
-                // 큰 사진은 볼 때 받아온다 (받는 동안은 작은 사진)
-                val full by produceState<ImageBitmap?>(null, meta.id) {
-                    value = withContext(Dispatchers.Default) {
-                        hooks.loadFull(meta.id)?.let { b -> runCatching { BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap() }.getOrNull() }
-                    }
-                }
-                val thumb = rememberPhotoBitmap(meta.id, meta.thumb)
-                (full ?: thumb)?.let { Image(it, contentDescription = "사진 ${page + 1}", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-                if (full == null) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
-            }
-            val current = photos.getOrNull(pager.currentPage)
-            Row(
-                Modifier.fillMaxWidth().safeDrawingPadding().padding(4.dp).background(Color(0x66000000), RoundedCornerShape(50)),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기", tint = Color.White) }
-                Column(Modifier.weight(1f)) {
-                    Text("${pager.currentPage + 1} / ${photos.size}", color = Color.White, style = MaterialTheme.typography.titleSmall)
-                    current?.let { p ->
-                        val who = if (p.uploadedBy == myUid) couple.myName(myUid) else (couple.names[p.uploadedBy] ?: "상대")
-                        Text("${who}가 올림 · ${p.date.monthValue}월 ${p.date.dayOfMonth}일", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-                IconButton(onClick = { deleting = current }) { Icon(Icons.Filled.Delete, contentDescription = "사진 지우기", tint = Color.White) }
-                Spacer(Modifier.width(4.dp))
-            }
-        }
-    }
-    deleting?.let { p ->
-        val thisWeek = p.week == PhotoQuota.weekKey(java.time.LocalDate.now())
-        AlertDialog(
-            onDismissRequest = { deleting = null },
-            title = { Text("사진을 지울까요?") },
-            text = {
-                Text(
-                    "상대 폰에서도 함께 사라져요." +
-                        if (thisWeek) "\n이번 주에 올린 사진이라, 지우면 이번 주에 한 장 더 올릴 수 있어요." else "",
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    deleting = null
-                    onDelete(p)
-                    if (photos.size <= 1) onDismiss()
-                }) { Text("지우기", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("취소") } },
+            allowReview = allowReview,
         )
     }
 }

@@ -173,7 +173,7 @@ fun ReviewDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (event != null && couple != null) {
-                    AlbumStrip(event = event, couple = couple, myUid = myUid, startPadding = 0.dp, modifier = Modifier.fillMaxWidth())
+                    AlbumStrip(event = event, couple = couple, myUid = myUid, startPadding = 0.dp, modifier = Modifier.fillMaxWidth(), allowReview = false)
                     Text(
                         "사진은 고르면 바로 올라가요 · 하트와 한 줄은 [저장]을 눌러 주세요",
                         style = MaterialTheme.typography.labelSmall,

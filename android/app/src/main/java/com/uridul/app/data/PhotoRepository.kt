@@ -132,8 +132,12 @@ class PhotoRepository(private val db: FirebaseFirestore) {
         photos(coupleId).whereEqualTo("week", week).count().get(com.google.firebase.firestore.AggregateSource.SERVER).await().count.toInt()
 
     /** 큰 사진 (크게 볼 때만) */
-    suspend fun fetchPhoto(coupleId: String, id: String): ByteArray? =
-        data(coupleId).document(id).get().await().getBlob("data")?.toBytes()
+    suspend fun fetchPhoto(coupleId: String, id: String): ByteArray? {
+        val doc = data(coupleId).document(id)
+        // 사진은 올린 뒤 바뀌지 않으므로, 폰에 받아 둔 것이 있으면 서버에 다시 묻지 않는다
+        val cached = runCatching { doc.get(com.google.firebase.firestore.Source.CACHE).await().getBlob("data")?.toBytes() }.getOrNull()
+        return cached ?: doc.get().await().getBlob("data")?.toBytes()
+    }
 
     /** 올리기: 작은 사진 문서 + 큰 사진 문서를 한 번에 */
     suspend fun upload(coupleId: String, uid: String, event: CalendarEvent, photo: ProcessedPhoto, today: LocalDate) {
