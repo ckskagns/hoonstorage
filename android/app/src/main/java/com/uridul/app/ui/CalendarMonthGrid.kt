@@ -109,6 +109,8 @@ internal fun MonthCalendar(
     modifier: Modifier,
     /** 길게 누른 채 여러 날을 끌면 그 기간으로 새 일정 */
     onAddRange: (LocalDate, LocalDate) -> Unit = { s, _ -> onAdd(s) },
+    /** 날짜를 한 번 눌렀을 때 (없으면: 선택, 선택된 날을 다시 누르면 새 일정) */
+    onTapDay: ((LocalDate) -> Unit)? = null,
 ) {
     val base = remember { YearMonth.now() }
     var pickingMonth by remember { mutableStateOf(false) }
@@ -198,7 +200,7 @@ internal fun MonthCalendar(
                 val pageMonth = monthOf(page)
                 val grid = remember(pageMonth) { CalendarMath.monthGrid(pageMonth) }
                 val specials = remember(grid, specialsFor) { specialsFor(grid) }
-                MonthGrid(pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, onAddRange, fillHeight)
+                MonthGrid(pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, onAddRange, fillHeight, onTapDay)
             }
         }
     }
@@ -232,8 +234,10 @@ private fun MonthGrid(
     onAdd: (LocalDate) -> Unit,
     onAddRange: (LocalDate, LocalDate) -> Unit,
     fillHeight: Boolean,
+    onTapDay: ((LocalDate) -> Unit)?,
 ) {
-            val latestSelected by rememberUpdatedState(selected)
+            val tap: (LocalDate) -> Unit = onTapDay ?: { day -> if (day == selected) onAdd(day) else onSelect(day) }
+            val latestTap by rememberUpdatedState(tap)
             val latestOnSelect by rememberUpdatedState(onSelect)
             val latestOnAdd by rememberUpdatedState(onAdd)
             val latestOnAddRange by rememberUpdatedState(onAddRange)
@@ -261,7 +265,7 @@ private fun MonthGrid(
                         cellWidthPx = with(density) { cellWidth.toPx() },
                         rowHeightPx = with(density) { rowHeight.toPx() },
                         // 한 번 누르면 선택, 선택된 날을 다시 누르면 그 날짜로 새 일정
-                        onTap = { { day -> if (day == latestSelected) latestOnAdd(day) else latestOnSelect(day) } },
+                        onTap = { latestTap },
                         onLongPress = { { day -> latestOnSelect(day); latestOnAdd(day) } },
                         onRange = { { s, e -> latestOnSelect(s); latestOnAddRange(s, e) } },
                         onDragging = { dragging = it },
@@ -289,7 +293,7 @@ private fun MonthGrid(
                                         showLabels = showLabels,
                                         maxLabels = maxLabels,
                                         // 손짓은 달력 전체에서 받는다 (dayGestures). 여기는 화면 읽기(TalkBack)용 동작
-                                        onClick = { if (day == selected) onAdd(day) else onSelect(day) },
+                                        onClick = { tap(day) },
                                         onLongClick = { onSelect(day); onAdd(day) },
                                         modifier = Modifier.weight(1f).fillMaxHeight(),
                                     )

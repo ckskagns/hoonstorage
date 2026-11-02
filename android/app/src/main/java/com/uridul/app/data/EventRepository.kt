@@ -200,6 +200,8 @@ class EventRepository(private val db: FirebaseFirestore) {
             repeat = Repeat.from(getString("repeat")),
             color = EventColor.fromOrNull(getString("color")),
             category = EventCategory.from(getString("category")),
+            // 막 저장해서 서버 시각이 아직 없으면 폰 시각으로 어림한다
+            createdAtMillis = getTimestamp("createdAt", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.toDate()?.time ?: 0L,
             skip = (get("skip") as? List<*>).orEmpty().mapNotNull { (it as? String)?.let { s -> runCatching { LocalDate.parse(s) }.getOrNull() } }.toSet(),
         )
     }

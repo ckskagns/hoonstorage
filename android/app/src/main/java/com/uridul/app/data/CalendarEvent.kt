@@ -52,6 +52,8 @@ data class CalendarEvent(
     val color: EventColor? = null,
     /** 분류: 우리둘(기본) / 만든 사람(후이) 일정 / 들어온 사람(나나) 일정 */
     val category: EventCategory = EventCategory.US,
+    /** 처음 등록한 시각 (밀리초, 모르면 0). 그 날 "가장 최근에 등록한 일정" 을 고를 때 쓴다 */
+    val createdAtMillis: Long = 0,
 ) {
     val allDay: Boolean get() = time == null
     /** 펼친 반복 일정이면 원본(첫 날 기준)으로 되돌린다 */

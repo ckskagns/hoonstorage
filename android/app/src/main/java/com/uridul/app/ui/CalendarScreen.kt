@@ -83,6 +83,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.math.abs
 
+/** 그 날 일정 중 가장 최근에 등록한 것 (등록 시각이 같거나 모르면 나중 일정) */
+internal fun latestRegistered(events: List<CalendarEvent>, day: LocalDate): CalendarEvent? =
+    CalendarMath.eventsOn(events, day).withIndex()
+        .maxWithOrNull(compareBy<IndexedValue<CalendarEvent>> { it.value.createdAtMillis }.thenBy { it.index })
+        ?.value
+
 /**
  * 공유 캘린더.
  *  - 폰 / 폴드 커버(600dp 미만): 위 달력, 아래 선택한 날 일정
@@ -119,6 +125,16 @@ fun CalendarContent(
     val selectedEvents = remember(events, selected) { CalendarMath.eventsOn(events, selected) }
     // 일정을 누르면 기본 캘린더처럼 먼저 상세 보기
     val openDetail: (CalendarEvent) -> Unit = { detailId = it.id }
+    // 날짜 누르기: 일정이 있는 날이면 그 날 가장 최근에 등록한 일정의 상세 보기부터 (바로 수정할 수 있게).
+    // 일정이 없는 날은 선택만, 선택된 빈 날을 다시 누르면 새 일정
+    val tapDay: (LocalDate) -> Unit = { day ->
+        val latest = latestRegistered(events, day)
+        when {
+            latest != null -> { onSelect(day); detailId = latest.id }
+            day == selected -> onAdd(day)
+            else -> onSelect(day)
+        }
+    }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val twoPane = maxWidth >= TwoPaneMinWidth
@@ -136,6 +152,7 @@ fun CalendarContent(
                         .weight(1.3f)
                         .fillMaxHeight(),
                     onAddRange = onAddRange,
+                    onTapDay = tapDay,
                 )
                 DayPanel(
                     selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, openDetail,
@@ -162,6 +179,7 @@ fun CalendarContent(
                     fillHeight = false,
                     modifier = m,
                     onAddRange = onAddRange,
+                    onTapDay = tapDay,
                 )
                 DayPanel(selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, openDetail, m)
                 // 아래 버튼(일정 추가)에 마지막 일정이 가려지지 않게
