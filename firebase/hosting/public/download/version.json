@@ -1,9 +1,9 @@
 {
-    "versionCode":  11,
-    "versionName":  "0.9.0",
-    "notes":  "일기장 탭(후기·사진 모아 보기), 일정 색을 두 사람이 같게, 상대 소식 알림(일정·가고 싶은 곳·후기, 약 15분마다)",
-    "size":  47857420,
-    "sha256":  "6e942508d7360e3cb08cc2fac074ab6492129cc812679685f2bfd236d7e258ba",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.9.0/uridul.apk",
-    "releasedAt":  "2026-10-29T10:02:29+09:00"
+    "versionCode":  12,
+    "versionName":  "0.10.0",
+    "notes":  "일정마다 색 고르기, 일정 분류(우리둘·후이·나나), 일정 누르면 상세 보기, 달 제목 눌러 년·월 고르기, 길게 눌러 끌어서 여러 날 일정, 후기 창·일기장에서 사진 올리기",
+    "size":  48021260,
+    "sha256":  "15becaaa5991c2d7345b4eb439cb68e0067f527e72855d390486a189ba1da35c",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.10.0/uridul.apk",
+    "releasedAt":  "2026-11-02T11:43:42+09:00"
 }
