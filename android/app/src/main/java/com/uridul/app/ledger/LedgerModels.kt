@@ -93,6 +93,7 @@ data class LedgerEntry(
     val createdBy: String = "",
 ) {
     val date: LocalDate get() = dateOf(at)
+    val localDateTime: java.time.LocalDateTime get() = Instant.ofEpochMilli(at).atZone(ZONE).toLocalDateTime()
 
     /** 합계에 더할 값: 지출은 +, 취소는 − (수입·이체는 따로 센다) */
     val signedAmount: Long get() = if (cancel) -amount else amount

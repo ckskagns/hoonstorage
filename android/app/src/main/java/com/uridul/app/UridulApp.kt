@@ -77,4 +77,9 @@ class AppContainer(context: Context) {
     val reviews: com.uridul.app.data.ReviewRepository? by lazy {
         if (firebaseReady) com.uridul.app.data.ReviewRepository(FirebaseFirestore.getInstance()) else null
     }
+
+    /** 가계부 */
+    val ledger: com.uridul.app.ledger.LedgerRepository? by lazy {
+        if (firebaseReady) com.uridul.app.ledger.LedgerRepository(FirebaseFirestore.getInstance()) else null
+    }
 }

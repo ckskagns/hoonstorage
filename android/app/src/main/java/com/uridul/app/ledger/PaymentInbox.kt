@@ -29,6 +29,10 @@ object PaymentInbox {
 
     private fun prefs(c: Context) = c.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /** 기본 자산을 이 커플 공간에 만들어 두었는지 (기본 자산이 늘면 버전을 올려 다시 확인) */
+    fun assetsReady(c: Context, coupleId: String): Boolean = prefs(c).getBoolean("assets_v${LedgerAsset.defaults.size}_$coupleId", false)
+    fun markAssetsReady(c: Context, coupleId: String) = prefs(c).edit().putBoolean("assets_v${LedgerAsset.defaults.size}_$coupleId", true).apply()
+
     fun isEnabled(c: Context): Boolean = prefs(c).getBoolean(ENABLED, false)
     fun setEnabled(c: Context, on: Boolean) = prefs(c).edit().putBoolean(ENABLED, on).apply()
 

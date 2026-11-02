@@ -46,13 +46,19 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         awaitClose { reg.remove() }
     }.catch { emit(emptyList()) }
 
-    /** 기본 자산(데이트 통장·모임카드)이 없으면 만든다 */
-    suspend fun ensureDefaultAssets(coupleId: String, uid: String) {
+    /**
+     * 기본 자산(데이트 통장·모임카드·현금)이 없으면 만든다. 이 폰에서 한 번 끝냈으면 서버에 묻지 않는다.
+     * @return 모두 있음 (확인하지 못했으면 false → 다음에 다시)
+     */
+    suspend fun ensureDefaultAssets(context: android.content.Context, coupleId: String, uid: String): Boolean {
+        if (PaymentInbox.assetsReady(context, coupleId)) return true
         for (a in LedgerAsset.defaults) {
             val ref = assets(coupleId).document(a.id)
-            val exists = runCatching { ref.get().await().exists() }.getOrDefault(true)
-            if (!exists) ref.set(assetData(a, uid) + mapOf("createdBy" to uid, "createdAt" to FieldValue.serverTimestamp())).await()
+            val exists = runCatching { ref.get().await().exists() }.getOrNull() ?: return false
+            if (!exists) runCatching { ref.set(assetData(a, uid) + mapOf("createdBy" to uid, "createdAt" to FieldValue.serverTimestamp())).await() }.getOrNull() ?: return false
         }
+        PaymentInbox.markAssetsReady(context, coupleId)
+        return true
     }
 
     /**

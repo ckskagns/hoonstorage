@@ -59,7 +59,7 @@ fun EntryFormDialog(
     onDismiss: () -> Unit,
 ) {
     val now = remember0 { LocalDateTime.now(LedgerEntry.ZONE) }
-    val start = initial?.let { Instant.ofEpochMilli(it.at).atZone(LedgerEntry.ZONE).toLocalDateTime() }
+    val start = initial?.localDateTime
         ?: LocalDateTime.of(defaultDate, if (defaultDate == now.toLocalDate()) now.toLocalTime().withSecond(0).withNano(0) else LocalTime.of(12, 0))
     val partnerUid = couple.partnerUid(myUid)
     val partnerName = couple.partnerName(myUid) ?: "상대"
@@ -129,6 +129,9 @@ fun EntryFormDialog(
                             onClick = {
                                 typeKey = t.key
                                 category = if (t == EntryType.INCOME) LedgerCategories.DEFAULT_INCOME else LedgerCategories.guess(merchant)
+                                // 수입은 카드로 들어올 수 없어 통장으로 (지출로 돌아오면 모임카드)
+                                if (t == EntryType.INCOME && assetId == LedgerAsset.DATE_CARD) assetId = LedgerAsset.DATE_ACCOUNT
+                                if (t == EntryType.EXPENSE && initial == null && assetId == LedgerAsset.DATE_ACCOUNT) assetId = LedgerAsset.DATE_CARD
                                 categoryTouched = false
                             },
                             label = { Text(t.label) },

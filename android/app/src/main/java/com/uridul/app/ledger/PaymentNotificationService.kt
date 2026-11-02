@@ -39,7 +39,9 @@ class PaymentNotificationService : NotificationListenerService() {
             bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
             textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n"),
         )
-        val capture = PaymentCapture.from(text, parser, sbn.postTime, PaymentInbox.matchers(this)) ?: return
+        // 알림이 갱신되면 postTime 은 바뀌지만 when(결제 시각)은 그대로라 두 번 기록되지 않는다
+        val at = n.`when`.takeIf { it > 0 && it <= sbn.postTime + 60_000L } ?: sbn.postTime
+        val capture = PaymentCapture.from(text, parser, at, PaymentInbox.matchers(this)) ?: return
         if (PaymentInbox.add(this, capture) && capture.assetId != null) LedgerUploadWorker.enqueue(this)
     }
 
@@ -64,7 +66,7 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
         val coupleId = snapshot.coupleId ?: return Result.retry()
         val myUid = snapshot.myUid ?: return Result.retry()
         val repo = LedgerRepository(FirebaseFirestore.getInstance())
-        runCatching { repo.ensureDefaultAssets(coupleId, myUid) }
+        repo.ensureDefaultAssets(ctx, coupleId, myUid)
         val done = mutableSetOf<String>()
         for (c in pending) {
             val name = c.parsed.payerName

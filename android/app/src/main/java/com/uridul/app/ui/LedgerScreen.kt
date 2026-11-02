@@ -90,8 +90,7 @@ internal fun wonText(amount: Long): String = "${won.format(amount)}원"
 @Composable
 fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val firebaseReady = remember { FirebaseApp.getApps(context).isNotEmpty() }
-    val repo = remember { if (firebaseReady) LedgerRepository(FirebaseFirestore.getInstance()) else null }
+    val repo = remember { (context.applicationContext as? com.uridul.app.UridulApp)?.container?.ledger }
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthText)
     val entries by remember(month, repo) { repo?.observeMonth(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
@@ -112,7 +111,7 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     }
     LaunchedEffect(repo) {
         if (repo == null) return@LaunchedEffect
-        runCatching { repo.ensureDefaultAssets(couple.id, myUid) }
+        repo.ensureDefaultAssets(context, couple.id, myUid)
         // 앱이 꺼져 있을 때 모인 결제가 있으면 올린다
         if (PaymentInbox.pendingUploads(context).isNotEmpty()) LedgerUploadWorker.enqueue(context)
     }
@@ -227,163 +226,3 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
         )
     }
 }
-
-private fun Modifier.clip8() = this.then(Modifier.clip(RoundedCornerShape(8.dp)))
-
-@Composable
-private fun SectionTitle(title: String, sub: String) {
-    Column(Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(top = 6.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** 자동 기록 켜기: 앱 안 스위치 + 폰 설정의 알림 접근 허용 (사용자가 직접) */
-@Composable
-private fun SetupCard(enabled: Boolean, granted: Boolean, onEnable: (Boolean) -> Unit, onOpenSettings: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("💳 데이트 통장 결제를 자동으로 기록해요", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "토스뱅크 chch모임통장·모임카드 결제 알림을 읽어 가계부에 바로 적어요. " +
-                    "토스 알림만 읽고, 다른 앱 알림은 열어 보지도 저장하지도 않아요. 개인 카드 결제는 이 폰에만 잠깐 보여 드리고 공유하지 않아요.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("① 자동 기록", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Switch(checked = enabled, onCheckedChange = onEnable)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (granted) "② 알림 접근 허용됨 ✅" else "② 폰 설정에서 '우리둘 가계부 자동 기록' 알림 접근 허용",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                if (!granted) OutlinedButton(onClick = onOpenSettings) { Text("설정 열기") }
-            }
-            Text(
-                "끄려면 같은 설정 화면에서 허용을 끄거나 위 스위치를 끄면 돼요.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SummaryCard(month: YearMonth, s: MonthSummary, assets: List<LedgerAsset>, onMonth: (YearMonth) -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
-    ) {
-        Column(Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { onMonth(month.minusMonths(1)) }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달") }
-                Text("${month.year}년 ${month.monthValue}월", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                IconButton(onClick = { onMonth(month.plusMonths(1)) }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달") }
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                SummaryCell("지출", wonText(s.expense), MaterialTheme.colorScheme.error, Modifier.weight(1f))
-                SummaryCell("수입", wonText(s.income), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-                SummaryCell("건수", "${s.count}건", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
-            }
-            if (assets.isNotEmpty()) {
-                HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 8.dp))
-                assets.forEach { a ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(when { a.kind.liability -> "🧾"; a.kind.key == "card" -> "💳"; a.kind.key == "cash" -> "💵"; else -> "🏦" }, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(a.name, style = MaterialTheme.typography.bodyMedium)
-                            if (a.institution.isNotBlank()) Text(a.institution, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text(
-                            a.lastBalance?.let { "잔액 ${wonText(it)}" } ?: when (a.kind.key) { "card" -> "연결: 데이트 통장"; "cash" -> "직접 기록"; else -> "잔액 알림 대기" },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryCell(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
-    }
-}
-
-@Composable
-private fun EntryRow(e: LedgerEntry, assets: List<LedgerAsset>, onClick: () -> Unit) {
-    val cat = LedgerCategories.of(e.category)
-    val asset = assets.firstOrNull { it.id == e.assetId }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .widthIn(max = 640.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(cat.emoji, style = MaterialTheme.typography.titleLarge, modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape).padding(4.dp), textAlign = TextAlign.Center)
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(e.merchant.ifBlank { cat.label }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val sub = buildList {
-                add(java.time.Instant.ofEpochMilli(e.at).atZone(LedgerEntry.ZONE).toLocalTime().format(KoreanTime))
-                add(cat.label)
-                asset?.let { add(it.name) }
-                if (e.installment > 0) add("${e.installment}개월 할부")
-                if (e.cancel) add("취소")
-            }.joinToString(" · ")
-            Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        val sign = when {
-            e.type == EntryType.INCOME -> "+"
-            e.cancel -> "+"
-            else -> "-"
-        }
-        Text(
-            "$sign${wonText(e.amount)}",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (sign == "+") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun LocalCaptureRow(c: PaymentCapture, onRecord: () -> Unit, onRemove: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val p = c.parsed
-            Text(
-                "${if (p.kind == PaymentKind.CANCEL) "취소 " else ""}${p.amount?.let(::wonText).orEmpty()} · ${p.merchant ?: "가맹점 모름"}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                "${p.method ?: "결제 수단 모름"} · ${java.time.Instant.ofEpochMilli(c.postedAt).atZone(LedgerEntry.ZONE).toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일 a h:mm", Locale.KOREAN))}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onRecord) { Text("데이트 통장 결제로 기록") }
-                TextButton(onClick = onRemove) { Text("지우기", color = MaterialTheme.colorScheme.error) }
-            }
-        }
-    }
-}
-
