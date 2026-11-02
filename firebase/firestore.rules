@@ -229,6 +229,62 @@ service cloud.firestore {
       }
 
       // 가고 싶은 곳: 지도 앱에서 공유받은 장소 목록 (두 사람만)
+      // 가계부 거래 (docs/가계부_설계.md). 금액은 원 단위 정수, 휴지통은 deleted 로
+      match /ledgerEntries/{entryId} {
+        function isLedgerMember() {
+          return signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+
+        function validEntry(d) {
+          return d.keys().hasOnly(['v', 'type', 'amount', 'cancel', 'date', 'at', 'merchant', 'memo', 'category',
+                                   'assetId', 'toAssetId', 'paidBy', 'paidByName', 'status', 'source', 'sourceApp',
+                                   'raw', 'parser', 'balanceAfter', 'installment', 'recurringId', 'eventId', 'tags',
+                                   'deleted', 'deletedAt', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+            && d.type in ['expense', 'income', 'transfer']
+            && d.amount is int && d.amount >= 0 && d.amount <= 10000000000
+            && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && d.at is int
+            && (!('merchant' in d) || (d.merchant is string && d.merchant.size() <= 100))
+            && (!('memo' in d) || (d.memo is string && d.memo.size() <= 500))
+            && (!('category' in d) || (d.category is string && d.category.size() <= 40))
+            && (!('status' in d) || d.status in ['confirmed', 'pending'])
+            && (!('source' in d) || d.source in ['notification', 'sms', 'manual', 'import', 'recurring'])
+            && (!('raw' in d) || d.raw == null || (d.raw is map && d.raw.keys().hasOnly(['title', 'text'])))
+            && (!('tags' in d) || (d.tags is list && d.tags.size() <= 10))
+            && d.updatedBy == request.auth.uid;
+        }
+
+        allow read: if isLedgerMember();
+        allow create: if isLedgerMember() && validEntry(request.resource.data)
+          && request.resource.data.createdBy in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        allow update: if isLedgerMember() && validEntry(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isLedgerMember();
+      }
+
+      // 가계부 자산·부채
+      match /ledgerAssets/{assetId} {
+        function isAssetMember() {
+          return signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+
+        function validAsset(d) {
+          return d.keys().hasOnly(['v', 'name', 'kind', 'institution', 'linkedAssetId', 'openingBalance', 'openingDate',
+                                   'lastBalance', 'lastBalanceAt', 'matchers', 'archived', 'order', 'color',
+                                   'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+            && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+            && d.kind in ['bank', 'card', 'cash', 'savings', 'investment', 'loan', 'other']
+            && (!('matchers' in d) || (d.matchers is list && d.matchers.size() <= 20))
+            && d.updatedBy == request.auth.uid;
+        }
+
+        allow read: if isAssetMember();
+        allow create, update: if isAssetMember() && validAsset(request.resource.data);
+        allow delete: if isAssetMember();
+      }
+
       match /wishes/{wishId} {
         function isWishMember() {
           return signedIn()

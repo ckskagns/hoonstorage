@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Place
@@ -74,6 +75,7 @@ private enum class Tab(val key: String, val label: String, val icon: ImageVector
     Calendar("calendar", "캘린더", Icons.Filled.DateRange),
     Diary("diary", "일기장", Icons.Filled.Edit),
     Wish("wish", "가고 싶은 곳", Icons.Filled.Place),
+    Ledger("ledger", "가계부", Icons.Filled.ShoppingCart),
 }
 
 /**
@@ -232,6 +234,7 @@ fun ReadyScreen(
                                 Tab.Calendar -> "우리 캘린더"
                                 Tab.Wish -> "가고 싶은 곳"
                                 Tab.Diary -> "우리 일기장"
+                                Tab.Ledger -> "데이트 가계부"
                             },
                             fontWeight = FontWeight.Bold,
                         )
@@ -408,6 +411,7 @@ fun ReadyScreen(
                         onDelete = { w -> onDeleteWish(w.id) },
                         modifier = content,
                     )
+                    Tab.Ledger -> LedgerContent(couple = couple, myUid = myUid, modifier = content)
                 }
                 }
             }
