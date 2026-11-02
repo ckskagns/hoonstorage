@@ -1,9 +1,9 @@
 {
-    "versionCode":  13,
-    "versionName":  "0.11.0",
-    "notes":  "일기장이 인스타 피드처럼: 사진 넘기기·크게 보기·한 줄 후기(누르면 크게), 홈 추억 슬라이드를 누르면 일기장에서 크게 보기, 캘린더 사진첩도 같은 크게 보기, 사진 더 빨리 열기",
-    "size":  48135948,
-    "sha256":  "e6534137e3857a87f50b953035ca4a2dba88dd880d6f93765dffa6539291ef6e",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.11.0/uridul.apk",
-    "releasedAt":  "2026-11-02T13:57:23+09:00"
+    "versionCode":  14,
+    "versionName":  "0.12.0",
+    "notes":  "데이트 가계부 탭: 토스 chch모임통장·모임카드 결제 알림 자동 기록, 직접 기록(지출·수입·현금), 고치기·휴지통 / 캘린더: 일정 있는 날을 누르면 최근 일정 상세부터",
+    "size":  48496611,
+    "sha256":  "44c9403928a3266daad010b41a524f74a4e7ab0f95b2c71b4247a2e5e2594630",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.12.0/uridul.apk",
+    "releasedAt":  "2026-11-02T16:39:05+09:00"
 }
