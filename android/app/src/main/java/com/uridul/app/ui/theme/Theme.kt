@@ -87,6 +87,21 @@ object CoupleColors {
     val partnerFill: Color
         @Composable get() = Color(LocalUiSettings.current.partner.fill)
     val onFill: Color = Color(ON_EVENT_FILL)
+
+    /** 이 일정의 색: 일정마다 고른 색, 고르지 않았으면 등록한 사람 색 */
+    @Composable
+    fun of(event: com.uridul.app.data.CalendarEvent, myUid: String): com.uridul.app.data.EventColor {
+        val ui = LocalUiSettings.current
+        return event.color ?: if (event.createdBy == myUid) ui.mine else ui.partner
+    }
+
+    /** 이 일정의 파스텔 바탕 (달력 막대·칸) */
+    @Composable
+    fun fillOf(event: com.uridul.app.data.CalendarEvent, myUid: String): Color = Color(of(event, myUid).fill)
+
+    /** 이 일정의 진한 색 (왼쪽 선·점) */
+    @Composable
+    fun strongOf(event: com.uridul.app.data.CalendarEvent, myUid: String): Color = Color(of(event, myUid).strong)
     /** 일요일·공휴일 빨강 / 토요일 파랑 */
     val sunday: Color
         @Composable get() = if (LocalDarkTheme.current) Color(0xFFFFB4AB) else Color(0xFFD32F2F)

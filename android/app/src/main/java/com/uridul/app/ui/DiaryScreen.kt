@@ -115,13 +115,10 @@ fun DiaryContent(
 /** 일기 하루: 날짜·제목·장소 / 두 사람 후기 / 그 날 사진 */
 @Composable
 private fun DiaryEntry(review: DateReview, couple: Couple, myUid: String, onOpen: () -> Unit) {
-    val photosHooks = LocalPhotos.current
     // 사진첩은 "일정 ID + 날짜" 로 찾는다
     val dayEvent = remember(review.id) {
         CalendarEvent(review.eventId, review.title, review.date, review.date, null, "", "")
     }
-    val photos by remember(review.id) { photosHooks.album(dayEvent) }.collectAsState(initial = emptyList())
-    var viewing by remember { mutableStateOf<Int?>(null) }
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
@@ -148,33 +145,8 @@ private fun DiaryEntry(review: DateReview, couple: Couple, myUid: String, onOpen
                     }
                 }
             }
-            if (photos.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    itemsIndexed(photos, key = { _, p -> p.id }) { i, p ->
-                        val bmp = rememberPhotoBitmap(p.id, p.thumb)
-                        Box(
-                            Modifier
-                                .size(84.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .clickable { viewing = i }
-                                .semantics { contentDescription = "사진 ${i + 1}, 눌러서 크게 보기" },
-                        ) {
-                            bmp?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                        }
-                    }
-                }
-            }
+            // 그 날 사진첩: 크게 보기·지우기에 더해 여기서 바로 올리기도
+            AlbumStrip(event = dayEvent, couple = couple, myUid = myUid, startPadding = 0.dp, thumbSize = 84.dp)
         }
-    }
-    viewing?.let { start ->
-        PhotoViewerDialog(
-            photos = photos,
-            start = start.coerceIn(0, (photos.size - 1).coerceAtLeast(0)),
-            couple = couple,
-            myUid = myUid,
-            onDelete = { p -> photosHooks.onDelete(p) },
-            onDismiss = { viewing = null },
-        )
     }
 }

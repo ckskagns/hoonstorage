@@ -365,6 +365,11 @@ fun ReadyScreen(
                         onAdd = { openDay(it, new = true) },
                         onEdit = { e -> openDay(if (e.occursOn(selected)) selected else e.date, focus = e.id) },
                         modifier = content,
+                        // 길게 누른 채 여러 날을 끌면 그 기간으로 새 일정 (자세히 입력 창)
+                        onAddRange = { s, e -> editing = EditorTarget.New(s, e) },
+                        onSave = onSaveEvent,
+                        onDelete = onDeleteEvent,
+                        onSkip = onSkipOccurrence,
                     )
                     Tab.Diary -> DiaryContent(
                         couple = couple,
@@ -486,7 +491,7 @@ fun ReadyScreen(
 
     editing?.let { target ->
         val draft = when (target) {
-            is EditorTarget.New -> EventDraft(title = "", date = target.date, endDate = target.date, time = null, memo = "")
+            is EditorTarget.New -> EventDraft(title = "", date = target.date, endDate = target.endDate, time = null, memo = "")
             is EditorTarget.Existing -> target.event.toDraft()
             is EditorTarget.FromDraft -> target.draft
         }
@@ -503,6 +508,11 @@ fun ReadyScreen(
                 },
                 incomingPlace = sharedPlace,
                 onIncomingPlaceConsumed = PlaceInbox::consume,
+                // 색을 고르지 않았을 때 보일 색: 그 일정을 등록한 사람 색
+                defaultColor = run {
+                    val creator = draft.id?.let { id -> monthEvents.firstOrNull { it.id == id }?.createdBy } ?: myUid
+                    if (creator == myUid) uiSettings.mine else uiSettings.partner
+                },
             )
         }
     }
@@ -560,7 +570,7 @@ fun ReadyScreen(
 }
 
 private sealed interface EditorTarget {
-    data class New(val date: LocalDate) : EditorTarget
+    data class New(val date: LocalDate, val endDate: LocalDate = date) : EditorTarget
     data class Existing(val event: CalendarEvent) : EditorTarget
     /** 하루 페이지의 "날짜·메모 자세히" 에서 넘어온 입력값 */
     data class FromDraft(val draft: EventDraft) : EditorTarget

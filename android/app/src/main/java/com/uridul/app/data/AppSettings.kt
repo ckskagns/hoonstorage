@@ -32,6 +32,7 @@ enum class EventColor(val key: String, val label: String, val fill: Long, val st
 
     companion object {
         fun from(key: String?, default: EventColor) = entries.firstOrNull { it.key == key } ?: default
+        fun fromOrNull(key: String?): EventColor? = entries.firstOrNull { it.key == key }
     }
 }
 

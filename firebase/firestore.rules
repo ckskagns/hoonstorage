@@ -123,7 +123,10 @@ service cloud.firestore {
 
         function validEvent(d) {
           return d.keys().hasOnly(['title', 'date', 'endDate', 'allDay', 'time', 'memo', 'place', 'timeline',
-                                   'remind', 'repeat', 'skip', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+                                   'remind', 'repeat', 'skip', 'color', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+            // 일정 색 (선택): 앱의 파스텔 색 이름
+            && (!('color' in d) || d.color == null
+                || d.color in ['pink', 'coral', 'peach', 'lemon', 'mint', 'sky', 'lavender', 'lilac', 'gray'])
             // 반복: 매주·매달·매년, 뺀 날 목록은 200개까지
             && (!('repeat' in d) || d.repeat == null || d.repeat in ['weekly', 'monthly', 'yearly'])
             && (!('skip' in d) || d.skip == null || (d.skip is list && d.skip.size() <= 200))

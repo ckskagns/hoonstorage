@@ -163,7 +163,7 @@ private fun EventRow(event: CalendarEvent, today: LocalDate, myUid: String?, nar
                     .width(4.dp)
                     .height(if (narrow) 30.dp else 22.dp)
                     .cornerRadius(2.dp)
-                    .background(if (mine) WidgetColors.Mine else WidgetColors.Partner),
+                    .background(WidgetColors.strongOf(event, mine)),
             ) {}
             Spacer(GlanceModifier.width(8.dp))
             if (narrow) {

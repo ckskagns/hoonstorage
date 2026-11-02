@@ -100,7 +100,15 @@ fun CalendarContent(
     onAdd: (LocalDate) -> Unit,
     onEdit: (CalendarEvent) -> Unit,
     modifier: Modifier = Modifier,
+    /** 길게 누른 채 여러 날을 끌었을 때: 그 기간으로 새 일정 */
+    onAddRange: (LocalDate, LocalDate) -> Unit = { s, _ -> onAdd(s) },
+    /** 상세 보기에서 색 바꾸기 */
+    onSave: (com.uridul.app.data.EventDraft) -> Boolean = { false },
+    onDelete: (String) -> Unit = {},
+    onSkip: (String, LocalDate) -> Unit = { _, _ -> },
 ) {
+    // 상세 보기 중인 일정 (ID). 일정이 바뀌면(색 등) 새 내용으로 다시 보여준다
+    var detailId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     val today = rememberToday()
     val grid = remember(month) { CalendarMath.monthGrid(month) }
     val birthdays = remember(couple) { couple.birthdays() }
@@ -109,6 +117,8 @@ fun CalendarContent(
     }
     val specials = remember(specialsFor, grid) { specialsFor(grid) }
     val selectedEvents = remember(events, selected) { CalendarMath.eventsOn(events, selected) }
+    // 일정을 누르면 기본 캘린더처럼 먼저 상세 보기
+    val openDetail: (CalendarEvent) -> Unit = { detailId = it.id }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val twoPane = maxWidth >= TwoPaneMinWidth
@@ -125,9 +135,10 @@ fun CalendarContent(
                     modifier = Modifier
                         .weight(1.3f)
                         .fillMaxHeight(),
+                    onAddRange = onAddRange,
                 )
                 DayPanel(
-                    selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, onEdit,
+                    selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, openDetail,
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -150,11 +161,31 @@ fun CalendarContent(
                     month, events, specialsFor, selected, today, myUid, onSelect, onAdd, onMonthChange,
                     fillHeight = false,
                     modifier = m,
+                    onAddRange = onAddRange,
                 )
-                DayPanel(selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, onEdit, m)
+                DayPanel(selected, selectedEvents, specials[selected].orEmpty(), couple, myUid, onAdd, openDetail, m)
                 // 아래 버튼(일정 추가)에 마지막 일정이 가려지지 않게
                 Spacer(Modifier.height(72.dp))
             }
+        }
+    }
+
+    // 상세 보기: 고른 날의 그 일정 (지워지거나 다른 날로 옮겨지면 닫힌다)
+    detailId?.let { id ->
+        val event = selectedEvents.firstOrNull { it.id == id }
+        if (event == null) {
+            LaunchedEffect(id) { detailId = null }
+        } else {
+            EventDetailSheet(
+                event = event,
+                couple = couple,
+                myUid = myUid,
+                onDismiss = { detailId = null },
+                onEdit = { e -> detailId = null; onEdit(e) },
+                onSave = onSave,
+                onDelete = onDelete,
+                onSkip = onSkip,
+            )
         }
     }
 }

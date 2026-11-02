@@ -190,6 +190,7 @@ internal fun EventDraft.toPreview(createdBy: String): CalendarEvent = CalendarEv
     timeline = timeline,
     remind = remind,
     repeat = repeat,
+    color = color,
 )
 
 /** 편집 상태 저장용 JSON */
@@ -229,6 +230,7 @@ internal object EditCodec {
         .put("place", placeJson(d.place))
         .put("remind", d.remind ?: JSONObject.NULL)
         .put("repeat", d.repeat?.key ?: JSONObject.NULL)
+        .put("color", d.color?.key ?: JSONObject.NULL)
         .put("seriesStart", d.seriesStart?.toString() ?: JSONObject.NULL)
         .put("occurrence", d.occurrence?.toString() ?: JSONObject.NULL)
         .put("timeline", JSONArray().also { arr ->
@@ -255,6 +257,7 @@ internal object EditCodec {
             place = parsePlace(o, "place"),
             remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
             repeat = Repeat.from(if (!o.has("repeat") || o.isNull("repeat")) null else o.getString("repeat")),
+            color = com.uridul.app.data.EventColor.fromOrNull(if (!o.has("color") || o.isNull("color")) null else o.getString("color")),
             seriesStart = if (!o.has("seriesStart") || o.isNull("seriesStart")) null else LocalDate.parse(o.getString("seriesStart")),
             occurrence = if (!o.has("occurrence") || o.isNull("occurrence")) null else LocalDate.parse(o.getString("occurrence")),
             timeline = (0 until arr.length()).map { i ->

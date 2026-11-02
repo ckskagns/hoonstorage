@@ -294,6 +294,11 @@ fun DayTimelinePage(
                                 onOpenPlace = { MapLinks.open(context, it) },
                                 onDelete = { confirmDelete = true },
                                 onMore = { onOpenFullEditor(e.finalDraft()); setEdit(null) },
+                                defaultColor = run {
+                                    val creator = e.original?.let { o -> dayEvents.firstOrNull { it.id == o.id }?.createdBy } ?: myUid
+                                    val ui = com.uridul.app.ui.theme.LocalUiSettings.current
+                                    if (creator == myUid) ui.mine else ui.partner
+                                },
                                 // 편집 칸은 화면의 절반 남짓까지만 (위의 시간표가 보이도록)
                                 maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.55f).dp,
                             )
@@ -384,9 +389,8 @@ private fun AllDayRow(events: List<CalendarEvent>, myUid: String, editingId: Str
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         events.forEach { e ->
-            val mine = e.createdBy == myUid
-            val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
-            val strong = if (mine) CoupleColors.mine else CoupleColors.partner
+            val fill = CoupleColors.fillOf(e, myUid)
+            val strong = CoupleColors.strongOf(e, myUid)
             val label = buildString {
                 if (e.repeat != null) append("🔁 ")
                 append(e.title)
@@ -468,7 +472,7 @@ private fun TimelineTable(
                 val colWidth = width / p.columns
                 TimelineBlock(
                     block = b,
-                    mine = b.event.createdBy == myUid,
+                    color = CoupleColors.of(b.event, myUid),
                     selected = b.key == editingKey,
                     modifier = Modifier
                         .offset(x = colWidth * p.column, y = dpPerMinute * b.startMin)
@@ -493,14 +497,14 @@ private fun TimelineTable(
 @Composable
 private fun TimelineBlock(
     block: DayTimeline.Block,
-    mine: Boolean,
+    color: com.uridul.app.data.EventColor,
     selected: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
     onOpenPlace: (Place) -> Unit,
 ) {
-    val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
-    val strong = if (mine) CoupleColors.mine else CoupleColors.partner
+    val fill = androidx.compose.ui.graphics.Color(color.fill)
+    val strong = androidx.compose.ui.graphics.Color(color.strong)
     val press = remember { MutableInteractionSource() }
     val scale = bounceScale(selected, 1.02f)
     val lengthMin = block.endMin - block.startMin

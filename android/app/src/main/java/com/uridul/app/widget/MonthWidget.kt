@@ -391,7 +391,7 @@ private fun DayCell(
                         .fillMaxWidth()
                         .padding(top = 1.dp)
                         .cornerRadius(3.dp)
-                        .background(if (mine) WidgetColors.MineSoft else WidgetColors.PartnerSoft)
+                        .background(WidgetColors.softOf(e, mine))
                         .padding(horizontal = 2.dp),
                 )
             }
@@ -413,7 +413,7 @@ private fun DayCell(
                         GlanceModifier
                             .size(5.dp)
                             .cornerRadius(3.dp)
-                            .background(if (mine) WidgetColors.Mine else WidgetColors.Partner),
+                            .background(WidgetColors.strongOf(e, mine)),
                     ) {}
                 }
             }
@@ -470,7 +470,7 @@ private fun BarLanes(
                                     .defaultWeight()
                                     .height(pitch - 1.dp)
                                     .cornerRadius(3.dp)
-                                    .background(if (mine) WidgetColors.MineBar else WidgetColors.PartnerBar)
+                                    .background(WidgetColors.softOf(bar.event, mine))
                                     .padding(horizontal = 3.dp),
                             )
                         } else {
@@ -479,7 +479,7 @@ private fun BarLanes(
                                     .defaultWeight()
                                     .height(4.dp)
                                     .cornerRadius(2.dp)
-                                    .background(if (mine) WidgetColors.Mine else WidgetColors.Partner),
+                                    .background(WidgetColors.strongOf(bar.event, mine)),
                             ) {}
                         }
                         if (endInset > 0.dp) Spacer(GlanceModifier.width(endInset))

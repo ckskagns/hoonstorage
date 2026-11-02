@@ -113,6 +113,7 @@ object WidgetStore {
                     .put("memo", e.memo)
                     .put("remind", e.remind ?: JSONObject.NULL)
                     .put("repeat", e.repeat?.key ?: JSONObject.NULL)
+                    .put("color", e.color?.key ?: JSONObject.NULL)
                     .put("skip", JSONArray(e.skip.sorted().map { it.toString() }))
                     .put("seriesStart", e.seriesStart?.toString() ?: JSONObject.NULL)
                     .put("placeName", e.place?.name ?: JSONObject.NULL)
@@ -152,6 +153,7 @@ object WidgetStore {
                         memo = o.optString("memo"),
                         remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
                         repeat = Repeat.from(if (o.isNull("repeat")) null else o.optString("repeat")),
+                        color = EventColor.fromOrNull(if (!o.has("color") || o.isNull("color")) null else o.optString("color")),
                         skip = o.optJSONArray("skip")?.let { arr ->
                             (0 until arr.length()).mapNotNull { k -> runCatching { LocalDate.parse(arr.getString(k)) }.getOrNull() }.toSet()
                         }.orEmpty(),

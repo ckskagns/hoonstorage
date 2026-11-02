@@ -127,6 +127,11 @@ internal object WidgetColors {
     val PartnerSoft get() = fixed(Color(ui.partner.fill))
     val MineBar get() = MineSoft
     val PartnerBar get() = PartnerSoft
+
+    /** 이 일정의 색: 일정마다 고른 색, 없으면 등록한 사람 색 */
+    private fun colorOf(e: com.uridul.app.data.CalendarEvent, mine: Boolean) = e.color ?: if (mine) ui.mine else ui.partner
+    fun strongOf(e: com.uridul.app.data.CalendarEvent, mine: Boolean) = fixed(Color(colorOf(e, mine).strong))
+    fun softOf(e: com.uridul.app.data.CalendarEvent, mine: Boolean) = fixed(Color(colorOf(e, mine).fill))
     /** 파스텔 막대 위 글자 (화이트·다크 모두 진한 색) */
     val OnFill get() = fixed(Color(com.uridul.app.data.ON_EVENT_FILL))
     /** 다른 달 날짜의 막대 글자 (반투명 진한 색) */

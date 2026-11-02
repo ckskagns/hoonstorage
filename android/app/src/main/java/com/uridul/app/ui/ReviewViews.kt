@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -118,6 +120,9 @@ fun ReviewStrip(event: CalendarEvent, couple: Couple, myUid: String) {
     if (editing) {
         ReviewDialog(
             title = event.title,
+            event = event,
+            couple = couple,
+            myUid = myUid,
             existing = mine,
             onSave = { hearts, text ->
                 editing = false
@@ -129,7 +134,10 @@ fun ReviewStrip(event: CalendarEvent, couple: Couple, myUid: String) {
     }
 }
 
-/** 후기 쓰기: 하트 1~5 + 한 줄 (100자) */
+/**
+ * 후기 쓰기: 하트 1~5 + 한 줄 (100자) + 그 날 사진첩 (사진 올리기·크게 보기·지우기 모두).
+ * 사진은 고르는 즉시 올라가고, 하트·한 줄은 [저장]을 눌러야 저장된다.
+ */
 @Composable
 fun ReviewDialog(
     title: String,
@@ -137,6 +145,10 @@ fun ReviewDialog(
     onSave: (hearts: Int, text: String) -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
+    /** 사진첩을 보여줄 일정 (그 날) */
+    event: CalendarEvent? = null,
+    couple: Couple? = null,
+    myUid: String = "",
 ) {
     var hearts by rememberSaveable { mutableIntStateOf(existing?.hearts ?: 5) }
     var text by rememberSaveable { mutableStateOf(existing?.text.orEmpty()) }
@@ -144,7 +156,11 @@ fun ReviewDialog(
         onDismissRequest = onDismiss,
         title = { Text("💗 $title", maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text("어땠어요?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HeartsRow(hearts, 30.sp) { hearts = it }
                 OutlinedTextField(
@@ -156,6 +172,15 @@ fun ReviewDialog(
                     supportingText = { Text("${text.length}/${ReviewEntry.TEXT_MAX}") },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (event != null && couple != null) {
+                    AlbumStrip(event = event, couple = couple, myUid = myUid, startPadding = 0.dp, modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "사진은 고르면 바로 올라가요 · 하트와 한 줄은 [저장]을 눌러 주세요",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         },
         confirmButton = { TextButton(onClick = { onSave(hearts, text.trim()) }) { Text("저장") } },

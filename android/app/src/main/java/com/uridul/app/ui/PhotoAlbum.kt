@@ -111,7 +111,14 @@ fun rememberPhotoBitmap(key: String, bytes: ByteArray?): ImageBitmap? {
  * 이번 주 장수를 다 쓰면 + 가 꺼지고, 이번 주 사진을 지우면 다시 올릴 수 있다고 알려준다.
  */
 @Composable
-fun AlbumStrip(event: CalendarEvent, couple: Couple, myUid: String) {
+fun AlbumStrip(
+    event: CalendarEvent,
+    couple: Couple,
+    myUid: String,
+    startPadding: androidx.compose.ui.unit.Dp = 16.dp,
+    thumbSize: androidx.compose.ui.unit.Dp = 64.dp,
+    modifier: Modifier = Modifier,
+) {
     val hooks = LocalPhotos.current
     val photos by remember(event.id, event.date) { hooks.album(event) }.collectAsState(initial = emptyList())
     // 사진이 늘거나 줄면(상대가 올린 것 포함) 이번 주 장수를 다시 센다
@@ -122,7 +129,7 @@ fun AlbumStrip(event: CalendarEvent, couple: Couple, myUid: String) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(PhotoQuota.PER_EVENT_MAX)) { uris ->
         if (uris.isNotEmpty()) hooks.onUpload(event, uris, photos.size)
     }
-    Column(Modifier.padding(start = 16.dp, top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier.padding(start = startPadding, top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("📷 사진첩", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             // 한 주 업로드 제한을 조그맣게
@@ -138,7 +145,7 @@ fun AlbumStrip(event: CalendarEvent, couple: Couple, myUid: String) {
                 val bmp = rememberPhotoBitmap(p.id, p.thumb)
                 Box(
                     Modifier
-                        .size(64.dp)
+                        .size(thumbSize)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .clickable { viewing = i }
@@ -151,7 +158,7 @@ fun AlbumStrip(event: CalendarEvent, couple: Couple, myUid: String) {
                 val enabled = room > 0 && !hooks.uploading
                 Box(
                     Modifier
-                        .size(64.dp)
+                        .size(thumbSize)
                         .clip(RoundedCornerShape(12.dp))
                         .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 0.8f else 0.3f), RoundedCornerShape(12.dp))
                         .clickable(enabled = enabled) {

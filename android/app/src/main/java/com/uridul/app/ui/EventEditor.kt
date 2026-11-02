@@ -74,8 +74,12 @@ fun EventEditorDialog(
     /** 지도 앱에서 "공유 → 우리둘" 로 받은 장소 (받으면 장소를 찾던 줄에 넣는다) */
     incomingPlace: Place? = null,
     onIncomingPlaceConsumed: () -> Unit = {},
+    /** 색을 고르지 않았을 때의 색 (등록한 사람 색) */
+    defaultColor: com.uridul.app.data.EventColor = com.uridul.app.ui.theme.LocalUiSettings.current.mine,
 ) {
     val context = LocalContext.current
+    var colorKey by rememberSaveable { mutableStateOf(initial.color?.key) }
+    val color = com.uridul.app.data.EventColor.fromOrNull(colorKey)
     var title by rememberSaveable { mutableStateOf(initial.title) }
     var date by rememberSaveable { mutableStateOf(initial.date.toString()) }
     var endDate by rememberSaveable { mutableStateOf(initial.endDate.toString()) }
@@ -129,6 +133,7 @@ fun EventEditorDialog(
             repeat = initial.repeat,
             seriesStart = initial.seriesStart,
             occurrence = initial.occurrence,
+            color = color,
             remind = initial.remind?.takeIf { r ->
                 if (allDay) com.uridul.app.data.Remind.allDayOptions.any { it.minutes == r } else true
             },
@@ -289,6 +294,12 @@ fun EventEditorDialog(
                                 ) { Text("+ 시간대 추가") }
                             }
                         }
+
+                        EventColorPicker(
+                            selected = color,
+                            defaultColor = defaultColor,
+                            onPick = { colorKey = it?.key },
+                        )
 
                         OutlinedTextField(
                             value = memo,

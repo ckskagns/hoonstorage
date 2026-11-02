@@ -136,13 +136,14 @@ internal fun DayPanel(
  * 선택한 날의 일정 카드.
  *  - 위: 제목, 날짜(여러 날이면 기간), 누가 등록했는지
  *  - 아래: 하루 종일 한 줄 또는 타임라인(시작~끝·내용) 여러 줄, 각 줄 오른쪽에 장소 태그 / [장소 찾기]
- * 카드를 누르면 수정, 장소 태그를 누르면 그 지도 앱에서 바로 열림.
+ * 카드를 누르면 상세 보기(기본 캘린더처럼), 장소 태그를 누르면 그 지도 앱에서 바로 열림.
  */
 @Composable
 private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdit: (CalendarEvent) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val mine = event.createdBy == myUid
     val color = if (mine) CoupleColors.mine else CoupleColors.partner
+    val eventColor = CoupleColors.strongOf(event, myUid)
     val who = if (mine) couple.myName(myUid) else (couple.names[event.createdBy] ?: "상대")
     /** 장소를 찾을 줄 (-1: 하루 종일 줄), null 이면 지도 고르기 창 닫힘 */
     var findingSlot by remember { mutableStateOf<Int?>(null) }
@@ -162,7 +163,7 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                     Modifier
                         .width(4.dp)
                         .height(40.dp)
-                        .background(color, RoundedCornerShape(2.dp)),
+                        .background(eventColor, RoundedCornerShape(2.dp)),
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -292,7 +293,7 @@ private fun TimelineLine(
 }
 
 /** "오후 6:30 ~ 오후 8:00", 여러 날 일정이면 "8.7 오후 4:00 ~ 8.14 오후 5:00" */
-private fun slotTimeText(event: CalendarEvent, slot: com.uridul.app.data.TimeSlot): String {
+internal fun slotTimeText(event: CalendarEvent, slot: com.uridul.app.data.TimeSlot): String {
     val startText = slot.start.format(KoreanTime)
     val endText = slot.end?.format(KoreanTime)
     return if (event.isMultiDay) {

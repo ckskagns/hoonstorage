@@ -48,6 +48,8 @@ data class CalendarEvent(
      * (펼친 일정의 date·endDate 는 그 날 기준이다)
      */
     val seriesStart: LocalDate? = null,
+    /** 이 일정만의 색 (null = 등록한 사람 색) */
+    val color: EventColor? = null,
 ) {
     val allDay: Boolean get() = time == null
     /** 펼친 반복 일정이면 원본(첫 날 기준)으로 되돌린다 */
@@ -88,6 +90,8 @@ data class EventDraft(
     /** 반복 일정의 어느 날을 고치는 중이면: 원래 첫 시작일 / 고치기 시작한 그 날의 시작일 */
     val seriesStart: LocalDate? = null,
     val occurrence: LocalDate? = null,
+    /** 이 일정만의 색 (null = 등록한 사람 색) */
+    val color: EventColor? = null,
 )
 
 /** 저장된 일정을 수정용 입력값으로 (펼친 반복 일정이면 그 날 기준 + 원래 첫 날을 함께 기억) */
@@ -97,6 +101,7 @@ fun CalendarEvent.toDraft(): EventDraft =
         repeat = repeat,
         seriesStart = seriesStart,
         occurrence = if (seriesStart != null) date else null,
+        color = color,
     )
 
 /**

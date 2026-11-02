@@ -74,6 +74,9 @@ fun MemorySlides(
     writingFor?.let { e ->
         ReviewDialog(
             title = e.title,
+            event = e,
+            couple = couple,
+            myUid = myUid,
             existing = hooks.of(e)?.entries?.get(myUid),
             onSave = { hearts, text -> writingFor = null; hooks.onSave(e, hearts, text) },
             onDelete = null,
@@ -156,7 +159,7 @@ fun MemorySlides(
 private fun MemoryCard(slide: Memories.Slide, couple: Couple, myUid: String, onClick: () -> Unit, onWrite: () -> Unit, modifier: Modifier) {
     val e = slide.event
     val mine = e.createdBy == myUid
-    val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
+    val fill = CoupleColors.fillOf(e, myUid)
     val other = if (mine) CoupleColors.partnerFill else CoupleColors.mineFill
     val review = LocalReviews.current.of(e)
     val photoKey = com.uridul.app.data.PhotoMeta.albumKey(e.id, e.date)

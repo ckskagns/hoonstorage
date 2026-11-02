@@ -170,8 +170,7 @@ private fun Header(text: String) {
 
 @Composable
 private fun ResultRow(e: CalendarEvent, myUid: String, today: LocalDate, onOpen: (CalendarEvent) -> Unit) {
-    val mine = e.createdBy == myUid
-    val strong = if (mine) CoupleColors.mine else CoupleColors.partner
+    val strong = CoupleColors.strongOf(e, myUid)
     val dateText = buildString {
         if (e.date.year != today.year) append("${e.date.year}년 ")
         append(e.date.format(KoreanMonthDay))

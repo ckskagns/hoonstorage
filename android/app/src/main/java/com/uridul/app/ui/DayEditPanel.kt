@@ -118,6 +118,8 @@ internal fun EditPanel(
     onDelete: () -> Unit,
     onMore: () -> Unit,
     maxHeight: Dp,
+    /** 색을 고르지 않았을 때의 색 (등록한 사람 색) */
+    defaultColor: com.uridul.app.data.EventColor = com.uridul.app.data.EventColor.PINK,
 ) {
     val d = edit.draft
     val allDay = edit.slot < 0
@@ -198,6 +200,11 @@ internal fun EditPanel(
                 }
             }
 
+            EventColorPicker(
+                selected = d.color,
+                defaultColor = defaultColor,
+                onPick = { onChange(edit.copy(draft = d.copy(color = it))) },
+            )
             RepeatRow(
                 repeat = d.repeat,
                 date = d.date,

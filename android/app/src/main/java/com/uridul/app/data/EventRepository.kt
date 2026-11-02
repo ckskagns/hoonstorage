@@ -69,6 +69,8 @@ class EventRepository(private val db: FirebaseFirestore) {
             data["createdAt"] = FieldValue.serverTimestamp()
             events(coupleId).document().set(data)
         } else {
+            // 색을 기본(등록한 사람 색)으로 되돌렸으면 저장된 색을 지운다
+            if (draft.color == null) data["color"] = FieldValue.delete()
             events(coupleId).document(draft.id).update(data)
         }
         task.addOnFailureListener(onError)
@@ -132,7 +134,10 @@ class EventRepository(private val db: FirebaseFirestore) {
             "repeat" to draft.repeat?.key,
             "updatedBy" to uid,
             "updatedAt" to FieldValue.serverTimestamp(),
-        )
+        ).apply {
+            // 일정마다 고른 색 (없으면 등록한 사람 색). 고르지 않았으면 칸을 아예 두지 않는다
+            draft.color?.let { put("color", it.key) }
+        }
     }
 
     fun delete(coupleId: String, eventId: String, onError: (Exception) -> Unit) {
@@ -190,6 +195,7 @@ class EventRepository(private val db: FirebaseFirestore) {
             },
             remind = (get("remind") as? Number)?.toInt()?.takeIf { it in Remind.allowed },
             repeat = Repeat.from(getString("repeat")),
+            color = EventColor.fromOrNull(getString("color")),
             skip = (get("skip") as? List<*>).orEmpty().mapNotNull { (it as? String)?.let { s -> runCatching { LocalDate.parse(s) }.getOrNull() } }.toSet(),
         )
     }

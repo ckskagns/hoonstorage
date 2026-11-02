@@ -62,6 +62,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -105,8 +110,11 @@ internal fun MonthCalendar(
     onMonthChange: (YearMonth) -> Unit,
     fillHeight: Boolean,
     modifier: Modifier,
+    /** 길게 누른 채 여러 날을 끌면 그 기간으로 새 일정 */
+    onAddRange: (LocalDate, LocalDate) -> Unit = { s, _ -> onAdd(s) },
 ) {
     val base = remember { YearMonth.now() }
+    var pickingMonth by remember { mutableStateOf(false) }
     fun pageOf(m: YearMonth) = PAGE_CENTER + ChronoUnit.MONTHS.between(base, m).toInt()
     fun monthOf(page: Int): YearMonth = base.plusMonths((page - PAGE_CENTER).toLong())
     val pagerState = rememberPagerState(initialPage = pageOf(month)) { PAGE_COUNT }
@@ -150,13 +158,19 @@ internal fun MonthCalendar(
                     label = "month-title",
                     modifier = Modifier.weight(1f),
                 ) { m ->
-                    Text(
-                        "${m.year}년 ${m.monthValue}월",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    // 기본 캘린더처럼 달 제목을 누르면 년·월을 바로 고른다
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "${m.year}년 ${m.monthValue}월 ▾",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable(onClickLabel = "년·월 고르기") { pickingMonth = true }
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        )
+                    }
                 }
                 IconButton(onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달")
@@ -187,8 +201,149 @@ internal fun MonthCalendar(
                 val pageMonth = monthOf(page)
                 val grid = remember(pageMonth) { CalendarMath.monthGrid(pageMonth) }
                 val specials = remember(grid, specialsFor) { specialsFor(grid) }
-                MonthGrid(pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, fillHeight)
+                MonthGrid(pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, onAddRange, fillHeight)
             }
+        }
+    }
+    if (pickingMonth) {
+        MonthPickerDialog(
+            initial = shownMonth,
+            today = today,
+            onPick = { m ->
+                pickingMonth = false
+                val target = pageOf(m)
+                scope.launch {
+                    if (abs(pagerState.currentPage - target) > 3) pagerState.scrollToPage(target) else pagerState.animateScrollToPage(target)
+                }
+            },
+            onDismiss = { pickingMonth = false },
+        )
+    }
+}
+
+/** 년·월 고르기: 위에서 해를 넘기고, 12달 중 하나를 누른다 */
+@Composable
+private fun MonthPickerDialog(initial: YearMonth, today: LocalDate, onPick: (YearMonth) -> Unit, onDismiss: () -> Unit) {
+    var year by remember { mutableStateOf(initial.year) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { year-- }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 해") }
+                Text("${year}년", textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                IconButton(onClick = { year++ }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 해") }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                (1..12).chunked(4).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { mo ->
+                            val ym = YearMonth.of(year, mo)
+                            val isShown = ym == initial
+                            val isNow = ym == YearMonth.from(today)
+                            val scheme = MaterialTheme.colorScheme
+                            Text(
+                                "${mo}월",
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = if (isShown || isNow) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isShown) scheme.onPrimary else if (isNow) scheme.primary else scheme.onSurface,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (isShown) scheme.primary else scheme.surfaceContainerHigh)
+                                    .clickable { onPick(ym) }
+                                    .padding(vertical = 10.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { onPick(YearMonth.from(today)) }) { Text("이번 달") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
+}
+
+/** 길게 누르기 전 손짓 결과 */
+private enum class EarlyEnd { TAP, CANCEL }
+
+/**
+ * 달력 칸 손짓 (안드로이드 기본 캘린더와 같게):
+ *  - 한 번 누르기: 그 날 선택 (선택된 날을 다시 누르면 새 일정)
+ *  - 길게 누르기: 그 날 새 일정
+ *  - 길게 누른 채 옆 날짜로 끌기: 끈 기간으로 여러 날 새 일정
+ * 길게 누르기 전에 손가락이 움직이면 손짓을 놓아서 달 넘기기·위아래 스크롤이 그대로 된다.
+ */
+private fun Modifier.dayGestures(
+    grid: List<LocalDate>,
+    rows: Int,
+    cellWidthPx: Float,
+    rowHeightPx: Float,
+    onTap: () -> ((LocalDate) -> Unit),
+    onLongPress: () -> ((LocalDate) -> Unit),
+    onRange: () -> ((LocalDate, LocalDate) -> Unit),
+    onDragging: (ClosedRange<LocalDate>?) -> Unit,
+    onHaptic: () -> Unit,
+): Modifier = pointerInput(grid, rows, cellWidthPx, rowHeightPx) {
+    fun dayAt(p: androidx.compose.ui.geometry.Offset): LocalDate? {
+        if (p.x < 0f || p.y < 0f) return null
+        val row = (p.y / rowHeightPx).toInt()
+        if (row >= rows) return null
+        val col = (p.x / cellWidthPx).toInt().coerceIn(0, 6)
+        return grid.getOrNull(row * 7 + col)
+    }
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val start = dayAt(down.position) ?: return@awaitEachGesture
+        // null = 길게 누르기 시간이 지남
+        val early: EarlyEnd? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            var result: EarlyEnd? = null
+            while (result == null) {
+                val ch = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                result = when {
+                    ch == null -> EarlyEnd.CANCEL
+                    ch.changedToUp() -> if (ch.isConsumed) EarlyEnd.CANCEL else EarlyEnd.TAP
+                    ch.isConsumed || (ch.position - down.position).getDistance() > viewConfiguration.touchSlop -> EarlyEnd.CANCEL
+                    else -> null
+                }
+            }
+            result
+        }
+        if (early != null) {
+            if (early == EarlyEnd.TAP) onTap()(start)
+            return@awaitEachGesture
+        }
+        onHaptic()
+        var end = start
+        var finished = false
+        onDragging(start..start)
+        try {
+            while (true) {
+                val ch = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                ch.consume()
+                if (!ch.pressed) {
+                    finished = true
+                    break
+                }
+                val d = dayAt(ch.position) ?: continue
+                // 한 일정은 최대 31일
+                val limited = when {
+                    d.isAfter(start.plusDays(CalendarEvent.MAX_SPAN_DAYS - 1)) -> start.plusDays(CalendarEvent.MAX_SPAN_DAYS - 1)
+                    d.isBefore(start.minusDays(CalendarEvent.MAX_SPAN_DAYS - 1)) -> start.minusDays(CalendarEvent.MAX_SPAN_DAYS - 1)
+                    else -> d
+                }
+                if (limited != end) {
+                    end = limited
+                    onDragging(minOf(start, end)..maxOf(start, end))
+                }
+            }
+        } finally {
+            onDragging(null)
+        }
+        if (finished) {
+            if (end == start) onLongPress()(start) else onRange()(minOf(start, end), maxOf(start, end))
         }
     }
 }
@@ -205,8 +360,16 @@ private fun MonthGrid(
     myUid: String,
     onSelect: (LocalDate) -> Unit,
     onAdd: (LocalDate) -> Unit,
+    onAddRange: (LocalDate, LocalDate) -> Unit,
     fillHeight: Boolean,
 ) {
+            val latestSelected by rememberUpdatedState(selected)
+            val latestOnSelect by rememberUpdatedState(onSelect)
+            val latestOnAdd by rememberUpdatedState(onAdd)
+            val latestOnAddRange by rememberUpdatedState(onAddRange)
+            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+            /** 길게 눌러 끄는 중인 기간 */
+            var dragging by remember { mutableStateOf<ClosedRange<LocalDate>?>(null) }
             BoxWithConstraints(if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
                 val cellWidth: Dp = maxWidth / 7
                 // 칸이 좁으면(폰 세로) 일정 제목 대신 점·얇은 선으로 표시
@@ -220,7 +383,21 @@ private fun MonthGrid(
                 // 칸마다 그릴 하루 일정(여러 날 일정은 막대로 따로)도 한 번에 (날짜를 누를 때마다 다시 거르지 않게)
                 val daySingles = remember(dayEvents) { dayEvents.mapValues { (_, list) -> list.filter { !it.isMultiDay } } }
                 val layouts = remember(events, weeks) { weeks.map { CalendarMath.weekLayout(it, events) } }
-                Column {
+                val density = LocalDensity.current
+                Column(
+                    Modifier.dayGestures(
+                        grid = grid,
+                        rows = weeks.size,
+                        cellWidthPx = with(density) { cellWidth.toPx() },
+                        rowHeightPx = with(density) { rowHeight.toPx() },
+                        // 한 번 누르면 선택, 선택된 날을 다시 누르면 그 날짜로 새 일정
+                        onTap = { { day -> if (day == latestSelected) latestOnAdd(day) else latestOnSelect(day) } },
+                        onLongPress = { { day -> latestOnSelect(day); latestOnAdd(day) } },
+                        onRange = { { s, e -> latestOnSelect(s); latestOnAddRange(s, e) } },
+                        onDragging = { dragging = it },
+                        onHaptic = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
+                    ),
+                ) {
                     weeks.forEachIndexed { w, week ->
                         val layout = layouts[w]
                         Box(Modifier.fillMaxWidth().height(rowHeight)) {
@@ -231,6 +408,7 @@ private fun MonthGrid(
                                         inMonth = YearMonth.from(day) == month,
                                         isToday = day == today,
                                         isSelected = day == selected,
+                                        inRange = dragging?.contains(day) == true,
                                         special = specials[day]?.firstOrNull(),
                                         holiday = com.uridul.app.domain.Holidays.isHoliday(day),
                                         allCount = dayEvents[day]?.size ?: 0,
@@ -240,7 +418,7 @@ private fun MonthGrid(
                                         myUid = myUid,
                                         showLabels = showLabels,
                                         maxLabels = maxLabels,
-                                        // 한 번 누르면 선택, 선택된 날을 다시 누르거나 길게 누르면 그 날짜로 일정 추가
+                                        // 손짓은 달력 전체에서 받는다 (dayGestures). 여기는 화면 읽기(TalkBack)용 동작
                                         onClick = { if (day == selected) onAdd(day) else onSelect(day) },
                                         onLongClick = { onSelect(day); onAdd(day) },
                                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -254,7 +432,7 @@ private fun MonthGrid(
                                         bar = bar,
                                         cellWidth = cellWidth,
                                         showLabel = showLabels,
-                                        mine = bar.event.createdBy == myUid,
+                                        myUid = myUid,
                                         inMonth = YearMonth.from(week[bar.startCol]) == month,
                                     )
                                 }
@@ -274,10 +452,10 @@ private val ThinPitch = 6.dp
 
 /** 여러 날 일정 막대: 이어지는 쪽은 모서리를 각지게 해서 다음 칸과 붙어 보이게 한다 */
 @Composable
-private fun EventBar(bar: CalendarMath.WeekBar, cellWidth: Dp, showLabel: Boolean, mine: Boolean, inMonth: Boolean) {
-    val color = if (mine) CoupleColors.mine else CoupleColors.partner
-    // 막대는 파스텔 바탕 + 진한 글자 (기본 연핑크, 메뉴에서 색 변경)
-    val fill = if (mine) CoupleColors.mineFill else CoupleColors.partnerFill
+private fun EventBar(bar: CalendarMath.WeekBar, cellWidth: Dp, showLabel: Boolean, myUid: String, inMonth: Boolean) {
+    // 막대는 파스텔 바탕 + 진한 글자 (일정마다 고른 색, 없으면 등록한 사람 색)
+    val color = CoupleColors.strongOf(bar.event, myUid)
+    val fill = CoupleColors.fillOf(bar.event, myUid)
     val alpha = if (inMonth) 1f else 0.45f
     val startInset = if (bar.continuesLeft) 0.dp else 3.dp
     val endInset = if (bar.continuesRight) 0.dp else 3.dp
@@ -329,6 +507,8 @@ private fun DayCell(
     inMonth: Boolean,
     isToday: Boolean,
     isSelected: Boolean,
+    /** 길게 눌러 끄는 기간 안 */
+    inRange: Boolean,
     special: SpecialDay?,
     /** 공휴일·대체공휴일이면 일요일처럼 빨간 숫자 */
     holiday: Boolean,
@@ -373,10 +553,15 @@ private fun DayCell(
         if (allCount > 0) append(", 일정 ${allCount}개")
         if (isSelected) append(", 한 번 더 누르면 일정 추가")
     }
+    val rangeColor = scheme.primary.copy(alpha = 0.28f)
 
     // 선택한 날: 바탕색이 부드럽게 물들고 날짜 숫자가 통통 튄다
     val selectedBg by androidx.compose.animation.animateColorAsState(
-        targetValue = if (isSelected) scheme.primaryContainer else Color.Transparent,
+        targetValue = when {
+            inRange -> rangeColor
+            isSelected -> scheme.primaryContainer
+            else -> Color.Transparent
+        },
         animationSpec = androidx.compose.animation.core.tween(220),
         label = "day-bg",
     )
@@ -386,8 +571,11 @@ private fun DayCell(
             .padding(1.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(selectedBg)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .semantics { contentDescription = description }
+            .semantics {
+                contentDescription = description
+                this.onClick(label = if (isSelected) "새 일정" else "선택") { onClick(); true }
+                this.onLongClick(label = "새 일정") { onLongClick(); true }
+            }
             .padding(top = 3.dp, start = 2.dp, end = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -448,7 +636,7 @@ private fun DayCell(
             val fitsAll = hiddenBars == 0 && singles.size <= room
             val shown = if (fitsAll) singles else singles.take((room - 1).coerceAtLeast(0))
             shown.forEach { e ->
-                val fill = if (e.createdBy == myUid) CoupleColors.mineFill else CoupleColors.partnerFill
+                val fill = CoupleColors.fillOf(e, myUid)
                 Text(
                     e.title,
                     style = smallStyle,
@@ -477,7 +665,7 @@ private fun DayCell(
         } else {
             Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 singles.take(3).forEach { e ->
-                    val color = if (e.createdBy == myUid) CoupleColors.mine else CoupleColors.partner
+                    val color = CoupleColors.strongOf(e, myUid)
                     Box(Modifier.size(5.dp).background(color.copy(alpha = alpha), CircleShape))
                 }
             }
