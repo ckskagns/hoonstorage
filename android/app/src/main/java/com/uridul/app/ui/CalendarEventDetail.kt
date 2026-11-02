@@ -17,7 +17,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -26,7 +25,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,7 +43,6 @@ import com.uridul.app.data.Remind
 import com.uridul.app.data.toDraft
 import com.uridul.app.data.categoryLabel
 import com.uridul.app.ui.theme.CoupleColors
-import com.uridul.app.ui.theme.LocalUiSettings
 
 /**
  * 일정 상세 보기 (안드로이드 기본 캘린더처럼 일정을 누르면 먼저 내용을 본다).
@@ -70,8 +67,7 @@ fun EventDetailSheet(
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var confirmDelete by remember { mutableStateOf(false) }
     val mine = event.createdBy == myUid
-    val ui = LocalUiSettings.current
-    val defaultColor: EventColor = if (mine) ui.mine else ui.partner
+    val defaultColor: EventColor = CoupleColors.defaultFor(event.createdBy, myUid)
     val strong = CoupleColors.strongOf(event, myUid)
     val who = if (mine) couple.myName(myUid) else (couple.names[event.createdBy] ?: "상대")
 
@@ -168,38 +164,21 @@ fun EventDetailSheet(
     }
 
     if (confirmDelete) {
-        // 반복 일정이면 "이 날만 빼기" / "반복 전체 삭제" 중에서 고른다
-        val repeat = event.repeat
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(if (repeat != null) "반복 일정을 삭제할까요?" else "일정을 삭제할까요?") },
-            text = {
-                Text(
-                    if (repeat != null) {
-                        "\"${event.title}\" 은(는) ${repeat.label(event.seriesStart ?: event.date)} 반복 일정이에요.\n" +
-                            "이 날(${event.date.monthValue}월 ${event.date.dayOfMonth}일)만 뺄 수도, 반복 전체를 지울 수도 있어요. 상대 폰에서도 똑같이 바뀌어요."
-                    } else {
-                        "\"${event.title}\" 일정이 상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요."
-                    },
-                )
+        DeleteEventDialog(
+            title = event.title,
+            repeatLabel = event.repeat?.label(event.seriesStart ?: event.date),
+            occurrence = event.date.takeIf { event.repeat != null },
+            onSkip = {
+                confirmDelete = false
+                onSkip(event.id, event.date)
+                onDismiss()
             },
-            confirmButton = {
-                Row {
-                    if (repeat != null) {
-                        TextButton(onClick = {
-                            confirmDelete = false
-                            onSkip(event.id, event.date)
-                            onDismiss()
-                        }) { Text("이 날만 빼기") }
-                    }
-                    TextButton(onClick = {
-                        confirmDelete = false
-                        onDelete(event.id)
-                        onDismiss()
-                    }) { Text(if (repeat != null) "반복 전체 삭제" else "삭제", color = MaterialTheme.colorScheme.error) }
-                }
+            onDelete = {
+                confirmDelete = false
+                onDelete(event.id)
+                onDismiss()
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
+            onDismiss = { confirmDelete = false },
         )
     }
 }

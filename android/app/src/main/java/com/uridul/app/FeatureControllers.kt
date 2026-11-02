@@ -72,9 +72,10 @@ class PhotoController internal constructor(private val f: FeatureScope) {
     fun refreshWeekPhotoCount() {
         val ready = f.ready() ?: return
         val repo = f.container.photos ?: return
-        // 여러 사진첩이 한꺼번에 불러도 한 번만 센다
-        if (weekCountJob?.isActive == true) return
+        // 여러 사진첩이 한꺼번에 불러도(일기장 목록 등) 잠깐 모았다가 한 번만 센다
+        weekCountJob?.cancel()
         weekCountJob = f.scope.launch {
+            kotlinx.coroutines.delay(400)
             runCatching { repo.countWeek(ready.couple.id, PhotoQuota.weekKey(LocalDate.now())) }
                 .onSuccess { _weekPhotoCount.value = it }
         }

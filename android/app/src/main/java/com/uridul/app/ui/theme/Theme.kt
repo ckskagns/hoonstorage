@@ -90,9 +90,14 @@ object CoupleColors {
 
     /** 이 일정의 색: 일정마다 고른 색, 고르지 않았으면 등록한 사람 색 */
     @Composable
-    fun of(event: com.uridul.app.data.CalendarEvent, myUid: String): com.uridul.app.data.EventColor {
+    fun of(event: com.uridul.app.data.CalendarEvent, myUid: String): com.uridul.app.data.EventColor =
+        event.color ?: defaultFor(event.createdBy, myUid)
+
+    /** 색을 고르지 않은 일정의 색: 등록한 사람 색 (메뉴 "일정 색"에서 고른 색) */
+    @Composable
+    fun defaultFor(createdBy: String, myUid: String): com.uridul.app.data.EventColor {
         val ui = LocalUiSettings.current
-        return event.color ?: if (event.createdBy == myUid) ui.mine else ui.partner
+        return if (createdBy == myUid) ui.mine else ui.partner
     }
 
     /** 이 일정의 파스텔 바탕 (달력 막대·칸) */

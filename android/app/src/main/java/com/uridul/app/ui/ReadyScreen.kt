@@ -511,10 +511,10 @@ fun ReadyScreen(
                 onIncomingPlaceConsumed = PlaceInbox::consume,
                 categoryLabel = { c -> couple.categoryLabel(c) },
                 // 색을 고르지 않았을 때 보일 색: 그 일정을 등록한 사람 색
-                defaultColor = run {
-                    val creator = draft.id?.let { id -> monthEvents.firstOrNull { it.id == id }?.createdBy } ?: myUid
-                    if (creator == myUid) uiSettings.mine else uiSettings.partner
-                },
+                defaultColor = com.uridul.app.ui.theme.CoupleColors.defaultFor(
+                    draft.id?.let { id -> monthEvents.firstOrNull { it.id == id }?.createdBy } ?: myUid,
+                    myUid,
+                ),
             )
         }
     }

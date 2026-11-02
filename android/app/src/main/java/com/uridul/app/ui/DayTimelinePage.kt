@@ -295,11 +295,10 @@ fun DayTimelinePage(
                                 onOpenPlace = { MapLinks.open(context, it) },
                                 onDelete = { confirmDelete = true },
                                 onMore = { onOpenFullEditor(e.finalDraft()); setEdit(null) },
-                                defaultColor = run {
-                                    val creator = e.original?.let { o -> dayEvents.firstOrNull { it.id == o.id }?.createdBy } ?: myUid
-                                    val ui = com.uridul.app.ui.theme.LocalUiSettings.current
-                                    if (creator == myUid) ui.mine else ui.partner
-                                },
+                                defaultColor = CoupleColors.defaultFor(
+                                    e.original?.let { o -> dayEvents.firstOrNull { it.id == o.id }?.createdBy } ?: myUid,
+                                    myUid,
+                                ),
                                 categoryLabel = { c -> couple.categoryLabel(c) },
                                 // 편집 칸은 화면의 절반 남짓까지만 (위의 시간표가 보이도록)
                                 maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.55f).dp,
@@ -342,38 +341,23 @@ fun DayTimelinePage(
     }
     if (confirmDelete) {
         val e = edit
-        // 반복 일정이면 "이 날만 빼기" / "반복 전체 삭제" 중에서 고른다
-        val occurrence = e?.original?.takeIf { it.repeat != null }?.let { it.occurrence ?: it.date }
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(if (occurrence != null) "반복 일정을 삭제할까요?" else "일정을 삭제할까요?") },
-            text = {
-                Text(
-                    if (occurrence != null) {
-                        "\"${e.draft.title}\" 은(는) ${e.original.repeat?.label(e.original.seriesStart ?: e.original.date)} 반복 일정이에요.\n" +
-                            "이 날(${occurrence.monthValue}월 ${occurrence.dayOfMonth}일)만 뺄 수도, 반복 전체를 지울 수도 있어요. 상대 폰에서도 똑같이 바뀌어요."
-                    } else {
-                        "\"${e?.draft?.title.orEmpty()}\" 일정 전체가 상대 폰에서도 함께 사라져요.\n지운 뒤 바로 [되돌리기]를 누르거나, 메뉴의 '최근 지운 일정'에서 30일 안에 되살릴 수 있어요."
-                    },
-                )
+        val original = e?.original
+        DeleteEventDialog(
+            title = e?.draft?.title.orEmpty(),
+            repeatLabel = original?.repeat?.label(original.seriesStart ?: original.date),
+            occurrence = original?.takeIf { it.repeat != null }?.let { it.occurrence ?: it.date },
+            onSkip = {
+                confirmDelete = false
+                val day = original?.let { it.occurrence ?: it.date }
+                if (day != null) e.draft.id?.let { onSkip(it, day) }
+                setEdit(null)
             },
-            confirmButton = {
-                Row {
-                    if (occurrence != null) {
-                        TextButton(onClick = {
-                            confirmDelete = false
-                            e.draft.id?.let { onSkip(it, occurrence) }
-                            setEdit(null)
-                        }) { Text("이 날만 빼기") }
-                    }
-                    TextButton(onClick = {
-                        confirmDelete = false
-                        e?.draft?.id?.let(onDelete)
-                        setEdit(null)
-                    }) { Text(if (occurrence != null) "반복 전체 삭제" else "삭제", color = MaterialTheme.colorScheme.error) }
-                }
+            onDelete = {
+                confirmDelete = false
+                e?.draft?.id?.let(onDelete)
+                setEdit(null)
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
+            onDismiss = { confirmDelete = false },
         )
     }
 }
