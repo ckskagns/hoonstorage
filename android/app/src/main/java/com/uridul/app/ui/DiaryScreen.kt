@@ -1,93 +1,68 @@
 package com.uridul.app.ui
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
 import com.uridul.app.data.DateReview
 
 /**
- * 일기장: 두 사람이 남긴 한 줄 후기를 최신 날짜부터 모아 본다.
- * 하루마다 일정 제목·장소, 두 사람의 하트와 한 줄, 그 날 사진첩 사진.
- * 사진을 누르면 크게 보기, 나머지를 누르면 그 날 하루 페이지.
+ * 일기장: 인스타그램 피드처럼 위아래로 넘겨 보는 우리 하루들 (최신 날짜부터).
+ *  - 게시물마다 일정 제목·장소, 옆으로 넘기는 사진, 하트·후기·사진 줄, 두 사람 후기 한 줄씩
+ *  - 사진을 누르면 크게 보기 (홈 추억 슬라이드를 눌러도 여기로 와서 크게 보기가 열린다)
+ *  - 머리글을 누르면 그 날 하루 페이지
  */
 @Composable
 fun DiaryContent(
     couple: Couple,
     myUid: String,
-    onOpenDay: (DateReview) -> Unit,
+    onOpenDay: (FeedPost) -> Unit,
     modifier: Modifier = Modifier,
+    /** 크게 보기로 열어 둘 게시물 (홈 추억 슬라이드에서 넘어온 경우 등) */
+    viewing: FeedPost? = null,
+    viewingPage: Int = 0,
+    onView: (FeedPost?, Int) -> Unit = { _, _ -> },
 ) {
     val reviews = LocalReviews.current.reviews
     // 최신 날짜부터 (같은 날은 제목순), 후기가 남아 있는 날만
-    val entries = remember(reviews) {
-        reviews.values.filter { it.entries.isNotEmpty() }.sortedWith(compareByDescending<DateReview> { it.date }.thenBy { it.title })
+    val posts = remember(reviews) {
+        reviews.values.filter { it.entries.isNotEmpty() }
+            .sortedWith(compareByDescending<DateReview> { it.date }.thenBy { it.title })
+            .map(FeedPost::of)
     }
-    // 달마다 머리글
-    val byMonth = remember(entries) { entries.groupBy { it.date.year to it.date.monthValue } }
 
     LazyColumn(
         modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("📖 우리 일기장", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        if (entries.isEmpty()) "지난 일정에 한 줄 후기를 남기면 여기에 차곡차곡 모여요" else "후기 ${entries.size}개 · 최근 날짜부터",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                    )
-                }
+        item(key = "head") {
+            Column(Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text(
+                    if (posts.isEmpty()) "지난 일정에 한 줄 후기를 남기면 여기에 차곡차곡 모여요" else "하루 ${posts.size}개 · 최근 날짜부터 · 사진을 누르면 크게 보여요",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        if (entries.isEmpty()) {
-            item {
+        if (posts.isEmpty()) {
+            item(key = "empty") {
                 Text(
                     "아직 쓴 후기가 없어요 🌷\n캘린더에서 지난 일정을 누르고\n💗 한 줄 후기 남기기 를 눌러 보세요.\n홈의 추억 슬라이드에서도 바로 쓸 수 있어요.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -97,56 +72,22 @@ fun DiaryContent(
                 )
             }
         }
-        byMonth.forEach { (ym, list) ->
-            item(key = "m${ym.first}-${ym.second}") {
-                Text(
-                    "${ym.first}년 ${ym.second}월",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(top = 8.dp, start = 4.dp),
+        items(posts, key = { it.reviewId }) { post ->
+            Column(Modifier.fillMaxWidth().widthIn(max = 640.dp)) {
+                DiaryPost(
+                    post = post,
+                    review = reviews[post.reviewId],
+                    couple = couple,
+                    myUid = myUid,
+                    onOpenDay = { onOpenDay(post) },
+                    onOpenViewer = { page -> onView(post, page) },
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
-            items(list, key = { it.id }) { r -> DiaryEntry(r, couple, myUid) { onOpenDay(r) } }
         }
     }
-}
 
-/** 일기 하루: 날짜·제목·장소 / 두 사람 후기 / 그 날 사진 */
-@Composable
-private fun DiaryEntry(review: DateReview, couple: Couple, myUid: String, onOpen: () -> Unit) {
-    // 사진첩은 "일정 ID + 날짜" 로 찾는다
-    val dayEvent = remember(review.id) {
-        CalendarEvent(review.eventId, review.title, review.date, review.date, null, "", "")
-    }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
-    ) {
-        Column(Modifier.clickable(onClick = onOpen).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(review.date.format(KoreanMonthDay), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(review.title.ifBlank { "(제목 없음)" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            review.place?.let {
-                Text("📍 ${it.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            // 두 사람 후기 (내 것 먼저)
-            review.entries.entries.sortedBy { if (it.key == myUid) 0 else 1 }.forEach { (uid, e) ->
-                val who = if (uid == myUid) couple.myName(myUid) else (couple.names[uid] ?: "상대")
-                Row(verticalAlignment = Alignment.Top) {
-                    CharacterAvatar(couple.characterOf(uid), 26.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(who, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(6.dp))
-                            HeartsRow(e.hearts, 13.sp)
-                        }
-                        if (e.text.isNotBlank()) Text(e.text, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-            // 그 날 사진첩: 크게 보기·지우기에 더해 여기서 바로 올리기도
-            AlbumStrip(event = dayEvent, couple = couple, myUid = myUid, startPadding = 0.dp, thumbSize = 84.dp)
-        }
+    viewing?.let { post ->
+        FeedViewerDialog(post = post, couple = couple, myUid = myUid, startPage = viewingPage, onDismiss = { onView(null, 0) })
     }
 }

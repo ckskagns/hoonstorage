@@ -166,6 +166,9 @@ fun ReadyScreen(
     var picking by remember { mutableStateOf(false) }
     /** 하루 페이지: "날짜|열어 둘 일정 ID|new" (폴드 접고 펴기에도 유지) */
     var dayPageText by rememberSaveable { mutableStateOf("") }
+    /** 일기장 크게 보기로 열어 둘 게시물 (글자로 저장) · 몇 번째 사진부터 */
+    var diaryViewText by rememberSaveable { mutableStateOf("") }
+    var diaryViewPage by rememberSaveable { mutableStateOf(0) }
     val dayPage = remember(dayPageText) { DayPageTarget.parse(dayPageText) }
     fun openDay(date: LocalDate, focus: String? = null, new: Boolean = false) {
         tabKey = Tab.Calendar.key
@@ -351,8 +354,12 @@ fun ReadyScreen(
                         couple, myUid, busy, onInvite, content,
                         memories = memories,
                         onLoadMemories = onLoadMemories,
-                        // 추억 카드를 누르면 그 날 하루 페이지에서 그 일정
-                        onOpenMemory = { e -> select(e.date); openDay(e.date, focus = e.id) },
+                        // 추억 카드를 누르면 일기장 탭으로 가서 그 날 사진·후기를 크게 보기
+                        onOpenMemory = { e ->
+                            diaryViewText = FeedPost.of(e).encode()
+                            diaryViewPage = 0
+                            tabKey = Tab.Diary.key
+                        },
                     )
                     Tab.Calendar -> CalendarContent(
                         couple = couple,
@@ -375,9 +382,15 @@ fun ReadyScreen(
                     Tab.Diary -> DiaryContent(
                         couple = couple,
                         myUid = myUid,
-                        // 일기를 누르면 그 날 하루 페이지에서 그 일정
-                        onOpenDay = { r -> select(r.date); openDay(r.date, focus = r.eventId) },
+                        // 게시물 머리글을 누르면 그 날 하루 페이지에서 그 일정
+                        onOpenDay = { p -> select(p.date); openDay(p.date, focus = p.eventId) },
                         modifier = content,
+                        viewing = remember(diaryViewText) { FeedPost.decode(diaryViewText) },
+                        viewingPage = diaryViewPage,
+                        onView = { p, page ->
+                            diaryViewText = p?.encode().orEmpty()
+                            diaryViewPage = page
+                        },
                     )
                     Tab.Wish -> WishlistContent(
                         wishes = wishes,
