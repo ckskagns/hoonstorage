@@ -33,7 +33,8 @@ object Memories {
     }
 
     fun slides(today: LocalDate, events: List<CalendarEvent>): List<Slide> {
-        val usable = events.filter { it.repeat == null }.distinctBy { it.id }
+        // 둘이 함께한(우리둘) 일정만 추억으로 (후이·나나 각자 일정은 빼고)
+        val usable = events.filter { it.repeat == null && it.category.together }.distinctBy { it.id }
         val yearly = (1..MAX_YEARS).flatMap { years ->
             val day = today.minusYears(years.toLong())
             CalendarMath.eventsOn(usable, day).map { Slide(it, "${years}년 전 오늘", emojiFor(it)) }

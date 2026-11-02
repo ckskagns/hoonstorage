@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.uridul.app.data.birthdays
+import com.uridul.app.data.categoryLabel
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -508,6 +509,7 @@ fun ReadyScreen(
                 },
                 incomingPlace = sharedPlace,
                 onIncomingPlaceConsumed = PlaceInbox::consume,
+                categoryLabel = { c -> couple.categoryLabel(c) },
                 // 색을 고르지 않았을 때 보일 색: 그 일정을 등록한 사람 색
                 defaultColor = run {
                     val creator = draft.id?.let { id -> monthEvents.firstOrNull { it.id == id }?.createdBy } ?: myUid

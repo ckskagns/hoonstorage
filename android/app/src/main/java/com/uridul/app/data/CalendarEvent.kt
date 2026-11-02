@@ -50,6 +50,8 @@ data class CalendarEvent(
     val seriesStart: LocalDate? = null,
     /** 이 일정만의 색 (null = 등록한 사람 색) */
     val color: EventColor? = null,
+    /** 분류: 우리둘(기본) / 만든 사람(후이) 일정 / 들어온 사람(나나) 일정 */
+    val category: EventCategory = EventCategory.US,
 ) {
     val allDay: Boolean get() = time == null
     /** 펼친 반복 일정이면 원본(첫 날 기준)으로 되돌린다 */
@@ -92,6 +94,8 @@ data class EventDraft(
     val occurrence: LocalDate? = null,
     /** 이 일정만의 색 (null = 등록한 사람 색) */
     val color: EventColor? = null,
+    /** 분류 (기본 우리둘) */
+    val category: EventCategory = EventCategory.US,
 )
 
 /** 저장된 일정을 수정용 입력값으로 (펼친 반복 일정이면 그 날 기준 + 원래 첫 날을 함께 기억) */
@@ -102,6 +106,7 @@ fun CalendarEvent.toDraft(): EventDraft =
         seriesStart = seriesStart,
         occurrence = if (seriesStart != null) date else null,
         color = color,
+        category = category,
     )
 
 /**
@@ -116,6 +121,35 @@ fun EventDraft.toSeriesDates(): EventDraft {
     val newStart = start.plusDays(shift)
     return copy(date = newStart, endDate = newStart.plusDays(span), seriesStart = null, occurrence = null)
 }
+
+/**
+ * 일정 분류. 두 사람 이름이 바뀌어도(또는 상대가 아직 들어오기 전이어도) 맞도록
+ * 사람 대신 역할로 저장한다: creator = 커플 공간을 만든 사람(후이), partner = 초대로 들어온 사람(나나).
+ * 서버에 분류 칸이 없는 예전 일정은 모두 우리둘이다.
+ */
+enum class EventCategory(val key: String) {
+    US("us"),
+    CREATOR("creator"),
+    PARTNER("partner");
+
+    /** 둘이 함께하는 일정만 후기·추억에 나온다 */
+    val together: Boolean get() = this == US
+
+    companion object {
+        fun from(key: String?): EventCategory = entries.firstOrNull { it.key == key } ?: US
+    }
+}
+
+/** "우리둘", "후이 일정", "나나 일정" */
+fun Couple.categoryLabel(c: EventCategory): String = when (c) {
+    EventCategory.US -> "우리둘"
+    EventCategory.CREATOR -> "${creatorName()} 일정"
+    EventCategory.PARTNER -> "${joinedName()} 일정"
+}
+
+/** 이 사람의 일정 분류 (나 → 내 일정) */
+fun Couple.categoryOf(uid: String): EventCategory =
+    if (members.firstOrNull() == uid) EventCategory.CREATOR else EventCategory.PARTNER
 
 /** 반복 주기 */
 enum class Repeat(val key: String) {

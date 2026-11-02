@@ -41,6 +41,12 @@ data class Couple(
 
     fun myName(myUid: String): String = names[myUid] ?: "나"
 
+    /** 커플 공간을 만든 사람 이름 (후이) */
+    fun creatorName(): String = members.firstOrNull()?.let { names[it] } ?: "후이"
+
+    /** 초대로 들어온 사람 이름 (나나). 들어오기 전이면 미리 정해 둔 이름 */
+    fun joinedName(): String = members.getOrNull(1)?.let { names[it] } ?: partnerDefaults?.name ?: "나나"
+
     fun partnerUid(myUid: String): String? = members.firstOrNull { it != myUid }
 
     /** 상대 이름. 연결 전이면 미리 정해 둔 이름, 그것도 없으면 null. */

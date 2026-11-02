@@ -76,6 +76,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
+import com.uridul.app.data.categoryLabel
 import com.uridul.app.data.EventDraft
 import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
@@ -299,6 +300,7 @@ fun DayTimelinePage(
                                     val ui = com.uridul.app.ui.theme.LocalUiSettings.current
                                     if (creator == myUid) ui.mine else ui.partner
                                 },
+                                categoryLabel = { c -> couple.categoryLabel(c) },
                                 // 편집 칸은 화면의 절반 남짓까지만 (위의 시간표가 보이도록)
                                 maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.55f).dp,
                             )

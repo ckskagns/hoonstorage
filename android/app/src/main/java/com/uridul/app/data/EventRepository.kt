@@ -71,6 +71,7 @@ class EventRepository(private val db: FirebaseFirestore) {
         } else {
             // 색을 기본(등록한 사람 색)으로 되돌렸으면 저장된 색을 지운다
             if (draft.color == null) data["color"] = FieldValue.delete()
+            if (draft.category == EventCategory.US) data["category"] = FieldValue.delete()
             events(coupleId).document(draft.id).update(data)
         }
         task.addOnFailureListener(onError)
@@ -137,6 +138,8 @@ class EventRepository(private val db: FirebaseFirestore) {
         ).apply {
             // 일정마다 고른 색 (없으면 등록한 사람 색). 고르지 않았으면 칸을 아예 두지 않는다
             draft.color?.let { put("color", it.key) }
+            // 분류: 우리둘(기본)이면 칸을 두지 않는다 (예전 일정도 우리둘로 읽힌다)
+            if (draft.category != EventCategory.US) put("category", draft.category.key)
         }
     }
 
@@ -196,6 +199,7 @@ class EventRepository(private val db: FirebaseFirestore) {
             remind = (get("remind") as? Number)?.toInt()?.takeIf { it in Remind.allowed },
             repeat = Repeat.from(getString("repeat")),
             color = EventColor.fromOrNull(getString("color")),
+            category = EventCategory.from(getString("category")),
             skip = (get("skip") as? List<*>).orEmpty().mapNotNull { (it as? String)?.let { s -> runCatching { LocalDate.parse(s) }.getOrNull() } }.toSet(),
         )
     }

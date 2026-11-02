@@ -76,9 +76,13 @@ fun EventEditorDialog(
     onIncomingPlaceConsumed: () -> Unit = {},
     /** 색을 고르지 않았을 때의 색 (등록한 사람 색) */
     defaultColor: com.uridul.app.data.EventColor = com.uridul.app.ui.theme.LocalUiSettings.current.mine,
+    /** 분류 이름 ("우리둘", "후이 일정", "나나 일정") */
+    categoryLabel: (com.uridul.app.data.EventCategory) -> String = { it.key },
 ) {
     val context = LocalContext.current
     var colorKey by rememberSaveable { mutableStateOf(initial.color?.key) }
+    var categoryKey by rememberSaveable { mutableStateOf(initial.category.key) }
+    val category = com.uridul.app.data.EventCategory.from(categoryKey)
     val color = com.uridul.app.data.EventColor.fromOrNull(colorKey)
     var title by rememberSaveable { mutableStateOf(initial.title) }
     var date by rememberSaveable { mutableStateOf(initial.date.toString()) }
@@ -134,6 +138,7 @@ fun EventEditorDialog(
             seriesStart = initial.seriesStart,
             occurrence = initial.occurrence,
             color = color,
+            category = category,
             remind = initial.remind?.takeIf { r ->
                 if (allDay) com.uridul.app.data.Remind.allDayOptions.any { it.minutes == r } else true
             },
@@ -222,6 +227,12 @@ fun EventEditorDialog(
                                 imeAction = ImeAction.Next,
                             ),
                             modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        EventCategoryPicker(
+                            selected = category,
+                            label = categoryLabel,
+                            onPick = { categoryKey = it.key },
                         )
 
                         LabeledButton("시작", start.format(KoreanDate)) { picker = "start" }

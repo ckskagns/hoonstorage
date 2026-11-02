@@ -43,6 +43,7 @@ import com.uridul.app.data.Couple
 import com.uridul.app.data.EventColor
 import com.uridul.app.data.Remind
 import com.uridul.app.data.toDraft
+import com.uridul.app.data.categoryLabel
 import com.uridul.app.ui.theme.CoupleColors
 import com.uridul.app.ui.theme.LocalUiSettings
 
@@ -92,6 +93,7 @@ fun EventDetailSheet(
                     Text(dateText(event), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            InfoLine("📂", couple.categoryLabel(event.category))
             event.repeat?.let { r ->
                 InfoLine("🔁", r.label(event.seriesStart ?: event.date))
             }
@@ -143,10 +145,10 @@ fun EventDetailSheet(
                 onPick = { c -> if (c != event.color) onSave(event.toDraft().copy(color = c)) },
             )
 
-            // 지난 일정(오늘 포함)이면 후기·사진첩
+            // 지난 일정(오늘 포함)이면 후기·사진첩 (후기는 우리둘 일정만)
             if (!event.date.isAfter(rememberToday())) {
                 HorizontalDivider()
-                ReviewStrip(event = event, couple = couple, myUid = myUid)
+                if (event.category.together) ReviewStrip(event = event, couple = couple, myUid = myUid)
                 AlbumStrip(event = event, couple = couple, myUid = myUid)
             }
 

@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
+import com.uridul.app.data.categoryLabel
 import com.uridul.app.domain.CalendarMath
 import com.uridul.app.data.birthdays
 import com.uridul.app.domain.SpecialDay
@@ -168,6 +169,13 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(event.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (!event.category.together) {
+                        Text(
+                            "📂 ${couple.categoryLabel(event.category)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (event.isMultiDay) {
                         Text(
                             "${event.date.format(KoreanMonthDay)} ~ ${event.endDate.format(KoreanMonthDay)}",
@@ -235,9 +243,9 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                     modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                 )
             }
-            // 지난 일정(오늘 포함)이면 한 줄 후기
+            // 지난 일정(오늘 포함)이면 한 줄 후기 (후기는 둘이 함께한 우리둘 일정만)
             if (!event.date.isAfter(rememberToday())) {
-                ReviewStrip(event = event, couple = couple, myUid = myUid)
+                if (event.category.together) ReviewStrip(event = event, couple = couple, myUid = myUid)
                 AlbumStrip(event = event, couple = couple, myUid = myUid)
             }
         }

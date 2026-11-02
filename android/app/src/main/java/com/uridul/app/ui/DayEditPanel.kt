@@ -120,6 +120,8 @@ internal fun EditPanel(
     maxHeight: Dp,
     /** 색을 고르지 않았을 때의 색 (등록한 사람 색) */
     defaultColor: com.uridul.app.data.EventColor = com.uridul.app.data.EventColor.PINK,
+    /** 분류 이름 ("우리둘", "후이 일정", "나나 일정") */
+    categoryLabel: (com.uridul.app.data.EventCategory) -> String = { it.key },
 ) {
     val d = edit.draft
     val allDay = edit.slot < 0
@@ -157,6 +159,11 @@ internal fun EditPanel(
                 placeholder = { Text("예) 저녁 데이트") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+            )
+            EventCategoryPicker(
+                selected = d.category,
+                label = categoryLabel,
+                onPick = { onChange(edit.copy(draft = d.copy(category = it))) },
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("하루 종일", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))

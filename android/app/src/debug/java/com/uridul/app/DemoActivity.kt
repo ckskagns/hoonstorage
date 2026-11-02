@@ -268,7 +268,7 @@ class DemoActivity : ComponentActivity() {
                             events += CalendarEvent(
                                 id, draft.title.trim(), draft.date, draft.endDate, draft.time, draft.memo, old?.createdBy ?: me,
                                 place = draft.place, timeline = draft.timeline, remind = draft.remind,
-                                repeat = draft.repeat, skip = old?.skip.orEmpty(), color = draft.color,
+                                repeat = draft.repeat, skip = old?.skip.orEmpty(), color = draft.color, category = draft.category,
                             )
                             true
                         }
