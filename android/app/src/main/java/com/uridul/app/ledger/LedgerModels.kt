@@ -75,6 +75,8 @@ data class LedgerEntry(
     val assetId: String? = null,
     val toAssetId: String? = null,
     val paidBy: String? = null,
+    /** 쓴 사람 이름 (상대가 아직 가입 전이거나 알림에 이름만 있을 때) */
+    val paidByName: String? = null,
     val status: EntryStatus = EntryStatus.CONFIRMED,
     val source: EntrySource = EntrySource.MANUAL,
     val sourceApp: String? = null,
@@ -129,9 +131,11 @@ data class LedgerAsset(
         /** 처음 쓸 때 만들어 두는 기본 자산 (데이트 통장 = 토스뱅크 모임통장, 그 모임카드) */
         const val DATE_ACCOUNT = "date_account"
         const val DATE_CARD = "date_card"
+        const val CASH = "cash"
         val defaults = listOf(
             LedgerAsset(DATE_ACCOUNT, "데이트 통장", AssetKind.BANK, "토스뱅크 chch모임통장", matchers = listOf("chch모임통장", "모임통장"), order = 0),
             LedgerAsset(DATE_CARD, "모임카드", AssetKind.CARD, "토스뱅크", linkedAssetId = DATE_ACCOUNT, matchers = listOf("모임카드"), order = 1),
+            LedgerAsset(CASH, "현금", AssetKind.CASH, order = 2),
         )
     }
 }

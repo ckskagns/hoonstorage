@@ -5,6 +5,9 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -98,6 +101,8 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     var enabled by remember { mutableStateOf(PaymentInbox.isEnabled(context)) }
     var granted by remember { mutableStateOf(PaymentNotificationService.isAccessGranted(context)) }
     var editing by remember { mutableStateOf<LedgerEntry?>(null) }
+    /** 직접 기록 창 */
+    var creating by rememberSaveable { mutableStateOf(false) }
     var showLocals by rememberSaveable { mutableStateOf(false) }
 
     // 설정에서 돌아오면 허용 상태를 다시 본다
@@ -122,9 +127,10 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     val confirmed = remember(entries) { entries.filter { it.status == EntryStatus.CONFIRMED } }
     val byDay = remember(confirmed) { confirmed.groupBy { it.date }.toSortedMap(compareByDescending { it }) }
 
+    Box(modifier.fillMaxSize()) {
     LazyColumn(
-        modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -179,7 +185,7 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
         }
         item(key = "next") {
             Text(
-                "자산 · 통계 · 예산 화면과 직접 추가는 다음 단계에서 열려요",
+                "자산 · 통계 · 예산 화면은 다음 단계에서 열려요",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -187,11 +193,35 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
             )
         }
     }
+    // 직접 기록 (현금 결제·알림을 놓친 결제·모임비 입금 등)
+    ExtendedFloatingActionButton(
+        onClick = { creating = true },
+        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+        text = { Text("직접 기록") },
+        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+    )
+    }
 
+    if (creating) {
+        EntryFormDialog(
+            initial = null,
+            couple = couple,
+            myUid = myUid,
+            assets = assets,
+            defaultDate = if (month == YearMonth.now()) java.time.LocalDate.now() else month.atDay(1),
+            onSave = { e -> repo?.save(couple.id, myUid, e); creating = false },
+            onTrash = null,
+            onDismiss = { creating = false },
+        )
+    }
     editing?.let { e ->
-        EntryEditDialog(
-            entry = e,
-            onSave = { updated -> repo?.confirm(couple.id, myUid, updated); editing = null },
+        EntryFormDialog(
+            initial = e,
+            couple = couple,
+            myUid = myUid,
+            assets = assets,
+            defaultDate = e.date,
+            onSave = { updated -> repo?.save(couple.id, myUid, updated); editing = null },
             onTrash = { repo?.moveToTrash(couple.id, myUid, e.id); editing = null },
             onDismiss = { editing = null },
         )
@@ -357,51 +387,3 @@ private fun LocalCaptureRow(c: PaymentCapture, onRecord: () -> Unit, onRemove: (
     }
 }
 
-/** 거래 고치기·확정: 분류, 가맹점, 메모 */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EntryEditDialog(entry: LedgerEntry, onSave: (LedgerEntry) -> Unit, onTrash: () -> Unit, onDismiss: () -> Unit) {
-    var category by remember { mutableStateOf(entry.category) }
-    var merchant by remember { mutableStateOf(entry.merchant) }
-    var memo by remember { mutableStateOf(entry.memo) }
-    var type by remember { mutableStateOf(entry.type) }
-    val groups = LedgerCategories.groups.filter { it.income == (type == EntryType.INCOME) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("${if (entry.cancel) "취소 " else ""}${wonText(entry.amount)}") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(EntryType.EXPENSE, EntryType.INCOME).forEach { t ->
-                        FilterChip(selected = type == t, onClick = {
-                            type = t
-                            category = if (t == EntryType.INCOME) LedgerCategories.DEFAULT_INCOME else LedgerCategories.guess(merchant)
-                        }, label = { Text(t.label) })
-                    }
-                }
-                OutlinedTextField(value = merchant, onValueChange = { merchant = it.take(LedgerEntry.MERCHANT_MAX) }, label = { Text("가맹점·내용") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                groups.forEach { g ->
-                    Text("${g.emoji} ${g.label}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        g.children.forEach { c -> FilterChip(selected = category == c.key, onClick = { category = c.key }, label = { Text("${c.emoji} ${c.label}") }) }
-                    }
-                }
-                OutlinedTextField(value = memo, onValueChange = { memo = it.take(LedgerEntry.MEMO_MAX) }, label = { Text("메모 (선택)") }, modifier = Modifier.fillMaxWidth())
-                entry.raw?.let { r ->
-                    Text("알림 원문: ${r.title} ${r.text}".trim(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onSave(entry.copy(category = category, merchant = merchant, memo = memo, type = type)) }) {
-                Text(if (entry.status == EntryStatus.PENDING) "확정" else "저장")
-            }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onTrash) { Text("휴지통", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = onDismiss) { Text("닫기") }
-            }
-        },
-    )
-}

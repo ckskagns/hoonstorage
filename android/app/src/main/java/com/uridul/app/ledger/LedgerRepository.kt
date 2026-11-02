@@ -67,10 +67,9 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         val id = PaymentCapture.keyForBucket(p, bucket)
         val prevId = PaymentCapture.keyForBucket(p, bucket - 1)
         val entry = capture.toEntry(uid, paidBy)
-        val data = entryData(entry, uid).apply {
+        val data = entryData(entry.copy(paidByName = paidByName), uid).apply {
             put("createdBy", uid)
             put("createdAt", FieldValue.serverTimestamp())
-            paidByName?.let { put("paidByName", it.take(20)) }
         }
         db.runTransaction { tx ->
             val here = tx.get(entries(coupleId).document(id))
@@ -100,19 +99,37 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         }
     }
 
-    /** 확인 필요 → 확정 (분류·가맹점·메모를 고치며) */
-    fun confirm(coupleId: String, uid: String, entry: LedgerEntry, onError: (Exception) -> Unit = {}) {
-        entries(coupleId).document(entry.id).update(
-            mapOf(
-                "status" to EntryStatus.CONFIRMED.key,
-                "category" to entry.category,
-                "merchant" to entry.merchant.trim().take(LedgerEntry.MERCHANT_MAX),
-                "memo" to entry.memo.trim().take(LedgerEntry.MEMO_MAX),
-                "type" to entry.type.key,
-                "updatedBy" to uid,
-                "updatedAt" to FieldValue.serverTimestamp(),
-            ),
-        ).addOnFailureListener(onError)
+    /**
+     * 저장: id 가 비어 있으면 직접 기록(새 거래), 있으면 고치기(확인 필요였으면 확정으로).
+     * 고칠 때 알림 원문·출처·만든 사람은 그대로 둔다.
+     */
+    fun save(coupleId: String, uid: String, entry: LedgerEntry, onError: (Exception) -> Unit = {}) {
+        if (entry.id.isEmpty()) {
+            val data = entryData(entry.copy(status = EntryStatus.CONFIRMED), uid).apply {
+                put("createdBy", uid)
+                put("createdAt", FieldValue.serverTimestamp())
+            }
+            entries(coupleId).document().set(data).addOnFailureListener(onError)
+        } else {
+            entries(coupleId).document(entry.id).update(
+                mapOf(
+                    "status" to EntryStatus.CONFIRMED.key,
+                    "type" to entry.type.key,
+                    "amount" to entry.amount,
+                    "cancel" to entry.cancel,
+                    "at" to entry.at,
+                    "date" to entry.date.toString(),
+                    "category" to entry.category,
+                    "merchant" to entry.merchant.trim().take(LedgerEntry.MERCHANT_MAX),
+                    "memo" to entry.memo.trim().take(LedgerEntry.MEMO_MAX),
+                    "assetId" to entry.assetId,
+                    "paidBy" to entry.paidBy,
+                    "paidByName" to entry.paidByName?.take(20),
+                    "updatedBy" to uid,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            ).addOnFailureListener(onError)
+        }
     }
 
     /** 휴지통으로 (바로 지우지 않는다: 나중에 되살리기) */
@@ -135,6 +152,7 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         "assetId" to e.assetId,
         "toAssetId" to e.toAssetId,
         "paidBy" to e.paidBy,
+        "paidByName" to e.paidByName?.take(20),
         "status" to e.status.key,
         "source" to e.source.key,
         "sourceApp" to e.sourceApp,
@@ -192,6 +210,7 @@ class LedgerRepository(private val db: FirebaseFirestore) {
                 assetId = getString("assetId"),
                 toAssetId = getString("toAssetId"),
                 paidBy = getString("paidBy"),
+                paidByName = getString("paidByName"),
                 status = EntryStatus.from(getString("status")),
                 source = EntrySource.from(getString("source")),
                 sourceApp = getString("sourceApp"),

@@ -498,7 +498,7 @@ private fun LabeledButton(label: String, value: String, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimePickerDialog(
+internal fun TimePickerDialog(
     initial: LocalTime,
     title: String,
     onDismiss: () -> Unit,
