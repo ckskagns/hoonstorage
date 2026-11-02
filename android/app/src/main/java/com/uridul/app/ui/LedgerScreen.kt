@@ -294,14 +294,14 @@ private fun SummaryCard(month: YearMonth, s: MonthSummary, assets: List<LedgerAs
                 HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 8.dp))
                 assets.forEach { a ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (a.kind.liability) "🧾" else if (a.kind.key == "card") "💳" else "🏦", style = MaterialTheme.typography.bodyMedium)
+                        Text(when { a.kind.liability -> "🧾"; a.kind.key == "card" -> "💳"; a.kind.key == "cash" -> "💵"; else -> "🏦" }, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
                             Text(a.name, style = MaterialTheme.typography.bodyMedium)
                             if (a.institution.isNotBlank()) Text(a.institution, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Text(
-                            a.lastBalance?.let { "잔액 ${wonText(it)}" } ?: if (a.kind.key == "card") "연결: 데이트 통장" else "잔액 알림 대기",
+                            a.lastBalance?.let { "잔액 ${wonText(it)}" } ?: when (a.kind.key) { "card" -> "연결: 데이트 통장"; "cash" -> "직접 기록"; else -> "잔액 알림 대기" },
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
