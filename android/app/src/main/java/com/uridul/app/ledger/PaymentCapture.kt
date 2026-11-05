@@ -3,6 +3,18 @@ package com.uridul.app.ledger
 import org.json.JSONObject
 
 /**
+ * 기록할 결제 고르기: 데이트 카드(CHCH 카드) 알림만 기록한다.
+ * 개인 카드·다른 계좌 알림은 이 폰에도 남기지 않고 버린다. 대소문자·띄어쓰기는 가리지 않는다
+ * ("CHCH 카드", "chch카드", "CHCH 모임카드" 모두 통과).
+ */
+object PaymentFilter {
+    private val CHCH_CARD = Regex("""chch.{0,4}카드""")
+
+    fun accepts(n: NotificationText): Boolean =
+        CHCH_CARD.containsMatchIn(n.lines.joinToString(" ").lowercase().filterNot { it.isWhitespace() })
+}
+
+/**
  * 알림 한 건을 가계부에 넣을 모양으로 정리한 것 (폰 보관함에 이 모양으로 쌓았다가 서버에 올린다).
  * [assetId] 가 null 이면 커플 자산과 맞지 않은 결제(개인 카드 등): 서버에 올리지 않고 이 폰에만 잠깐 둔다.
  */

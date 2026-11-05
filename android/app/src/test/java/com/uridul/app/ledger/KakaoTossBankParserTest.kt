@@ -62,6 +62,17 @@ class KakaoTossBankParserTest {
     }
 
     @Test
+    fun onlyChchCard() {
+        assertTrue(PaymentFilter.accepts(kakao(payment)))
+        assertTrue(PaymentFilter.accepts(kakao(payment.replace("CHCH 카드", "chch카드"))))
+        assertTrue(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "카드 알림 받기", text = "12,300원 결제", subText = "CHCH 모임카드 | 테스트상점(일시불)")))
+        // 개인 체크카드·다른 카드·계좌 알림은 기록하지 않는다
+        assertFalse(PaymentFilter.accepts(kakao(payment.replace("CHCH 카드", "체크카드"))))
+        assertFalse(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "카드 알림 받기", text = "12,300원 결제", subText = "하나체크 | 테스트상점(일시불)")))
+        assertFalse(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "12,300원 입금", text = "chch모임통장")))
+    }
+
+    @Test
     fun goesToDateCard() {
         val c = PaymentCapture.from(kakao(payment), KakaoTossBankParser, 1_000_000L, PaymentInbox.defaultMatchers())!!
         assertEquals(LedgerAsset.DATE_CARD, c.assetId)

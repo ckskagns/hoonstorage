@@ -45,6 +45,8 @@ class PaymentNotificationService : NotificationListenerService() {
             textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n"),
             messages = lastMessage(extras),
         )
+        // CHCH 카드 결제만 기록 (다른 카드·계좌 알림은 여기서 버린다)
+        if (!PaymentFilter.accepts(text)) return
         // 알림이 갱신되면 postTime 은 바뀌지만 when(결제 시각)은 그대로라 두 번 기록되지 않는다
         val at = n.`when`.takeIf { it > 0 && it <= sbn.postTime + 60_000L } ?: sbn.postTime
         val capture = PaymentCapture.from(text, parser, at, PaymentInbox.matchers(this)) ?: return
