@@ -20,49 +20,58 @@ import com.uridul.app.data.WidgetStore
 
 /**
  * 결제 알림 받기. 앱 안 "자동 기록"이 켜져 있고 폰 설정에서 알림 접근을 허용해야 동작한다.
- * 허용된 금융 앱(PaymentSources: 지금은 토스) 알림만 읽고, 다른 앱 알림은 열어 보지도 저장하지도 않는다.
+ * 허용된 앱(PaymentSources: 토스, 카카오톡 "토스뱅크" 알림톡)만 읽고, 다른 앱·대화 알림은 열어 보지도 저장하지도 않는다.
  */
 class PaymentNotificationService : NotificationListenerService() {
 
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val source = PaymentSources.sourceFor(sbn.packageName) ?: return
-        if (!PaymentInbox.isEnabled(this)) return
-        if (sbn.isOngoing) return
-        val n = sbn.notification ?: return
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        val extras = n.extras ?: return
-        // 카카오톡처럼 여러 대화가 섞인 앱은 보낸 쪽(제목)만 먼저 보고, 토스뱅크가 아니면 본문을 읽지 않고 끝낸다
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-        val conversation = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
-        if (!source.acceptsSender(title, conversation)) return
-        val parser = source.parser
-        val text = NotificationText(
-            packageName = sbn.packageName,
-            title = title,
-            text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
-            subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
-            bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
-            textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n"),
-            messages = lastMessage(extras),
-        )
-        // CHCH 카드 결제만 기록 (다른 카드·계좌 알림은 여기서 버린다)
-        if (!PaymentFilter.accepts(text)) return
-        // 알림이 갱신되면 postTime 은 바뀌지만 when(결제 시각)은 그대로라 두 번 기록되지 않는다
-        val at = n.`when`.takeIf { it > 0 && it <= sbn.postTime + 60_000L } ?: sbn.postTime
-        val capture = PaymentCapture.from(text, parser, at, PaymentInbox.matchers(this)) ?: return
-        if (PaymentInbox.add(this, capture) && capture.assetId != null) LedgerUploadWorker.enqueue(this)
-    }
-
-    /** 대화형 알림의 마지막 메시지 글 (카카오톡은 본문이 여기에만 다 들어 있을 수 있다) */
-    @Suppress("DEPRECATION")
-    private fun lastMessage(extras: android.os.Bundle): String? =
-        extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-            ?.lastOrNull()
-            ?.let { it as? android.os.Bundle }
-            ?.getCharSequence("text")
-            ?.toString()
+    override fun onNotificationPosted(sbn: StatusBarNotification) = handle(this, sbn)
 
     companion object {
+        /** 알림 한 건 처리 (개발 빌드의 시험 알림도 이 길로 들어온다) */
+        fun handle(context: Context, sbn: StatusBarNotification) {
+            val source = PaymentSources.sourceFor(sbn.packageName) ?: return
+            if (!PaymentInbox.isEnabled(context)) return
+            if (sbn.isOngoing) return
+            val n = sbn.notification ?: return
+            if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+            val extras = n.extras ?: return
+            // 카카오톡처럼 여러 대화가 섞인 앱은 보낸 쪽(제목)만 먼저 보고, 토스뱅크가 아니면 본문을 읽지 않고 끝낸다
+            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            val conversation = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+            if (!source.acceptsSender(title, conversation)) return
+            val text = NotificationText(
+                packageName = sbn.packageName,
+                title = title,
+                text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+                subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
+                bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+                textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n"),
+                messages = lastMessage(extras),
+            )
+            // 알림이 갱신되면 postTime 은 바뀌지만 when(결제 시각)은 그대로라 두 번 기록되지 않는다
+            val at = n.`when`.takeIf { it > 0 && it <= sbn.postTime + 60_000L } ?: sbn.postTime
+            val result = intake(context, text, source.parser, at)
+            PaymentInbox.noteIntake(context, source.packageName, result)
+        }
+
+        /** CHCH 카드·통장 알림만 골라 글을 풀고 보관함에 넣는다 */
+        private fun intake(context: Context, text: NotificationText, parser: PaymentNotificationParser, at: Long): IntakeResult {
+            if (!PaymentFilter.accepts(text)) return IntakeResult.OTHER_ACCOUNT
+            val capture = PaymentCapture.from(text, parser, at, PaymentInbox.matchers(context)) ?: return IntakeResult.NOT_PAYMENT
+            if (!PaymentInbox.add(context, capture)) return IntakeResult.DUPLICATE
+            if (capture.assetId != null) LedgerUploadWorker.enqueue(context)
+            return IntakeResult.RECORDED
+        }
+
+        /** 대화형 알림의 마지막 메시지 글 (카카오톡은 본문이 여기에만 다 들어 있을 수 있다) */
+        @Suppress("DEPRECATION")
+        private fun lastMessage(extras: android.os.Bundle): String? =
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+                ?.lastOrNull()
+                ?.let { it as? android.os.Bundle }
+                ?.getCharSequence("text")
+                ?.toString()
+
         /** 폰 설정에서 이 앱의 알림 접근이 허용돼 있는지 */
         fun isAccessGranted(context: Context): Boolean {
             val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: return false
@@ -85,7 +94,7 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
         val repo = LedgerRepository(FirebaseFirestore.getInstance())
         repo.ensureDefaultAssets(ctx, coupleId, myUid)
         // 결제한 사람 이름(가려진 이름) 연결을 서버에서 새로 받아 둔다
-        runCatching { PaymentInbox.syncPayerNames(ctx, repo.payerNames(coupleId)) }
+        if (PaymentInbox.payerSyncDue(ctx)) runCatching { PaymentInbox.syncPayerNames(ctx, repo.payerNames(coupleId)) }
         val done = mutableSetOf<String>()
         for (c in pending) {
             val name = c.parsed.payerName

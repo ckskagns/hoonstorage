@@ -87,12 +87,16 @@ class LedgerRepository(private val db: FirebaseFirestore) {
             if (!here.exists() && !before.exists()) tx.set(entries(coupleId).document(id), data)
             null
         }.await()
-        // 알림에 잔액이 있으면 그 자산의 최신 잔액으로
+        // 알림에 잔액이 있으면 그 자산의 최신 잔액으로.
+        // 체크카드 결제 알림의 잔액은 카드가 빠져나가는 통장의 잔액이라, 연결된 통장이 있으면 그쪽에 적는다
         val balance = p.balance
         val assetId = capture.assetId
         if (balance != null && assetId != null) {
             runCatching {
-                assets(coupleId).document(assetId).update(
+                val target = assets(coupleId).document(assetId).get().await().getString("linkedAssetId")
+                    ?: LedgerAsset.defaults.firstOrNull { it.id == assetId }?.linkedAssetId
+                    ?: assetId
+                assets(coupleId).document(target).update(
                     mapOf("lastBalance" to balance, "lastBalanceAt" to capture.postedAt, "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()),
                 ).await()
             }

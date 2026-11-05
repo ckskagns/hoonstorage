@@ -48,6 +48,21 @@ object PaymentInbox {
     fun syncPayerNames(c: Context, names: Map<String, String>) {
         val creator = isCreator(c) ?: return
         names.forEach { (name, role) -> setPayerRole(c, name, PayerNames.phoneRole(role, creator)) }
+        prefs(c).edit().putLong("payers_synced_at", System.currentTimeMillis()).apply()
+    }
+
+    /** 결제를 올릴 때 서버에서 이름 연결을 다시 받을 때가 됐는지 (12시간마다. 가계부 탭을 열면 그때 바로 맞춘다) */
+    fun payerSyncDue(c: Context, now: Long = System.currentTimeMillis()): Boolean =
+        now - prefs(c).getLong("payers_synced_at", 0L) > 12 * 60 * 60 * 1000L
+
+    /**
+     * 점검용: 읽기로 한 알림(토스·토스뱅크 알림톡)을 어떻게 처리했는지 앱·결과별 개수와 마지막 시각만 남긴다.
+     * 알림 내용은 남기지 않는다. 결제가 기록되지 않았을 때 어디서 걸렀는지 확인하는 데 쓴다.
+     */
+    fun noteIntake(c: Context, packageName: String, result: IntakeResult) {
+        val p = prefs(c)
+        val key = "intake_${packageName}_${result.name}"
+        p.edit().putInt(key, p.getInt(key, 0) + 1).putLong("intake_${packageName}_last", System.currentTimeMillis()).apply()
     }
 
     fun isEnabled(c: Context): Boolean = prefs(c).getBoolean(ENABLED, false)

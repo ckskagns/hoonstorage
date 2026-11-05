@@ -3,20 +3,9 @@ package com.uridul.app.ledger
 import org.json.JSONObject
 
 /**
- * 기록할 알림 고르기: 데이트 카드(CHCH 카드) 결제와 데이트 통장(CHCH 모임통장) 입출금만 기록한다.
- * 개인 카드·다른 계좌 알림은 이 폰에도 남기지 않고 버린다. 대소문자·띄어쓰기는 가리지 않는다
- * ("CHCH 카드", "chch카드", "CHCH 모임카드", "chch모임통장" 모두 통과).
- */
-object PaymentFilter {
-    private val CHCH = Regex("""chch.{0,4}(카드|통장)""")
-
-    fun accepts(n: NotificationText): Boolean =
-        CHCH.containsMatchIn(n.lines.joinToString(" ").lowercase().filterNot { it.isWhitespace() })
-}
-
-/**
  * 알림 한 건을 가계부에 넣을 모양으로 정리한 것 (폰 보관함에 이 모양으로 쌓았다가 서버에 올린다).
- * [assetId] 가 null 이면 커플 자산과 맞지 않은 결제(개인 카드 등): 서버에 올리지 않고 이 폰에만 잠깐 둔다.
+ * [assetId] 가 null 이면 커플 자산과 맞지 않은 결제: 서버에 올리지 않고 이 폰에만 잠깐 둔다
+ * (CHCH 카드·통장 알림만 들어오므로 보통은 없다).
  */
 data class PaymentCapture(
     val key: String,
@@ -97,10 +86,9 @@ data class PaymentCapture(
             val parsed = parser.parse(n)
             if (!parsed.recordable) return null
             // 대소문자·띄어쓰기는 가리지 않는다 ("CHCH 카드" = "chch카드")
-            fun norm(s: String) = s.lowercase().filterNot { it.isWhitespace() }
-            val all = norm(n.lines.joinToString(""))
-            val method = parsed.method?.let(::norm)
-            val ordered = matchers.entries.map { norm(it.key) to it.value }.filter { it.first.isNotEmpty() }.sortedByDescending { it.first.length }
+            val all = n.lines.joinToString("").forMatch()
+            val method = parsed.method?.forMatch()
+            val ordered = matchers.entries.map { it.key.forMatch() to it.value }.filter { it.first.isNotEmpty() }.sortedByDescending { it.first.length }
             val asset = ordered.firstOrNull { (word, _) -> method?.contains(word) == true }?.second
                 ?: ordered.firstOrNull { (word, _) -> all.contains(word) }?.second
             return PaymentCapture(

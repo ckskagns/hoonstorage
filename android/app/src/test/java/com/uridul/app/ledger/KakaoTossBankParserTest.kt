@@ -50,6 +50,9 @@ class KakaoTossBankParserTest {
         val kakao = PaymentSources.sourceFor(PaymentSources.KAKAO)!!
         assertTrue(kakao.acceptsSender("토스뱅크", null))
         assertTrue(kakao.acceptsSender(null, "토스뱅크"))
+        // 인증 표시·띄어쓰기가 붙어도 같은 채널
+        assertTrue(kakao.acceptsSender("토스뱅크 ✔", null))
+        assertTrue(kakao.acceptsSender(" 토스 뱅크 ", null))
         // 개인 대화·단체방·다른 채널은 본문을 열어 보지 않는다
         assertFalse(kakao.acceptsSender("친구", null))
         assertFalse(kakao.acceptsSender("토스뱅크 친구들", "단체방"))
@@ -84,6 +87,8 @@ class KakaoTossBankParserTest {
         assertEquals("CHCH 모임통장", dep.method)
         assertEquals(95_600L, dep.balance)
         assertFalse(dep.confident)
+        // 통장 주인 이름은 넣은 사람으로 적지 않는다
+        assertNull(dep.payerName)
         val out = KakaoTossBankParser.parse(kakao("[토스뱅크] 출금\n최*○님의 CHCH 모임통장\n20,000원 출금 | 김철수\n잔액 75,600원"))
         assertEquals(PaymentKind.WITHDRAWAL, out.kind)
         assertEquals(20_000L, out.amount)
