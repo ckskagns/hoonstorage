@@ -186,7 +186,7 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-        <!-- 가계부: 결제 알림 받기 (사용자가 폰 설정에서 알림 접근을 허용해야 동작, 토스 알림만 처리) -->
+        <!-- 가계부: 결제 알림 받기 (사용자가 폰 설정에서 알림 접근을 허용해야 동작, 토스 알림과 카카오톡 토스뱅크 알림톡만 처리) -->
         <service
             android:name=".ledger.PaymentNotificationService"
             android:exported="true"

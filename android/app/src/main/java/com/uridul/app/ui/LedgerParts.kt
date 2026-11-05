@@ -104,7 +104,7 @@ internal fun SetupCard(enabled: Boolean, granted: Boolean, onEnable: (Boolean) -
             Text("💳 데이트 통장 결제를 자동으로 기록해요", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
                 "토스뱅크 chch모임통장·모임카드 결제 알림을 읽어 가계부에 바로 적어요. " +
-                    "토스 알림만 읽고, 다른 앱 알림은 열어 보지도 저장하지도 않아요. 개인 카드 결제는 이 폰에만 잠깐 보여 드리고 공유하지 않아요.",
+                    "토스 앱 결제 알림과 카카오톡 '토스뱅크' 알림톡만 읽어요. 카카오톡의 다른 대화나 다른 앱 알림은 열어 보지도 저장하지도 않아요. 개인 카드 결제는 이 폰에만 잠깐 보여 드리고 공유하지 않아요.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {

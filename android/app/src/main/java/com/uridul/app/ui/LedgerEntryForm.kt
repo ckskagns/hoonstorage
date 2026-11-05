@@ -63,6 +63,9 @@ fun EntryFormDialog(
         ?: LocalDateTime.of(defaultDate, if (defaultDate == now.toLocalDate()) now.toLocalTime().withSecond(0).withNano(0) else LocalTime.of(12, 0))
     val partnerUid = couple.partnerUid(myUid)
     val partnerName = couple.partnerName(myUid) ?: "상대"
+    val context = androidx.compose.ui.platform.LocalContext.current
+    /** 알림에 가려진 이름(최*○)만 있고 아직 누구인지 모르는 거래 */
+    val maskedPayer = initial?.paidByName?.takeIf { initial.paidBy == null && '*' in it }
 
     var typeKey by rememberSaveable { mutableStateOf((initial?.type ?: EntryType.EXPENSE).key) }
     val type = EntryType.from(typeKey)
@@ -79,6 +82,8 @@ fun EntryFormDialog(
             when {
                 initial == null -> Payer.ME.name
                 initial.paidBy == myUid -> Payer.ME.name
+                // 가려진 이름은 누구인지 몰라서 직접 고르게 한다
+                maskedPayer != null -> Payer.TOGETHER.name
                 initial.paidBy != null || initial.paidByName != null -> Payer.PARTNER.name
                 else -> Payer.TOGETHER.name
             },
@@ -96,6 +101,14 @@ fun EntryFormDialog(
         if (amount == null || amount <= 0) { error = "금액을 입력해 주세요"; return }
         if (amount > LedgerEntry.AMOUNT_MAX) { error = "금액이 너무 커요"; return }
         val payer = Payer.valueOf(payerKey)
+        // 가려진 이름을 나/상대로 고르면 이 폰에 기억해서, 다음 알림부터는 자동으로 맞춘다
+        if (maskedPayer != null && payer != Payer.TOGETHER) {
+            com.uridul.app.ledger.PaymentInbox.setPayerRole(
+                context,
+                maskedPayer,
+                if (payer == Payer.ME) com.uridul.app.ledger.PaymentInbox.PAYER_ME else com.uridul.app.ledger.PaymentInbox.PAYER_PARTNER,
+            )
+        }
         val at = LocalDateTime.of(date, time).atZone(LedgerEntry.ZONE).toInstant().toEpochMilli()
         val base = initial ?: LedgerEntry(id = "", type = type, amount = amount, at = at, source = EntrySource.MANUAL, createdBy = myUid)
         onSave(
@@ -181,6 +194,13 @@ fun EntryFormDialog(
                     FilterChip(selected = payerKey == Payer.ME.name, onClick = { payerKey = Payer.ME.name }, label = { Text(couple.myName(myUid)) })
                     FilterChip(selected = payerKey == Payer.PARTNER.name, onClick = { payerKey = Payer.PARTNER.name }, label = { Text(partnerName) })
                     FilterChip(selected = payerKey == Payer.TOGETHER.name, onClick = { payerKey = Payer.TOGETHER.name }, label = { Text("같이") })
+                }
+                if (maskedPayer != null) {
+                    Text(
+                        "알림에는 '$maskedPayer'님으로 왔어요. 누구인지 한 번 골라 주면 다음부터 자동으로 맞춰요.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 OutlinedTextField(value = memo, onValueChange = { memo = it.take(LedgerEntry.MEMO_MAX) }, label = { Text("메모 (선택)") }, modifier = Modifier.fillMaxWidth())
                 initial?.raw?.let { r ->

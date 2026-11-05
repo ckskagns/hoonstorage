@@ -439,6 +439,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 .filter { it is AppState.Ready || it is AppState.SignedOut || it is AppState.NoCouple }
                 .map { s ->
                     (s as? AppState.Ready)?.let {
+                        // 가계부 알림 서비스가 결제한 사람을 나/상대로 맞출 때 쓴다
+                        com.uridul.app.ledger.PaymentInbox.setCreator(getApplication(), it.couple.isCreator(it.myUid))
                         WidgetSnapshot(
                             startDate = it.couple.startDate,
                             countFromOne = it.couple.countFromOne,

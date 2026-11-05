@@ -25,25 +25,40 @@ import com.uridul.app.data.WidgetStore
 class PaymentNotificationService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val parser = PaymentSources.parserFor(sbn.packageName) ?: return
+        val source = PaymentSources.sourceFor(sbn.packageName) ?: return
         if (!PaymentInbox.isEnabled(this)) return
         if (sbn.isOngoing) return
         val n = sbn.notification ?: return
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras ?: return
+        // 카카오톡처럼 여러 대화가 섞인 앱은 보낸 쪽(제목)만 먼저 보고, 토스뱅크가 아니면 본문을 읽지 않고 끝낸다
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        val conversation = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+        if (!source.acceptsSender(title, conversation)) return
+        val parser = source.parser
         val text = NotificationText(
             packageName = sbn.packageName,
-            title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
+            title = title,
             text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
             subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
             bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
             textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n"),
+            messages = lastMessage(extras),
         )
         // 알림이 갱신되면 postTime 은 바뀌지만 when(결제 시각)은 그대로라 두 번 기록되지 않는다
         val at = n.`when`.takeIf { it > 0 && it <= sbn.postTime + 60_000L } ?: sbn.postTime
         val capture = PaymentCapture.from(text, parser, at, PaymentInbox.matchers(this)) ?: return
         if (PaymentInbox.add(this, capture) && capture.assetId != null) LedgerUploadWorker.enqueue(this)
     }
+
+    /** 대화형 알림의 마지막 메시지 글 (카카오톡은 본문이 여기에만 다 들어 있을 수 있다) */
+    @Suppress("DEPRECATION")
+    private fun lastMessage(extras: android.os.Bundle): String? =
+        extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+            ?.lastOrNull()
+            ?.let { it as? android.os.Bundle }
+            ?.getCharSequence("text")
+            ?.toString()
 
     companion object {
         /** 폰 설정에서 이 앱의 알림 접근이 허용돼 있는지 */
@@ -67,12 +82,20 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
         val myUid = snapshot.myUid ?: return Result.retry()
         val repo = LedgerRepository(FirebaseFirestore.getInstance())
         repo.ensureDefaultAssets(ctx, coupleId, myUid)
+        // 결제한 사람 이름(가려진 이름) 연결을 서버에서 새로 받아 둔다
+        runCatching { PaymentInbox.syncPayerNames(ctx, repo.payerNames(coupleId)) }
         val done = mutableSetOf<String>()
         for (c in pending) {
             val name = c.parsed.payerName
-            // "○○님이 결제" 의 이름이 내 이름이면 나, 아니면 이름만 적어 둔다
-            val paidBy = if (name != null && name == snapshot.myName) myUid else null
-            val ok = runCatching { repo.uploadCapture(coupleId, myUid, c, paidBy, name?.takeIf { paidBy == null }) }.getOrDefault(false)
+            // 알림 속 이름: 내 이름이거나, 전에 "나"로 고른 (가려진) 이름이면 나 / "상대"로 고른 이름이면 상대 이름 / 모르면 그 이름 그대로
+            val role = name?.let { PaymentInbox.payerRole(ctx, it) }
+            val paidBy = if (name != null && (name == snapshot.myName || role == PaymentInbox.PAYER_ME)) myUid else null
+            val paidByName = when {
+                paidBy != null -> null
+                role == PaymentInbox.PAYER_PARTNER -> snapshot.partnerName ?: name
+                else -> name
+            }
+            val ok = runCatching { repo.uploadCapture(coupleId, myUid, c, paidBy, paidByName) }.getOrDefault(false)
             if (ok) done += c.key
         }
         PaymentInbox.removeUploaded(ctx, done)

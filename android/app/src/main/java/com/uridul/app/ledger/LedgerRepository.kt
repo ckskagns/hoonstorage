@@ -38,6 +38,10 @@ class LedgerRepository(private val db: FirebaseFirestore) {
             list.filter { !it.deleted }.sortedByDescending { it.at }
         }
 
+    /** 자산들의 맞추기 말에 정해 둔 결제한 사람 이름 → 커플 역할 */
+    suspend fun payerNames(coupleId: String): Map<String, String> =
+        assets(coupleId).get().await().documents.mapNotNull { it.toAsset() }.flatMap { PayerNames.parse(it.matchers).toList() }.toMap()
+
     fun observeAssets(coupleId: String): Flow<List<LedgerAsset>> = callbackFlow {
         val reg = assets(coupleId).addSnapshotListener { snap, error ->
             if (error != null) { close(error); return@addSnapshotListener }

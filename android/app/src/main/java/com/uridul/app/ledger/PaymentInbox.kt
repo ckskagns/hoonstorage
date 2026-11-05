@@ -33,6 +33,23 @@ object PaymentInbox {
     fun assetsReady(c: Context, coupleId: String): Boolean = prefs(c).getBoolean("assets_v${LedgerAsset.defaults.size}_$coupleId", false)
     fun markAssetsReady(c: Context, coupleId: String) = prefs(c).edit().putBoolean("assets_v${LedgerAsset.defaults.size}_$coupleId", true).apply()
 
+    const val PAYER_ME = "me"
+    const val PAYER_PARTNER = "partner"
+
+    /** 알림 속 결제한 사람 이름(토스뱅크 알림톡은 "최*○" 처럼 가려져 옴) → 이 폰 기준 나/상대. 거래에서 한 번 고르면 기억한다 */
+    fun payerRole(c: Context, name: String): String? = prefs(c).getString("payer_" + name.trim(), null)
+    fun setPayerRole(c: Context, name: String, role: String) = prefs(c).edit().putString("payer_" + name.trim(), role).apply()
+
+    /** 이 폰 사용자가 커플 공간을 만든 사람인지 (알림 서비스가 앱 없이 쓰도록 여기에) */
+    fun setCreator(c: Context, creator: Boolean) = prefs(c).edit().putBoolean("i_am_creator", creator).apply()
+    private fun isCreator(c: Context): Boolean? = prefs(c).let { if (it.contains("i_am_creator")) it.getBoolean("i_am_creator", false) else null }
+
+    /** 서버에 정해 둔 이름 → 커플 역할을 이 폰 기준 나/상대로 기억 */
+    fun syncPayerNames(c: Context, names: Map<String, String>) {
+        val creator = isCreator(c) ?: return
+        names.forEach { (name, role) -> setPayerRole(c, name, PayerNames.phoneRole(role, creator)) }
+    }
+
     fun isEnabled(c: Context): Boolean = prefs(c).getBoolean(ENABLED, false)
     fun setEnabled(c: Context, on: Boolean) = prefs(c).edit().putBoolean(ENABLED, on).apply()
 

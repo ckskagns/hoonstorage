@@ -135,10 +135,37 @@ data class LedgerAsset(
         const val CASH = "cash"
         val defaults = listOf(
             LedgerAsset(DATE_ACCOUNT, "데이트 통장", AssetKind.BANK, "토스뱅크 chch모임통장", matchers = listOf("chch모임통장", "모임통장"), order = 0),
-            LedgerAsset(DATE_CARD, "모임카드", AssetKind.CARD, "토스뱅크", linkedAssetId = DATE_ACCOUNT, matchers = listOf("모임카드"), order = 1),
+            LedgerAsset(DATE_CARD, "모임카드", AssetKind.CARD, "토스뱅크", linkedAssetId = DATE_ACCOUNT, matchers = listOf("모임카드", "chch카드"), order = 1),
             LedgerAsset(CASH, "현금", AssetKind.CASH, order = 2),
         )
     }
+}
+
+/**
+ * 알림 속 결제한 사람 이름(토스뱅크 알림톡은 "최*○" 처럼 가려져 옴) → 커플 역할.
+ * 두 폰이 함께 쓰도록 서버의 모임카드 자산 "맞추기 말"에 "@creator=이름", "@partner=이름" 으로 둔다
+ * (creator = 커플 공간을 만든 사람, partner = 초대로 들어온 사람). 이 말은 자산 맞추기에는 쓰지 않는다.
+ */
+object PayerNames {
+    const val CREATOR = "creator"
+    const val PARTNER = "partner"
+
+    fun isTag(s: String): Boolean = s.startsWith("@")
+
+    fun tag(role: String, name: String): String = "@$role=${name.trim()}"
+
+    /** 맞추기 말 목록에서 이름 → 역할 */
+    fun parse(matchers: List<String>): Map<String, String> = matchers.mapNotNull { m ->
+        if (!isTag(m)) return@mapNotNull null
+        val parts = m.removePrefix("@").split("=", limit = 2)
+        val role = parts.getOrNull(0)?.trim()
+        val name = parts.getOrNull(1)?.trim()
+        if (role !in setOf(CREATOR, PARTNER) || name.isNullOrEmpty()) null else name to role!!
+    }.toMap()
+
+    /** 커플 역할 → 이 폰 기준 나/상대 */
+    fun phoneRole(coupleRole: String, iAmCreator: Boolean): String =
+        if ((coupleRole == CREATOR) == iAmCreator) PaymentInbox.PAYER_ME else PaymentInbox.PAYER_PARTNER
 }
 
 /** 한 달 합계 */

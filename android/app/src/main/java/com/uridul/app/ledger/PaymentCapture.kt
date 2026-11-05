@@ -84,10 +84,13 @@ data class PaymentCapture(
         fun from(n: NotificationText, parser: PaymentNotificationParser, postedAt: Long, matchers: Map<String, String>): PaymentCapture? {
             val parsed = parser.parse(n)
             if (!parsed.recordable) return null
-            val all = n.lines.joinToString("\n")
-            val ordered = matchers.entries.sortedByDescending { it.key.length }
-            val asset = ordered.firstOrNull { (word, _) -> parsed.method?.contains(word) == true }?.value
-                ?: ordered.firstOrNull { (word, _) -> all.contains(word) }?.value
+            // 대소문자·띄어쓰기는 가리지 않는다 ("CHCH 카드" = "chch카드")
+            fun norm(s: String) = s.lowercase().filterNot { it.isWhitespace() }
+            val all = norm(n.lines.joinToString(""))
+            val method = parsed.method?.let(::norm)
+            val ordered = matchers.entries.map { norm(it.key) to it.value }.filter { it.first.isNotEmpty() }.sortedByDescending { it.first.length }
+            val asset = ordered.firstOrNull { (word, _) -> method?.contains(word) == true }?.second
+                ?: ordered.firstOrNull { (word, _) -> all.contains(word) }?.second
             return PaymentCapture(
                 key = dedupeKey(parsed, postedAt),
                 packageName = n.packageName,

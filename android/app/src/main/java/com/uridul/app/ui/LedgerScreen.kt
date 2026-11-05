@@ -74,6 +74,7 @@ import com.uridul.app.ledger.LedgerUploadWorker
 import com.uridul.app.ledger.MonthSummary
 import com.uridul.app.ledger.PaymentCapture
 import com.uridul.app.ledger.PaymentInbox
+import com.uridul.app.ledger.PayerNames
 import com.uridul.app.ledger.PaymentKind
 import com.uridul.app.ledger.PaymentNotificationService
 import kotlinx.coroutines.flow.flowOf
@@ -118,8 +119,11 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     // 서버 자산의 맞추기 말을 이 폰 알림 서비스도 쓰게 (두 사람이 같은 말로)
     LaunchedEffect(assets) {
         if (assets.isEmpty()) return@LaunchedEffect
-        val map = PaymentInbox.defaultMatchers() + assets.flatMap { a -> a.matchers.map { it to a.id } }
+        val map = PaymentInbox.defaultMatchers() + assets.flatMap { a -> a.matchers.filterNot(PayerNames::isTag).map { it to a.id } }
         PaymentInbox.setMatchers(context, map)
+        // 결제한 사람 이름 연결 (서버에 정해 둔 것 → 이 폰 기준 나/상대)
+        PaymentInbox.setCreator(context, couple.isCreator(myUid))
+        PaymentInbox.syncPayerNames(context, assets.flatMap { PayerNames.parse(it.matchers).toList() }.toMap())
     }
 
     val summary = remember(entries) { MonthSummary.of(entries) }
