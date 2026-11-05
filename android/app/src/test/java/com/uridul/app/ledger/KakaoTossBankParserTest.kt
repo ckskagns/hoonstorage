@@ -69,7 +69,27 @@ class KakaoTossBankParserTest {
         // 개인 체크카드·다른 카드·계좌 알림은 기록하지 않는다
         assertFalse(PaymentFilter.accepts(kakao(payment.replace("CHCH 카드", "체크카드"))))
         assertFalse(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "카드 알림 받기", text = "12,300원 결제", subText = "하나체크 | 테스트상점(일시불)")))
-        assertFalse(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "12,300원 입금", text = "chch모임통장")))
+        assertFalse(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "12,300원 입금", text = "생활비통장")))
+        // 데이트 통장(CHCH 모임통장) 입출금은 기록한다
+        assertTrue(PaymentFilter.accepts(NotificationText(PaymentSources.TOSS, title = "12,300원 입금", text = "chch모임통장")))
+        assertTrue(PaymentFilter.accepts(kakao("[토스뱅크] 입금\n차*○님의 CHCH 모임통장\n50,000원 입금 | 홍길동\n잔액 95,600원")))
+    }
+
+    @Test
+    fun accountTransfers() {
+        val dep = KakaoTossBankParser.parse(kakao("[토스뱅크] 입금\n차*○님의 CHCH 모임통장\n50,000원 입금 | 홍길동\n잔액 95,600원"))
+        assertEquals(PaymentKind.DEPOSIT, dep.kind)
+        assertEquals(50_000L, dep.amount)
+        assertEquals("홍길동", dep.merchant)
+        assertEquals("CHCH 모임통장", dep.method)
+        assertEquals(95_600L, dep.balance)
+        assertFalse(dep.confident)
+        val out = KakaoTossBankParser.parse(kakao("[토스뱅크] 출금\n최*○님의 CHCH 모임통장\n20,000원 출금 | 김철수\n잔액 75,600원"))
+        assertEquals(PaymentKind.WITHDRAWAL, out.kind)
+        assertEquals(20_000L, out.amount)
+        // 통장 알림은 데이트 통장으로
+        val c = PaymentCapture.from(kakao("[토스뱅크] 입금\n차*○님의 CHCH 모임통장\n50,000원 입금 | 홍길동"), KakaoTossBankParser, 1_000_000L, PaymentInbox.defaultMatchers())!!
+        assertEquals(LedgerAsset.DATE_ACCOUNT, c.assetId)
     }
 
     @Test

@@ -3,15 +3,15 @@ package com.uridul.app.ledger
 import org.json.JSONObject
 
 /**
- * 기록할 결제 고르기: 데이트 카드(CHCH 카드) 알림만 기록한다.
+ * 기록할 알림 고르기: 데이트 카드(CHCH 카드) 결제와 데이트 통장(CHCH 모임통장) 입출금만 기록한다.
  * 개인 카드·다른 계좌 알림은 이 폰에도 남기지 않고 버린다. 대소문자·띄어쓰기는 가리지 않는다
- * ("CHCH 카드", "chch카드", "CHCH 모임카드" 모두 통과).
+ * ("CHCH 카드", "chch카드", "CHCH 모임카드", "chch모임통장" 모두 통과).
  */
 object PaymentFilter {
-    private val CHCH_CARD = Regex("""chch.{0,4}카드""")
+    private val CHCH = Regex("""chch.{0,4}(카드|통장)""")
 
     fun accepts(n: NotificationText): Boolean =
-        CHCH_CARD.containsMatchIn(n.lines.joinToString(" ").lowercase().filterNot { it.isWhitespace() })
+        CHCH.containsMatchIn(n.lines.joinToString(" ").lowercase().filterNot { it.isWhitespace() })
 }
 
 /**
