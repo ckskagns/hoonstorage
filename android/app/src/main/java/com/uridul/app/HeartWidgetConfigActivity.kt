@@ -12,6 +12,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -65,10 +67,14 @@ import com.uridul.app.widget.heartViews
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/** 디자인을 바꿀 대상: 놓인 하트 위젯 하나 (id) */
+internal data class HeartTarget(val appWidgetId: Int, val label: String)
+
 /**
  * 하트 위젯 디자인 고르기 (지금 하트 + 14종).
- *  - 위젯을 길게 눌러 "설정" 으로 열면: 그 위젯만, 또는 모든 하트 위젯에 적용
- *  - 앱 메뉴 "하트 위젯 디자인" 으로 열면: 모든 하트 위젯 (새로 놓는 위젯도)
+ *  - 앱 메뉴 "하트 위젯 디자인": 모든 하트 위젯, 또는 놓인 위젯 하나씩 (잠금화면 · 정사각 처럼 이름 붙여)
+ *  - 홈 화면에서 위젯을 길게 눌러 "설정": 그 위젯이 골라진 채로 열린다
+ * 삼성 잠금화면 편집기(LockStar)는 위젯 "설정" 을 열어 주지 않아서(폴드8 확인), 잠금화면 위젯은 앱 메뉴에서 바꾼다.
  * 미리보기는 실제 위젯 그림을 그대로 띄워서 하트도 똑같이 움직인다.
  */
 class HeartWidgetConfigActivity : ComponentActivity() {
@@ -89,7 +95,7 @@ class HeartWidgetConfigActivity : ComponentActivity() {
                 return
             }
         }
-        val initial = if (forWidget) HeartDesignStore.forWidget(this, appWidgetId) else HeartDesignStore.forAll(this)
+        val targets = placedTargets()
 
         setContent {
             UridulTheme {
@@ -100,8 +106,9 @@ class HeartWidgetConfigActivity : ComponentActivity() {
                     placed = runCatching { GlanceAppWidgetManager(this@HeartWidgetConfigActivity).getGlanceIds(HeartWidget::class.java).size }.getOrNull()
                 }
                 HeartDesignScreen(
-                    forWidget = forWidget,
-                    initial = initial,
+                    targets = targets,
+                    initialTarget = if (forWidget) appWidgetId else null,
+                    designOf = { id -> if (id == null) HeartDesignStore.forAll(this) else HeartDesignStore.forWidget(this, id) },
                     face = face,
                     placedCount = placed,
                     onApply = ::apply,
@@ -111,8 +118,32 @@ class HeartWidgetConfigActivity : ComponentActivity() {
         }
     }
 
-    private fun apply(design: HeartDesign, onlyThis: Boolean) {
-        if (onlyThis) HeartDesignStore.setWidget(this, appWidgetId, design) else HeartDesignStore.setAll(this, design)
+    /**
+     * 놓인 하트 위젯 목록과 이름. 홈 화면(삼성 런처는 크기 정보에 hsMode 를 넣는다)인지 잠금화면인지, 정사각인지 가로인지로 부른다.
+     * 같은 이름이 둘 이상이면 (폴드는 바깥·안쪽 잠금화면이 따로) 번호를 붙인다.
+     */
+    private fun placedTargets(): List<HeartTarget> {
+        val manager = AppWidgetManager.getInstance(this)
+        val ids = runCatching { manager.getAppWidgetIds(ComponentName(this, HeartWidgetReceiver::class.java)) }.getOrNull() ?: return emptyList()
+        val named = ids.sorted().map { id ->
+            val o = manager.getAppWidgetOptions(id)
+            val where = if (o.containsKey("hsMode")) "홈 화면" else "잠금화면"
+            val w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+            val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+            id to if (w > 0 && h > 0 && w > h * 1.4f) "$where · 가로" else "$where · 정사각"
+        }
+        val total = named.groupingBy { it.second }.eachCount()
+        val seen = mutableMapOf<String, Int>()
+        return named.map { (id, name) ->
+            val n = (seen[name] ?: 0) + 1
+            seen[name] = n
+            HeartTarget(id, if ((total[name] ?: 0) > 1) "$name $n" else name)
+        }
+    }
+
+    /** target = null 이면 모든 하트 위젯 */
+    private fun apply(design: HeartDesign, target: Int?) {
+        if (target != null) HeartDesignStore.setWidget(this, target, design) else HeartDesignStore.setAll(this, design)
         lifecycleScope.launch {
             runCatching { HeartRedraw.updateChanged(applicationContext) }
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
@@ -125,17 +156,24 @@ class HeartWidgetConfigActivity : ComponentActivity() {
 
 @Composable
 private fun HeartDesignScreen(
-    forWidget: Boolean,
-    initial: HeartDesign,
+    targets: List<HeartTarget>,
+    initialTarget: Int?,
+    designOf: (Int?) -> HeartDesign,
     face: HeartFace?,
     placedCount: Int?,
-    onApply: (HeartDesign, Boolean) -> Unit,
+    onApply: (HeartDesign, Int?) -> Unit,
     onCancel: () -> Unit,
 ) {
-    var selectedKey by rememberSaveable { mutableStateOf(initial.key) }
+    /** -1 = 모든 하트 위젯 */
+    var targetId by rememberSaveable { mutableStateOf(initialTarget ?: -1) }
+    val target = targetId.takeIf { it != -1 }
+    var selectedKey by rememberSaveable { mutableStateOf(designOf(target).key) }
     val selected = HeartDesign.from(selectedKey)
-    var onlyThis by rememberSaveable { mutableStateOf(forWidget) }
     var dark by rememberSaveable { mutableStateOf(true) }
+    fun pickTarget(id: Int?) {
+        targetId = id ?: -1
+        selectedKey = designOf(id).key
+    }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -143,21 +181,30 @@ private fun HeartDesignScreen(
                 Text("하트 위젯 디자인", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
                     when {
-                        forWidget -> "고른 모양은 이 폰에만 저장돼요. 언제든 위젯을 길게 눌러 \"설정\" 이나 앱 메뉴에서 바꿀 수 있어요"
                         placedCount == 0 -> "아직 놓인 하트 위젯이 없어요. 고른 모양은 새로 놓는 하트 위젯에 쓰여요"
-                        else -> "모든 하트 위젯(홈·잠금 화면)에 적용돼요. 이 폰에만 저장돼요"
+                        target == null -> "모든 하트 위젯(홈·잠금화면)에 적용돼요. 위젯 하나만 바꾸려면 아래에서 골라 주세요. 이 폰에만 저장돼요"
+                        else -> "고른 위젯 하나만 바뀌어요. 괄호 안 숫자는 지금 쓰는 모양 번호예요"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (forWidget) {
-                        FilterChip(selected = onlyThis, onClick = { onlyThis = true }, label = { Text("이 위젯만") })
-                        FilterChip(selected = !onlyThis, onClick = { onlyThis = false }, label = { Text("모든 하트 위젯") })
+                Row(
+                    Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(selected = target == null, onClick = { pickTarget(null) }, label = { Text("모든 하트 위젯") })
+                    targets.forEach { t ->
+                        val now = designOf(t.appWidgetId)
+                        FilterChip(selected = target == t.appWidgetId, onClick = { pickTarget(t.appWidgetId) }, label = { Text("${t.label} (${now.number})") })
                     }
-                    FilterChip(selected = dark, onClick = { dark = !dark }, label = { Text(if (dark) "어두운 배경" else "밝은 배경") })
                 }
+                FilterChip(
+                    selected = dark,
+                    onClick = { dark = !dark },
+                    label = { Text(if (dark) "미리보기: 어두운 배경" else "미리보기: 밝은 배경") },
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(150.dp),
@@ -181,7 +228,7 @@ private fun HeartDesignScreen(
             ) {
                 Text(selected.label, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = onCancel) { Text("닫기") }
-                Button(onClick = { onApply(selected, forWidget && onlyThis) }) { Text("적용") }
+                Button(onClick = { onApply(selected, target) }) { Text("적용") }
             }
         }
     }
