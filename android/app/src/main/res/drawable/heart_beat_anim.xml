@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 미니 하트 두 개가 번갈아 콩닥이는 애니메이션. 위젯의 ProgressBar 에 넣어 재생한다. -->
+<!--
+  미니 하트 두 개가 쉬지 않고 번갈아 "콩-닥" 뛰는 애니메이션 (12장 × 0.1초 = 1.2초 한 바퀴).
+  위젯의 ProgressBar 에 넣어 재생한다.
+  - 꺼진 화면 시계(AOD)는 1초에 30번만 화면을 바꾼다. 그림 한 장을 0.1초(화면 3번)로 고르게 맞춰
+    AOD 에서도 박자가 들쭉날쭉하지 않다. 멈춰 있는 구간이 없어 AOD 에서도 계속 뛰는 것처럼 보인다.
+-->
 <animation-list xmlns:android="http://schemas.android.com/apk/res/android"
     android:oneshot="false">
-    <item android:drawable="@drawable/heart_beat_0" android:duration="380" />
-    <item android:drawable="@drawable/heart_beat_1" android:duration="90" />
-    <item android:drawable="@drawable/heart_beat_2" android:duration="110" />
-    <item android:drawable="@drawable/heart_beat_3" android:duration="90" />
-    <item android:drawable="@drawable/heart_beat_4" android:duration="90" />
-    <item android:drawable="@drawable/heart_beat_5" android:duration="110" />
-    <item android:drawable="@drawable/heart_beat_6" android:duration="90" />
+    <item android:drawable="@drawable/heart_beat_0" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_1" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_2" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_3" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_4" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_5" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_6" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_7" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_8" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_9" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_10" android:duration="100" />
+    <item android:drawable="@drawable/heart_beat_11" android:duration="100" />
 </animation-list>

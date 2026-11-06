@@ -1,6 +1,7 @@
 package com.uridul.app.widget
 
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.util.TypedValue
@@ -12,6 +13,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
@@ -23,6 +25,7 @@ import com.uridul.app.data.WidgetStore
 import com.uridul.app.domain.DDay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.runBlocking
 
 /**
  * "사귄 날" 하트 위젯. 홈 화면 + 잠금 화면(굿락 LockStar).
@@ -45,6 +48,7 @@ class HeartWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = WidgetStore.load(context)
         val today = LocalDate.now()
+        runCatching { HeartRedraw.remember(context, GlanceAppWidgetManager(context).getAppWidgetId(id), HeartRedraw.signature(context, snapshot, today)) }
         provideContent {
             val views = heartRemoteViews(context, snapshot, today, LocalSize.current)
             AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
@@ -58,6 +62,57 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         MidnightScheduler.schedule(context)
+    }
+
+    /** 홈·잠금 화면의 정기 갱신(6시간)도 내용이 그대로면 건너뛴다 (새로 놓은 위젯은 그린다) */
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        val sig = HeartRedraw.signature(context, runBlocking { WidgetStore.load(context) }, LocalDate.now())
+        val stale = appWidgetIds.filter { !HeartRedraw.isDrawn(context, it, sig) }.toIntArray()
+        if (stale.isNotEmpty()) super.onUpdate(context, appWidgetManager, stale)
+    }
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        HeartRedraw.forget(context, appWidgetIds)
+    }
+}
+
+/**
+ * 하트 위젯은 보이는 내용(디데이 숫자·날짜)이 바뀔 때만 다시 그린다.
+ *
+ * 꺼진 화면 시계(AOD)에서 위젯을 다시 그리면 하트 애니메이션이 다음에 화면을 켤 때까지 멈춘다
+ * (폴드8 측정: 다시 그린 뒤 25초에 한 장꼴로만 그림). 상대 일정 확인(15분마다)·앱 열기 때마다
+ * 전체 위젯을 새로 그리던 것을 하트 위젯만은 건너뛰어, AOD 에서도 하트가 계속 뛰게 한다.
+ * 앱을 새로 깔면(업데이트) 그림 파일이 바뀌므로 다시 그린다.
+ */
+internal object HeartRedraw {
+    private const val PREFS = "heart_widget_drawn"
+
+    fun signature(context: Context, snapshot: WidgetSnapshot?, today: LocalDate): String {
+        val installed = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime }.getOrDefault(0L)
+        val days = snapshot?.let { DDay.heroText(it.startDate, today, it.countFromOne) } ?: "-"
+        return "$installed|$days|${snapshot?.startDate}"
+    }
+
+    fun isDrawn(context: Context, appWidgetId: Int, sig: String): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(appWidgetId.toString(), null) == sig
+
+    fun remember(context: Context, appWidgetId: Int, sig: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(appWidgetId.toString(), sig).apply()
+    }
+
+    fun forget(context: Context, appWidgetIds: IntArray) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply { appWidgetIds.forEach { remove(it.toString()) } }.apply()
+    }
+
+    /** 내용이 바뀐 하트 위젯만 다시 그린다 */
+    suspend fun updateChanged(context: Context) {
+        val sig = signature(context, WidgetStore.load(context), LocalDate.now())
+        val manager = GlanceAppWidgetManager(context)
+        val widget = HeartWidget()
+        for (id in manager.getGlanceIds(HeartWidget::class.java)) {
+            if (!isDrawn(context, manager.getAppWidgetId(id), sig)) widget.update(context, id)
+        }
     }
 }
 

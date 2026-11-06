@@ -29,7 +29,8 @@ object Widgets {
 
     suspend fun updateAll(context: Context) {
         DDayWidget().updateAll(context)
-        HeartWidget().updateAll(context)
+        // 하트 위젯은 숫자·날짜가 바뀔 때만 (AOD 에서 다시 그리면 하트가 멈춘다)
+        HeartRedraw.updateChanged(context)
         CalendarWidget().updateAll(context)
         MonthWidget.refreshAll(context)
         PhotoWidget().updateAll(context)
