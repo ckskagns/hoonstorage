@@ -3,7 +3,7 @@
   하트 위젯: 기본 4×2 (가로 4칸 × 세로 2칸).
   minWidth/minHeight 는 칸 수를 쓰지 않는 홈 화면 앱에서 기본 크기로 쓰인다 (4칸=250dp, 2칸=110dp).
   minResize 는 작게 둬서 2×1 등으로 줄여도 하트+숫자 가로 배치가 유지된다.
-  홈 화면 + 잠금 화면(keyguard / 굿락 LockStar)
+  홈 화면 + 잠금 화면(keyguard: One UI 시계 아래 위젯, 굿락 LockStar)
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/heart_widget_description"
