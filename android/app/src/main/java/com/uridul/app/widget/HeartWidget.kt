@@ -28,7 +28,8 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
- * "사귄 날" 하트 위젯. 홈 화면 + 잠금 화면(굿락 LockStar).
+ * "사귄 날" 하트 위젯. 홈 화면 + 잠금 화면(One UI 시계 아래, 굿락 LockStar).
+ * 디자인 15가지(지금 하트 + 14종, HeartDesigns.kt)를 앱 메뉴나 위젯 "설정"에서 고른다. 아래는 지금 하트.
  *
  *   [♥♥] 103일
  *        26.07.17
@@ -51,10 +52,11 @@ class HeartWidget : GlanceAppWidget() {
         provideContent {
             // 다시 그리기 신호와 함께 넣은 사귄 날을 먼저 쓴다 (세션이 살아 있으면 위의 loaded 는 다시 읽히지 않는다)
             val face = HeartFace.from(currentState<Preferences>()) ?: loaded
+            val design = HeartDesignStore.forWidget(context, appWidgetId)
             val today = LocalDate.now()
-            val sig = HeartRedraw.signature(context, face, today)
+            val sig = HeartRedraw.signature(context, face, today, design)
             SideEffect { if (appWidgetId != null) HeartRedraw.remember(context, appWidgetId, sig, face) }
-            val views = heartRemoteViews(context, face, today, LocalSize.current)
+            val views = heartViews(context, design, face, today, LocalSize.current, clickable = true)
             AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
         }
     }
@@ -70,14 +72,18 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
 
     /** 홈·잠금 화면의 정기 갱신(6시간)도 내용이 그대로면 건너뛴다 (새로 놓은 위젯은 그린다) */
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        val sig = HeartRedraw.signature(context, HeartRedraw.lastFace(context), LocalDate.now())
-        val stale = appWidgetIds.filter { !HeartRedraw.isDrawn(context, it, sig) }.toIntArray()
+        val face = HeartRedraw.lastFace(context)
+        val today = LocalDate.now()
+        val stale = appWidgetIds.filter {
+            !HeartRedraw.isDrawn(context, it, HeartRedraw.signature(context, face, today, HeartDesignStore.forWidget(context, it)))
+        }.toIntArray()
         if (stale.isNotEmpty()) super.onUpdate(context, appWidgetManager, stale)
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         HeartRedraw.forget(context, appWidgetIds)
+        HeartDesignStore.forget(context, appWidgetIds)
     }
 }
 
@@ -129,6 +135,24 @@ internal fun heartLayout(widthDp: Float, heightDp: Float, daysText: String): Hea
     return HeartLayout(text, showSince)
 }
 
+/**
+ * 하트 위젯 그림 (위젯과 디자인 고르기 미리보기가 같이 쓴다).
+ * clickable: 누르면 앱 홈을 연다 (미리보기에서는 끈다)
+ */
+internal fun heartViews(context: Context, design: HeartDesign, face: HeartFace, today: LocalDate, size: DpSize, clickable: Boolean): RemoteViews {
+    val views = if (design == HeartDesign.CLASSIC) heartRemoteViews(context, face, today, size) else HeartDesigns.render(context, design, face, today, size)
+    if (clickable) {
+        val open = Intent(context, MainActivity::class.java)
+            .putExtra(MainExtras.TAB, "home")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        views.setOnClickPendingIntent(
+            R.id.heart_root,
+            PendingIntent.getActivity(context, REQUEST_OPEN_HOME, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT),
+        )
+    }
+    return views
+}
+
 private fun heartRemoteViews(
     context: Context,
     face: HeartFace,
@@ -161,18 +185,6 @@ private fun heartRemoteViews(
         setContentDescription(
             R.id.heart_root,
             if (face.start == null) "우리둘: 앱을 열어 연결해 주세요" else "사귄 지 $days, ${since}부터",
-        )
-        val open = Intent(context, MainActivity::class.java)
-            .putExtra(MainExtras.TAB, "home")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        setOnClickPendingIntent(
-            R.id.heart_root,
-            PendingIntent.getActivity(
-                context,
-                REQUEST_OPEN_HOME,
-                open,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            ),
         )
     }
 }

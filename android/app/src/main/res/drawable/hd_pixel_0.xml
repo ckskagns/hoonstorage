@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 픽셀 하트 보통 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="9dp"
+    android:height="8dp"
+    android:viewportWidth="9"
+    android:viewportHeight="8">
+    <path android:fillColor="#FFFF4F6D" android:pathData="M2,1h1v1h-1z M3,1h1v1h-1z M5,1h1v1h-1z M6,1h1v1h-1z M1,2h1v1h-1z M2,2h1v1h-1z M3,2h1v1h-1z M4,2h1v1h-1z M5,2h1v1h-1z M6,2h1v1h-1z M7,2h1v1h-1z M1,3h1v1h-1z M2,3h1v1h-1z M3,3h1v1h-1z M4,3h1v1h-1z M5,3h1v1h-1z M6,3h1v1h-1z M7,3h1v1h-1z M2,4h1v1h-1z M3,4h1v1h-1z M4,4h1v1h-1z M5,4h1v1h-1z M6,4h1v1h-1z M3,5h1v1h-1z M4,5h1v1h-1z M5,5h1v1h-1z M4,6h1v1h-1z" />
+    <path android:fillColor="#FFFFC2CC" android:pathData="M2,2h1v1h-1z" />
+</vector>

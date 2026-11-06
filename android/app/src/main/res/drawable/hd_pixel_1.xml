@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 픽셀 하트 큼 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="9dp"
+    android:height="8dp"
+    android:viewportWidth="9"
+    android:viewportHeight="8">
+    <path android:fillColor="#FFFF4F6D" android:pathData="M1.63,0.55h1.15v1.15h-1.15z M2.78,0.55h1.15v1.15h-1.15z M5.08,0.55h1.15v1.15h-1.15z M6.23,0.55h1.15v1.15h-1.15z M0.48,1.7h1.15v1.15h-1.15z M1.63,1.7h1.15v1.15h-1.15z M2.78,1.7h1.15v1.15h-1.15z M3.93,1.7h1.15v1.15h-1.15z M5.08,1.7h1.15v1.15h-1.15z M6.23,1.7h1.15v1.15h-1.15z M7.38,1.7h1.15v1.15h-1.15z M0.48,2.85h1.15v1.15h-1.15z M1.63,2.85h1.15v1.15h-1.15z M2.78,2.85h1.15v1.15h-1.15z M3.93,2.85h1.15v1.15h-1.15z M5.08,2.85h1.15v1.15h-1.15z M6.23,2.85h1.15v1.15h-1.15z M7.38,2.85h1.15v1.15h-1.15z M1.63,4h1.15v1.15h-1.15z M2.78,4h1.15v1.15h-1.15z M3.93,4h1.15v1.15h-1.15z M5.08,4h1.15v1.15h-1.15z M6.23,4h1.15v1.15h-1.15z M2.78,5.15h1.15v1.15h-1.15z M3.93,5.15h1.15v1.15h-1.15z M5.08,5.15h1.15v1.15h-1.15z M3.93,6.3h1.15v1.15h-1.15z" />
+    <path android:fillColor="#FFFFC2CC" android:pathData="M1.63,1.7h1.15v1.15h-1.15z" />
+</vector>

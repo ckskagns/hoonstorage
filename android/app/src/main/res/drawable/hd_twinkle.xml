@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 반짝이 하나 (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_twinkle_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_1" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_2" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_3" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_4" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_5" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_6" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_7" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_8" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_9" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_10" android:duration="100" />
+    <item android:drawable="@drawable/hd_twinkle_11" android:duration="100" />
+</animation-list>

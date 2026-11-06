@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 떠오르는 하트 5 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="60dp"
+    android:viewportWidth="100"
+    android:viewportHeight="60">
+    <group android:translateX="4.58" android:translateY="39" android:scaleX="0.28" android:scaleY="0.28">
+        <path android:fillColor="#FFFF8FB1" android:fillAlpha="0.83" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+    </group>
+    <group android:translateX="79.1" android:translateY="22.18" android:scaleX="0.41" android:scaleY="0.41">
+        <path android:fillColor="#FFFF5C8A" android:fillAlpha="0.61" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+    </group>
+    <group android:translateX="16.2" android:translateY="7.95" android:scaleX="0.32" android:scaleY="0.32">
+        <path android:fillColor="#FFFFC2D4" android:fillAlpha="0.17" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+    </group>
+    <group android:translateX="69.38" android:translateY="32.13" android:scaleX="0.22" android:scaleY="0.22">
+        <path android:fillColor="#FFFFC2D4" android:fillAlpha="0.83" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+    </group>
+</vector>

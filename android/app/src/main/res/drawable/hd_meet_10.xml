@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 두 하트 만나기 10 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="52dp"
+    android:height="34dp"
+    android:viewportWidth="52"
+    android:viewportHeight="34">
+    <group android:translateX="14" android:translateY="14" android:scaleX="0.75" android:scaleY="0.75">
+        <path android:fillColor="#FF7FB2FF" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+        <path android:fillColor="#C8FFFFFF" android:pathData="M5.4,8.2a2.3,1.35 0,1 0,4.6 0a2.3,1.35 0,1 0,-4.6 0z" />
+    </group>
+    <group android:translateX="20" android:translateY="14" android:scaleX="0.75" android:scaleY="0.75">
+        <path android:fillColor="#FFFF7AA2" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+        <path android:fillColor="#C8FFFFFF" android:pathData="M5.4,8.2a2.3,1.35 0,1 0,4.6 0a2.3,1.35 0,1 0,-4.6 0z" />
+    </group>
+</vector>

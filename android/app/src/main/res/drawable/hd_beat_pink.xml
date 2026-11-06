@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 한 하트 콩닥 (pink) (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_beat_pink_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_1" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_2" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_3" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_4" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_5" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_6" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_7" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_8" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_9" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_10" android:duration="100" />
+    <item android:drawable="@drawable/hd_beat_pink_11" android:duration="100" />
+</animation-list>

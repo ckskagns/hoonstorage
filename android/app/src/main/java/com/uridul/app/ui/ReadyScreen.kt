@@ -283,6 +283,9 @@ fun ReadyScreen(
                                     MenuAction.TogglePartnerAlerts -> onSetPartnerAlerts(!partnerAlertsEnabled)
                                     MenuAction.Theme -> pickingTheme = true
                                     MenuAction.Colors -> pickingColors = true
+                                    MenuAction.HeartDesign -> runCatching {
+                                        appContext.startActivity(android.content.Intent(appContext, com.uridul.app.HeartWidgetConfigActivity::class.java))
+                                    }
                                     MenuAction.Deleted -> showingDeleted = true
                                     MenuAction.BackupSave -> exportLauncher.launch(com.uridul.app.data.Backup.fileName(LocalDate.now()))
                                     MenuAction.BackupLoad -> importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))

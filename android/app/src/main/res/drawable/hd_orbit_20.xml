@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 궤도 하트 20 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path android:strokeColor="#FFFFFFFF" android:strokeAlpha="0.5" android:strokeWidth="1" android:pathData="M50,9 A41,41 0 0,1 56.41,9.5 M62.67,11.01 A41,41 0 0,1 68.61,13.47 M74.1,16.83 A41,41 0 0,1 78.99,21.01 M83.17,25.9 A41,41 0 0,1 86.53,31.39 M88.99,37.33 A41,41 0 0,1 90.5,43.59 M91,50 A41,41 0 0,1 90.5,56.41 M88.99,62.67 A41,41 0 0,1 86.53,68.61 M83.17,74.1 A41,41 0 0,1 78.99,78.99 M74.1,83.17 A41,41 0 0,1 68.61,86.53 M62.67,88.99 A41,41 0 0,1 56.41,90.5 M50,91 A41,41 0 0,1 43.59,90.5 M37.33,88.99 A41,41 0 0,1 31.39,86.53 M25.9,83.17 A41,41 0 0,1 21.01,78.99 M16.83,74.1 A41,41 0 0,1 13.47,68.61 M11.01,62.67 A41,41 0 0,1 9.5,56.41 M9,50 A41,41 0 0,1 9.5,43.59 M11.01,37.33 A41,41 0 0,1 13.47,31.39 M16.83,25.9 A41,41 0 0,1 21.01,21.01 M25.9,16.83 A41,41 0 0,1 31.39,13.47 M37.33,11.01 A41,41 0 0,1 43.59,9.5" />
+    <group android:translateX="6.49" android:translateY="62.5" android:scaleX="0.67" android:scaleY="0.67">
+        <path android:fillColor="#FFFF5C8A" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2" android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z" />
+        <path android:fillColor="#C8FFFFFF" android:pathData="M5.4,8.2a2.3,1.35 0,1 0,4.6 0a2.3,1.35 0,1 0,-4.6 0z" />
+    </group>
+</vector>

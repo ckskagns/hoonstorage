@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 하트 디자인 8 핑크 카드 배경 (scripts/gen_heart_layouts.js 로 생성) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#FFFFD9E5" />
+</shape>

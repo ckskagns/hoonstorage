@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 심전도: 선이 그려지고 하트가 뛴다 (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_ecg_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_1" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_2" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_3" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_4" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_5" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_6" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_7" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_8" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_9" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_10" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_11" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_12" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_13" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_14" android:duration="100" />
+    <item android:drawable="@drawable/hd_ecg_15" android:duration="100" />
+</animation-list>

@@ -27,7 +27,7 @@ import java.time.LocalDate
 /** 메뉴에서 고른 것 */
 internal enum class MenuAction {
     Profile, StartDate, ToggleCountFromOne, Invite,
-    ToggleNotify, TogglePartnerAlerts, Theme, Colors, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
+    ToggleNotify, TogglePartnerAlerts, Theme, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
 }
 
 /** 오른쪽 위 ⋮ 메뉴 */
@@ -84,6 +84,7 @@ internal fun MainMenu(
             },
             onClick = { pick(MenuAction.Colors) },
         )
+        DropdownMenuItem(text = { Text("하트 위젯 디자인") }, onClick = { pick(MenuAction.HeartDesign) })
         DropdownMenuItem(
             text = { Text(if (deletedCount == 0) "최근 지운 일정" else "최근 지운 일정 ($deletedCount)") },
             onClick = { pick(MenuAction.Deleted) },

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 11 말풍선: 하얀 말풍선 "오늘로 113일째" + 콩닥 하트. 글자·그림 크기는 HeartDesigns.kt 가 위젯 칸에 맞춰 키우고 줄인다 (scripts/gen_heart_layouts.js 로 생성) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/heart_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="4dp">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:layout_gravity="center">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:id="@+id/heart_box" android:background="@drawable/hd_bubble_bg" android:paddingStart="14dp" android:paddingEnd="12dp" android:paddingTop="9dp" android:paddingBottom="9dp">
+<TextView android:id="@+id/heart_days" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="14sp" android:textColor="#FF3A2A33" android:textStyle="bold" />
+<ProgressBar android:id="@+id/heart_anim" android:layout_width="16dp" android:layout_height="16dp" android:importantForAccessibility="no" android:indeterminate="true" android:indeterminateOnly="true" android:indeterminateDrawable="@drawable/hd_beat_rose" android:layout_marginStart="5dp" />
+</LinearLayout>
+<ImageView android:id="@+id/heart_tail" android:layout_width="12dp" android:layout_height="8dp" android:layout_marginStart="18dp" android:importantForAccessibility="no" android:src="@drawable/hd_bubble_tail" />
+</LinearLayout>
+</FrameLayout>

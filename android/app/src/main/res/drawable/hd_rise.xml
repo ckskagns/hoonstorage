@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 떠오르는 하트 (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_rise_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_1" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_2" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_3" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_4" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_5" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_6" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_7" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_8" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_9" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_10" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_11" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_12" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_13" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_14" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_15" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_16" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_17" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_18" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_19" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_20" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_21" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_22" android:duration="100" />
+    <item android:drawable="@drawable/hd_rise_23" android:duration="100" />
+</animation-list>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 핑크 카드 반짝이 10 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="56dp"
+    android:viewportWidth="100"
+    android:viewportHeight="56">
+    <group android:translateX="1.42" android:translateY="1.42" android:scaleX="0.72" android:scaleY="0.72">
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.23" android:pathData="M5,0L6,4 10,5 6,6 5,10 4,6 0,5 4,4z" />
+    </group>
+    <group android:translateX="90.76" android:translateY="46.76" android:scaleX="0.85" android:scaleY="0.85">
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.87" android:pathData="M5,0L6,4 10,5 6,6 5,10 4,6 0,5 4,4z" />
+    </group>
+    <group android:translateX="85.63" android:translateY="3.63" android:scaleX="0.47" android:scaleY="0.47">
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.69" android:pathData="M5,0L6,4 10,5 6,6 5,10 4,6 0,5 4,4z" />
+    </group>
+</vector>

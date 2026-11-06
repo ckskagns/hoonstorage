@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 반짝 0 (scripts/gen_heart_designs.js 로 생성) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="12dp"
+    android:viewportWidth="12"
+    android:viewportHeight="12">
+    <group android:translateX="0.75" android:translateY="0.75" android:scaleX="1.05" android:scaleY="1.05">
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.9" android:pathData="M5,0L6,4 10,5 6,6 5,10 4,6 0,5 4,4z" />
+    </group>
+</vector>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 9 네온사인: 빛나는 테두리 하트가 가끔 깜빡, 분홍 빛 글자. 글자·그림 크기는 HeartDesigns.kt 가 위젯 칸에 맞춰 키우고 줄인다 (scripts/gen_heart_layouts.js 로 생성) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/heart_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="4dp">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_gravity="center">
+<ProgressBar android:id="@+id/heart_anim" android:layout_width="34dp" android:layout_height="34dp" android:importantForAccessibility="no" android:indeterminate="true" android:indeterminateOnly="true" android:indeterminateDrawable="@drawable/hd_neon"  />
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="6dp">
+<TextView android:id="@+id/heart_days" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="26sp" android:textColor="#FFFFE6F0" android:shadowColor="#FFFF3D8B" android:shadowDx="0" android:shadowDy="0" android:shadowRadius="14" android:textStyle="bold" />
+<TextView android:id="@+id/heart_since" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="11sp" android:textColor="#FFFFE6F0" android:shadowColor="#FFFF3D8B" android:shadowDx="0" android:shadowDy="0" android:shadowRadius="14" android:layout_marginTop="2dp" />
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

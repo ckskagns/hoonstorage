@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 핑크 카드 반짝이 (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_sparkle_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_1" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_2" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_3" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_4" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_5" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_6" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_7" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_8" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_9" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_10" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_11" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_12" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_13" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_14" android:duration="100" />
+    <item android:drawable="@drawable/hd_sparkle_15" android:duration="100" />
+</animation-list>

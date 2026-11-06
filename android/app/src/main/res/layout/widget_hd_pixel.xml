@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 12 픽셀 하트: 8비트 하트가 계단식으로 두근, 고정폭 글자. 글자·그림 크기는 HeartDesigns.kt 가 위젯 칸에 맞춰 키우고 줄인다 (scripts/gen_heart_layouts.js 로 생성) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/heart_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="4dp">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_gravity="center">
+<ProgressBar android:id="@+id/heart_anim" android:layout_width="36dp" android:layout_height="32dp" android:importantForAccessibility="no" android:indeterminate="true" android:indeterminateOnly="true" android:indeterminateDrawable="@drawable/hd_pixel"  />
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="10dp">
+<TextView android:id="@+id/heart_days" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="24sp" android:textColor="#FFFFFFFF" android:textStyle="bold" android:shadowColor="#CC000000" android:shadowDy="1" android:shadowRadius="6" android:fontFamily="monospace" />
+<TextView android:id="@+id/heart_since" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="11sp" android:textColor="#FFFFFFFF"  android:shadowColor="#CC000000" android:shadowDy="1" android:shadowRadius="6" android:fontFamily="monospace" android:layout_marginTop="2dp" />
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

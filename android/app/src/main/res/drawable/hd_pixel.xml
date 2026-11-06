@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 픽셀 하트 두근 (계단식) (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_pixel_0" android:duration="300" />
+    <item android:drawable="@drawable/hd_pixel_1" android:duration="200" />
+    <item android:drawable="@drawable/hd_pixel_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_pixel_1" android:duration="200" />
+    <item android:drawable="@drawable/hd_pixel_0" android:duration="400" />
+</animation-list>

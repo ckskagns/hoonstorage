@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 두 하트 만나기 (scripts/gen_heart_designs.js 로 생성). 위젯의 ProgressBar 에 넣어 재생, 0번 = 쉬는 자세 -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/hd_meet_0" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_1" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_2" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_3" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_4" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_5" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_6" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_7" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_8" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_9" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_10" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_11" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_12" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_13" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_14" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_15" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_16" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_17" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_18" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_19" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_20" android:duration="100" />
+    <item android:drawable="@drawable/hd_meet_21" android:duration="100" />
+</animation-list>

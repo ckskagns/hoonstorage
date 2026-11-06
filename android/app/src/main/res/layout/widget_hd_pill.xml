@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1 글래스 알약: 반투명 알약 안에 콩닥 하트 + 디데이 + 날짜. 글자·그림 크기는 HeartDesigns.kt 가 위젯 칸에 맞춰 키우고 줄인다 (scripts/gen_heart_layouts.js 로 생성) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/heart_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="4dp">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:id="@+id/heart_box" android:background="@drawable/hd_pill_bg" android:paddingStart="12dp" android:paddingEnd="16dp" android:paddingTop="8dp" android:paddingBottom="8dp" android:layout_gravity="center">
+<ProgressBar android:id="@+id/heart_anim" android:layout_width="26dp" android:layout_height="26dp" android:importantForAccessibility="no" android:indeterminate="true" android:indeterminateOnly="true" android:indeterminateDrawable="@drawable/hd_beat_pink"  />
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="8dp">
+<TextView android:id="@+id/heart_days" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="20sp" android:textColor="#FFFFFFFF" android:textStyle="bold" android:shadowColor="#CC000000" android:shadowDy="1" android:shadowRadius="6"  />
+<TextView android:id="@+id/heart_since" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:textSize="11sp" android:textColor="#FFFFFFFF"  android:shadowColor="#CC000000" android:shadowDy="1" android:shadowRadius="6" android:layout_marginTop="2dp" />
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>
