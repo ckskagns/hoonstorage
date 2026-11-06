@@ -81,6 +81,32 @@ class LedgerCategoriesTest {
         assertFalse(LedgerCategories.normalize("a/b.c__d").any { it == '/' || it == '.' || it == '_' })
     }
 
+    private fun entry(merchant: String, category: String, type: EntryType = EntryType.EXPENSE) =
+        LedgerEntry(id = "test0", type = type, amount = 1000, at = 0, merchant = merchant, category = category, createdBy = "test0a")
+
+    @Test
+    fun `고친 거래는 분류가 바뀌었을 때만 기억한다`() {
+        val before = entry("test0단골집", "etc.etc")
+        assertTrue(LedgerCategories.shouldLearn(before, before.copy(category = "food.drink"), emptyMap()))
+        // 금액만 고침
+        assertFalse(LedgerCategories.shouldLearn(before, before.copy(amount = 2000), emptyMap()))
+        // 가맹점이 없으면 기억할 데가 없음
+        assertFalse(LedgerCategories.shouldLearn(before.copy(merchant = ""), before.copy(merchant = " ", category = "food.drink"), emptyMap()))
+        // 수입으로 바꾼 거래는 지출 학습표에 넣지 않음
+        assertFalse(LedgerCategories.shouldLearn(before, before.copy(type = EntryType.INCOME, category = "income.deposit"), emptyMap()))
+    }
+
+    @Test
+    fun `새 거래는 짐작과 다르게 골랐을 때만 기억한다`() {
+        // 사전 짐작(카페) 그대로면 기억하지 않음
+        assertFalse(LedgerCategories.shouldLearn(null, entry("스타벅스", "food.cafe"), emptyMap()))
+        // 짐작과 다르게 고름
+        assertTrue(LedgerCategories.shouldLearn(null, entry("스타벅스", "date.gift"), emptyMap()))
+        // 이미 학습표대로면 다시 쓰지 않음
+        val learned = mapOf(LedgerCategories.normalize("스타벅스") to "date.gift")
+        assertFalse(LedgerCategories.shouldLearn(null, entry("스타벅스", "date.gift"), learned))
+    }
+
     @Test
     fun `수입 분류는 지출 학습에 쓰지 않는다`() {
         assertTrue(LedgerCategories.isExpense("food.cafe"))

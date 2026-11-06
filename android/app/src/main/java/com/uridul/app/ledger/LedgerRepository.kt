@@ -1,6 +1,5 @@
 package com.uridul.app.ledger
 
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -9,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.tasks.await
-import java.time.LocalDate
 import java.time.YearMonth
 
 /**
@@ -35,11 +33,17 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         awaitClose { reg.remove() }
     }.catch { emit(emptyMap()) }
 
-    /** 학습표에서 이 가맹점의 분류 (없거나 못 읽으면 null) */
-    suspend fun learnedCategory(coupleId: String, merchant: String): String? {
+    /**
+     * 학습표에서 이 가맹점의 분류 (없거나 못 읽으면 null).
+     * [cache] 를 주면 한 번 읽은 가맹점은 다시 읽지 않는다 (쌓인 결제를 한꺼번에 올릴 때).
+     */
+    suspend fun learnedCategory(coupleId: String, merchant: String, cache: MutableMap<String, String?>? = null): String? {
         val key = LedgerCategories.normalize(merchant).ifEmpty { return null }
-        return runCatching { merchants(coupleId).document(key).get().await().getString("category") }.getOrNull()
-            ?.takeIf(LedgerCategories::isExpense)
+        if (cache != null && cache.containsKey(key)) return cache[key]
+        val doc = runCatching { merchants(coupleId).document(key).get().await() }.getOrNull() ?: return null
+        val category = doc.getString("category")?.takeIf(LedgerCategories::isExpense)
+        cache?.put(key, category)
+        return category
     }
 
     /** 이 가맹점은 다음부터 이 분류로 (두 사람이 같은 표를 쓴다) */
@@ -121,7 +125,14 @@ class LedgerRepository(private val db: FirebaseFirestore) {
      * 계좌 출금 알림은 같은 금액의 카드 결제가 5분 안에 있으면 같은 돈으로 보고 건너뛴다.
      * @return 처리 끝 (올렸거나 이미 있음)
      */
-    suspend fun uploadCapture(coupleId: String, uid: String, capture: PaymentCapture, paidBy: String?, paidByName: String?): Boolean {
+    suspend fun uploadCapture(
+        coupleId: String,
+        uid: String,
+        capture: PaymentCapture,
+        paidBy: String?,
+        paidByName: String?,
+        learnedCache: MutableMap<String, String?>? = null,
+    ): Boolean {
         val p = capture.parsed
         if (p.kind == PaymentKind.WITHDRAWAL && hasNearbyExpense(coupleId, capture)) return true
         val bucket = capture.postedAt / PaymentCapture.BUCKET_MS
@@ -129,7 +140,7 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         val prevId = PaymentCapture.keyForBucket(p, bucket - 1)
         val entry = capture.toEntry(uid, paidBy)
         // 우리 둘 학습표에 있는 가맹점이면 그 분류 (폰에서 짐작한 기본 사전보다 먼저)
-        val learned = if (entry.type == EntryType.EXPENSE) learnedCategory(coupleId, entry.merchant) else null
+        val learned = if (entry.type == EntryType.EXPENSE) learnedCategory(coupleId, entry.merchant, learnedCache) else null
         val data = entryData(entry.copy(paidByName = paidByName, category = learned ?: entry.category), uid).apply {
             put("createdBy", uid)
             put("createdAt", FieldValue.serverTimestamp())
@@ -206,50 +217,6 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         ).addOnFailureListener(onError)
     }
 
-    private fun entryData(e: LedgerEntry, uid: String): MutableMap<String, Any?> = mutableMapOf(
-        "v" to LedgerEntry.SCHEMA,
-        "type" to e.type.key,
-        "amount" to e.amount,
-        "cancel" to e.cancel,
-        "date" to e.date.toString(),
-        "at" to e.at,
-        "merchant" to e.merchant.trim().take(LedgerEntry.MERCHANT_MAX),
-        "memo" to e.memo.trim().take(LedgerEntry.MEMO_MAX),
-        "category" to e.category,
-        "assetId" to e.assetId,
-        "toAssetId" to e.toAssetId,
-        "paidBy" to e.paidBy,
-        "paidByName" to e.paidByName?.take(20),
-        "status" to e.status.key,
-        "source" to e.source.key,
-        "sourceApp" to e.sourceApp,
-        "raw" to e.raw?.let { mapOf("title" to it.title.take(RAW_MAX), "text" to it.text.take(RAW_MAX)) },
-        "parser" to e.parser,
-        "balanceAfter" to e.balanceAfter,
-        "installment" to e.installment,
-        "recurringId" to e.recurringId,
-        "eventId" to e.eventId,
-        "tags" to e.tags.take(10),
-        "deleted" to e.deleted,
-        "updatedBy" to uid,
-        "updatedAt" to FieldValue.serverTimestamp(),
-    )
-
-    private fun assetData(a: LedgerAsset, uid: String): Map<String, Any?> = mapOf(
-        "v" to LedgerAsset.SCHEMA,
-        "name" to a.name,
-        "kind" to a.kind.key,
-        "institution" to a.institution,
-        "linkedAssetId" to a.linkedAssetId,
-        "openingBalance" to a.openingBalance,
-        "openingDate" to a.openingDate?.toString(),
-        "matchers" to a.matchers,
-        "archived" to a.archived,
-        "order" to a.order,
-        "updatedBy" to uid,
-        "updatedAt" to FieldValue.serverTimestamp(),
-    )
-
     private fun listen(query: Query, transform: (List<LedgerEntry>) -> List<LedgerEntry>): Flow<List<LedgerEntry>> = callbackFlow {
         val reg = query.addSnapshotListener { snap, error ->
             if (error != null) { close(error); return@addSnapshotListener }
@@ -257,58 +224,4 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         }
         awaitClose { reg.remove() }
     }.catch { emit(emptyList()) }
-
-    companion object {
-        const val RAW_MAX = 1000
-
-        internal fun DocumentSnapshot.toEntry(): LedgerEntry? {
-            val amount = getLong("amount") ?: return null
-            val at = getLong("at") ?: return null
-            val raw = (get("raw") as? Map<*, *>)?.let { RawText((it["title"] as? String).orEmpty(), (it["text"] as? String).orEmpty()) }
-            return LedgerEntry(
-                id = id,
-                type = EntryType.from(getString("type")),
-                amount = amount,
-                cancel = getBoolean("cancel") == true,
-                at = at,
-                merchant = getString("merchant").orEmpty(),
-                memo = getString("memo").orEmpty(),
-                category = getString("category") ?: LedgerCategories.DEFAULT_EXPENSE,
-                assetId = getString("assetId"),
-                toAssetId = getString("toAssetId"),
-                paidBy = getString("paidBy"),
-                paidByName = getString("paidByName"),
-                status = EntryStatus.from(getString("status")),
-                source = EntrySource.from(getString("source")),
-                sourceApp = getString("sourceApp"),
-                raw = raw,
-                parser = getString("parser"),
-                balanceAfter = getLong("balanceAfter"),
-                installment = getLong("installment")?.toInt() ?: 0,
-                recurringId = getString("recurringId"),
-                eventId = getString("eventId"),
-                tags = (get("tags") as? List<*>).orEmpty().filterIsInstance<String>(),
-                deleted = getBoolean("deleted") == true,
-                createdBy = getString("createdBy").orEmpty(),
-            )
-        }
-
-        internal fun DocumentSnapshot.toAsset(): LedgerAsset? {
-            val name = getString("name") ?: return null
-            return LedgerAsset(
-                id = id,
-                name = name,
-                kind = AssetKind.from(getString("kind")),
-                institution = getString("institution").orEmpty(),
-                linkedAssetId = getString("linkedAssetId"),
-                openingBalance = getLong("openingBalance") ?: 0,
-                openingDate = getString("openingDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
-                lastBalance = getLong("lastBalance"),
-                lastBalanceAt = getLong("lastBalanceAt"),
-                matchers = (get("matchers") as? List<*>).orEmpty().filterIsInstance<String>(),
-                archived = getBoolean("archived") == true,
-                order = getLong("order")?.toInt() ?: 0,
-            )
-        }
-    }
 }

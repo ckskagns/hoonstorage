@@ -137,9 +137,7 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
      */
     fun learnAfterSave(before: LedgerEntry?, after: LedgerEntry) {
         val r = repo ?: return
-        if (after.type != EntryType.EXPENSE || after.merchant.isBlank()) return
-        val changed = if (before == null) after.category != LedgerCategories.guess(after.merchant, learned) else after.category != before.category
-        if (!changed) return
+        if (!LedgerCategories.shouldLearn(before, after, learned)) return
         r.learnCategory(couple.id, myUid, after.merchant, after.category)
         if (before == null) return
         scope.launch {

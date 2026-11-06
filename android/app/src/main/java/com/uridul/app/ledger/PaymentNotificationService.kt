@@ -96,6 +96,8 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
         // 결제한 사람 이름(가려진 이름) 연결을 서버에서 새로 받아 둔다
         if (PaymentInbox.payerSyncDue(ctx)) runCatching { PaymentInbox.syncPayerNames(ctx, repo.payerNames(coupleId)) }
         val done = mutableSetOf<String>()
+        // 같은 가맹점 결제가 여러 건이면 학습표는 한 번만 읽는다
+        val learnedCache = mutableMapOf<String, String?>()
         for (c in pending) {
             val name = c.parsed.payerName
             // 알림 속 이름: 내 이름이거나, 전에 "나"로 고른 (가려진) 이름이면 나 / "상대"로 고른 이름이면 상대 이름 / 모르면 그 이름 그대로
@@ -106,7 +108,7 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
                 role == PaymentInbox.PAYER_PARTNER -> snapshot.partnerName ?: name
                 else -> name
             }
-            val ok = runCatching { repo.uploadCapture(coupleId, myUid, c, paidBy, paidByName) }.getOrDefault(false)
+            val ok = runCatching { repo.uploadCapture(coupleId, myUid, c, paidBy, paidByName, learnedCache) }.getOrDefault(false)
             if (ok) done += c.key
         }
         PaymentInbox.removeUploaded(ctx, done)
