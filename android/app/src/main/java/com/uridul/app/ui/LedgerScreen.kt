@@ -78,6 +78,7 @@ import com.uridul.app.ledger.PayerNames
 import com.uridul.app.ledger.PaymentKind
 import com.uridul.app.ledger.PaymentNotificationService
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.time.YearMonth
 import java.util.Locale
@@ -97,6 +98,10 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     val entries by remember(month, repo) { repo?.observeMonth(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     val pending by remember(repo) { repo?.observePending(couple.id) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     val assets by remember(repo) { repo?.observeAssets(couple.id) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
+    val learned by remember(repo) { repo?.observeLearned(couple.id) ?: flowOf(emptyMap()) }.collectAsState(initial = emptyMap())
+    /** 분류를 고친 뒤 "같은 가맹점 지난 기록도 바꿀까요?" */
+    var relabel by remember { mutableStateOf<Relabel?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val locals by PaymentInbox.local.collectAsState()
     var enabled by remember { mutableStateOf(PaymentInbox.isEnabled(context)) }
     var granted by remember { mutableStateOf(PaymentNotificationService.isAccessGranted(context)) }
@@ -124,6 +129,23 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
         // 결제한 사람 이름 연결 (서버에 정해 둔 것 → 이 폰 기준 나/상대)
         PaymentInbox.setCreator(context, couple.isCreator(myUid))
         PaymentInbox.syncPayerNames(context, assets.flatMap { PayerNames.parse(it.matchers).toList() }.toMap())
+    }
+
+    /**
+     * 저장 뒤 분류 학습: 고친 거래는 분류가 바뀌었을 때, 새 거래는 짐작과 다르게 골랐을 때
+     * 그 가맹점을 학습표에 기억하고, 고친 거래면 같은 가맹점의 지난 기록도 바꿀지 묻는다.
+     */
+    fun learnAfterSave(before: LedgerEntry?, after: LedgerEntry) {
+        val r = repo ?: return
+        if (after.type != EntryType.EXPENSE || after.merchant.isBlank()) return
+        val changed = if (before == null) after.category != LedgerCategories.guess(after.merchant, learned) else after.category != before.category
+        if (!changed) return
+        r.learnCategory(couple.id, myUid, after.merchant, after.category)
+        if (before == null) return
+        scope.launch {
+            val others = r.sameMerchantOthers(couple.id, after.merchant, after.category, after.id)
+            if (others.isNotEmpty()) relabel = Relabel(after.merchant.trim(), after.category, others.map { it.id })
+        }
     }
 
     val summary = remember(entries) { MonthSummary.of(entries) }
@@ -212,7 +234,8 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
             myUid = myUid,
             assets = assets,
             defaultDate = if (month == YearMonth.now()) java.time.LocalDate.now() else month.atDay(1),
-            onSave = { e -> repo?.save(couple.id, myUid, e); creating = false },
+            learned = learned,
+            onSave = { e -> repo?.save(couple.id, myUid, e); learnAfterSave(null, e); creating = false },
             onTrash = null,
             onDismiss = { creating = false },
         )
@@ -224,9 +247,28 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
             myUid = myUid,
             assets = assets,
             defaultDate = e.date,
-            onSave = { updated -> repo?.save(couple.id, myUid, updated); editing = null },
+            learned = learned,
+            onSave = { updated -> repo?.save(couple.id, myUid, updated); learnAfterSave(e, updated); editing = null },
             onTrash = { repo?.moveToTrash(couple.id, myUid, e.id); editing = null },
             onDismiss = { editing = null },
         )
     }
+    relabel?.let { r ->
+        val cat = LedgerCategories.of(r.category)
+        AlertDialog(
+            onDismissRequest = { relabel = null },
+            title = { Text("같은 가맹점도 바꿀까요?") },
+            text = {
+                Text(
+                    "'${r.merchant}'의 다른 기록 ${r.ids.size}건도 ${cat.emoji} ${cat.label}(으)로 바꿀까요?\n" +
+                        "앞으로 들어오는 결제는 이 분류로 자동으로 들어가요.",
+                )
+            },
+            confirmButton = { Button(onClick = { repo?.recategorize(couple.id, myUid, r.ids, r.category); relabel = null }) { Text("모두 바꾸기") } },
+            dismissButton = { TextButton(onClick = { relabel = null }) { Text("이번 것만") } },
+        )
+    }
 }
+
+/** 분류를 고친 가맹점의 다른 기록들 */
+private data class Relabel(val merchant: String, val category: String, val ids: List<String>)

@@ -16,6 +16,7 @@ import java.time.YearMonth
  * 가계부 서버 저장소.
  *   couples/{coupleId}/ledgerEntries/{id}  거래
  *   couples/{coupleId}/ledgerAssets/{id}   자산·부채
+ *   couples/{coupleId}/ledgerMerchants/{정리한 가맹점 이름}  우리 둘 학습표 (고친 분류 기억)
  * 두 사람만 읽고 쓸 수 있다 (firestore.rules).
  */
 class LedgerRepository(private val db: FirebaseFirestore) {
@@ -23,6 +24,56 @@ class LedgerRepository(private val db: FirebaseFirestore) {
     private fun couple(c: String) = db.collection("couples").document(c)
     private fun entries(c: String) = couple(c).collection("ledgerEntries")
     private fun assets(c: String) = couple(c).collection("ledgerAssets")
+    private fun merchants(c: String) = couple(c).collection("ledgerMerchants")
+
+    /** 우리 둘 학습표: 정리한 가맹점 이름 → 분류 */
+    fun observeLearned(coupleId: String): Flow<Map<String, String>> = callbackFlow {
+        val reg = merchants(coupleId).addSnapshotListener { snap, error ->
+            if (error != null) { close(error); return@addSnapshotListener }
+            trySend(snap?.documents?.mapNotNull { d -> d.getString("category")?.let { d.id to it } }?.toMap().orEmpty())
+        }
+        awaitClose { reg.remove() }
+    }.catch { emit(emptyMap()) }
+
+    /** 학습표에서 이 가맹점의 분류 (없거나 못 읽으면 null) */
+    suspend fun learnedCategory(coupleId: String, merchant: String): String? {
+        val key = LedgerCategories.normalize(merchant).ifEmpty { return null }
+        return runCatching { merchants(coupleId).document(key).get().await().getString("category") }.getOrNull()
+            ?.takeIf(LedgerCategories::isExpense)
+    }
+
+    /** 이 가맹점은 다음부터 이 분류로 (두 사람이 같은 표를 쓴다) */
+    fun learnCategory(coupleId: String, uid: String, merchant: String, category: String, onError: (Exception) -> Unit = {}) {
+        val key = LedgerCategories.normalize(merchant).ifEmpty { return }
+        if (!LedgerCategories.isExpense(category)) return
+        merchants(coupleId).document(key).set(
+            mapOf(
+                "merchant" to merchant.trim().take(LedgerEntry.MERCHANT_MAX),
+                "category" to category,
+                "updatedBy" to uid,
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ),
+        ).addOnFailureListener(onError)
+    }
+
+    /** 같은 가맹점(글자 그대로)의 다른 지출 중 분류가 [category] 가 아닌 것 */
+    suspend fun sameMerchantOthers(coupleId: String, merchant: String, category: String, exceptId: String): List<LedgerEntry> {
+        val m = merchant.trim().take(LedgerEntry.MERCHANT_MAX).ifEmpty { return emptyList() }
+        return runCatching { entries(coupleId).whereEqualTo("merchant", m).get().await().documents }.getOrDefault(emptyList())
+            .mapNotNull { it.toEntry() }
+            .filter { !it.deleted && it.id != exceptId && it.type == EntryType.EXPENSE && it.category != category }
+    }
+
+    /** 여러 거래의 분류만 한꺼번에 바꾸기 */
+    fun recategorize(coupleId: String, uid: String, ids: List<String>, category: String, onError: (Exception) -> Unit = {}) {
+        ids.chunked(400).forEach { chunk ->
+            val batch = db.batch()
+            chunk.forEach { id ->
+                batch.update(entries(coupleId).document(id), mapOf("category" to category, "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()))
+            }
+            batch.commit().addOnFailureListener(onError)
+        }
+    }
 
     /** 한 달 거래 (지운 것 빼고, 최신 먼저) */
     fun observeMonth(coupleId: String, month: YearMonth): Flow<List<LedgerEntry>> =
@@ -77,7 +128,9 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         val id = PaymentCapture.keyForBucket(p, bucket)
         val prevId = PaymentCapture.keyForBucket(p, bucket - 1)
         val entry = capture.toEntry(uid, paidBy)
-        val data = entryData(entry.copy(paidByName = paidByName), uid).apply {
+        // 우리 둘 학습표에 있는 가맹점이면 그 분류 (폰에서 짐작한 기본 사전보다 먼저)
+        val learned = if (entry.type == EntryType.EXPENSE) learnedCategory(coupleId, entry.merchant) else null
+        val data = entryData(entry.copy(paidByName = paidByName, category = learned ?: entry.category), uid).apply {
             put("createdBy", uid)
             put("createdAt", FieldValue.serverTimestamp())
         }

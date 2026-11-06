@@ -42,7 +42,7 @@ private enum class Payer { ME, PARTNER, TOGETHER }
 /**
  * 거래 직접 기록·고치기 (자동 기록으로 들어온 거래도 같은 창에서 금액·날짜까지 고친다).
  * 지출/수입, 금액, 날짜·시간, 내용(가맹점), 분류, 결제 수단, 쓴 사람, 메모.
- * 내용을 쓰면 분류를 자동으로 짐작한다 (직접 고르면 그대로 둔다).
+ * 내용을 쓰면 분류를 자동으로 짐작한다: 우리 둘 학습표 → 기본 사전 (직접 고르면 그대로 둔다).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -54,6 +54,8 @@ fun EntryFormDialog(
     assets: List<LedgerAsset>,
     /** 새로 기록할 때 처음 날짜 (지금 보는 달) */
     defaultDate: LocalDate,
+    /** 우리 둘 학습표 (정리한 가맹점 이름 → 분류) */
+    learned: Map<String, String> = emptyMap(),
     onSave: (LedgerEntry) -> Unit,
     onTrash: (() -> Unit)?,
     onDismiss: () -> Unit,
@@ -141,7 +143,7 @@ fun EntryFormDialog(
                             selected = type == t,
                             onClick = {
                                 typeKey = t.key
-                                category = if (t == EntryType.INCOME) LedgerCategories.DEFAULT_INCOME else LedgerCategories.guess(merchant)
+                                category = if (t == EntryType.INCOME) LedgerCategories.DEFAULT_INCOME else LedgerCategories.guess(merchant, learned)
                                 // 수입은 카드로 들어올 수 없어 통장으로 (지출로 돌아오면 모임카드)
                                 if (t == EntryType.INCOME && assetId == LedgerAsset.DATE_CARD) assetId = LedgerAsset.DATE_ACCOUNT
                                 if (t == EntryType.EXPENSE && initial == null && assetId == LedgerAsset.DATE_ACCOUNT) assetId = LedgerAsset.DATE_CARD
@@ -170,7 +172,7 @@ fun EntryFormDialog(
                     value = merchant,
                     onValueChange = { v ->
                         merchant = v.take(LedgerEntry.MERCHANT_MAX)
-                        if (!categoryTouched && type == EntryType.EXPENSE) category = LedgerCategories.guess(merchant)
+                        if (!categoryTouched && type == EntryType.EXPENSE) category = LedgerCategories.guess(merchant, learned)
                     },
                     label = { Text(if (type == EntryType.INCOME) "내용" else "어디서 (가맹점·내용)") },
                     placeholder = { Text(if (type == EntryType.INCOME) "모임비 입금" else "선릉감자탕") },
@@ -184,6 +186,13 @@ fun EntryFormDialog(
                             FilterChip(selected = category == c.key, onClick = { category = c.key; categoryTouched = true }, label = { Text("${c.emoji} ${c.label}") })
                         }
                     }
+                }
+                if (type == EntryType.EXPENSE && merchant.isNotBlank()) {
+                    Text(
+                        "분류를 바꾸면 '${merchant.trim()}'은(는) 다음부터 그 분류로 자동으로 들어가요",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Text(if (type == EntryType.INCOME) "어디로" else "결제 수단", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

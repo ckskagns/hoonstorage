@@ -285,6 +285,25 @@ service cloud.firestore {
         allow delete: if isAssetMember();
       }
 
+      // 가계부 분류 학습표: 정리한 가맹점 이름(문서 이름) → 분류. 분류를 고치면 다음부터 자동으로 그 분류
+      match /ledgerMerchants/{merchantKey} {
+        function isMerchantMember() {
+          return signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+
+        function validMerchant(d) {
+          return d.keys().hasOnly(['merchant', 'category', 'updatedBy', 'updatedAt'])
+            && d.merchant is string && d.merchant.size() > 0 && d.merchant.size() <= 100
+            && d.category is string && d.category.size() > 0 && d.category.size() <= 40
+            && d.updatedBy == request.auth.uid;
+        }
+
+        allow read: if isMerchantMember();
+        allow create, update: if isMerchantMember() && merchantKey.size() <= 60 && validMerchant(request.resource.data);
+        allow delete: if isMerchantMember();
+      }
+
       match /wishes/{wishId} {
         function isWishMember() {
           return signedIn()
