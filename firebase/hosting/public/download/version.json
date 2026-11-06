@@ -1,9 +1,9 @@
 {
-    "versionCode":  15,
-    "versionName":  "0.13.0",
-    "notes":  "가계부: 카카오톡 토스뱅크 알림톡의 CHCH 카드 결제·모임통장 입출금 자동 기록, 결제한 사람 자동 연결, 카드 결제 잔액은 데이트 통장에 반영",
-    "size":  48529415,
-    "sha256":  "84fb7b79e68a7673fd2ed22ba2f48795dedf497bee805dd849ecb5a8e6622c9f",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.13.0/uridul.apk",
-    "releasedAt":  "2026-11-05T21:05:10+09:00"
+    "versionCode":  16,
+    "versionName":  "0.14.0",
+    "notes":  "하트 위젯 디자인 15가지 (앱 메뉴 \u0027하트 위젯 디자인\u0027에서 위젯마다 골라 바꾸기), 하트가 쉬지 않고 고른 박자로 뛰고 AOD에서 멈춰도 예쁜 모양, 폰을 다시 켜도 하트 위젯이 바로 보이게, 가계부 분류 자동 입력(우리 둘이 고친 분류를 기억)",
+    "size":  48922702,
+    "sha256":  "5061208c4ab06bd10f5bcf9dc65111905324fc6bd642c18167ab21c1b0fb1023",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.14.0/uridul.apk",
+    "releasedAt":  "2026-11-06T18:11:26+09:00"
 }
