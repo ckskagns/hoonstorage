@@ -1,5 +1,11 @@
 package com.uridul.app
 
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -37,6 +43,11 @@ import java.time.YearMonth
 class DemoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 하트 위젯 디자인 15종을 잠금화면 칸 크기(정사각 99×99, 가로 249×99)로 늘어놓고 보기: --ez heartSizes true
+        if (intent.getBooleanExtra("heartSizes", false)) {
+            setContent { com.uridul.app.ui.theme.UridulTheme { HeartSizesCheck() } }
+            return
+        }
         enableEdgeToEdge()
         // 알림 점검: 저장된 실제 커플 정보로 아침 알림을 지금 바로 보낸다
         //   adb shell am start -n com.uridul.app/.DemoActivity --ez reminderNow true
@@ -320,4 +331,35 @@ internal fun demoPhoto(i: Int): com.uridul.app.data.ProcessedPhoto {
         com.uridul.app.domain.PhotoQuota.THUMB_MAX_BYTES,
     )
     return com.uridul.app.data.ProcessedPhoto(photo, thumb, big.width, big.height)
+}
+
+
+/** 점검용: 디자인마다 잠금화면 정사각·가로 칸에 그린 모습 (실제 위젯 그림) */
+@androidx.compose.runtime.Composable
+private fun HeartSizesCheck() {
+    val face = com.uridul.app.widget.HeartFace(java.time.LocalDate.of(2026, 7, 17), true, "후이", "나나")
+    val today = java.time.LocalDate.now()
+    androidx.compose.foundation.lazy.LazyColumn(
+        androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF1D2134)),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+    ) {
+        items(com.uridul.app.widget.HeartDesign.entries.size) { i ->
+            val d = com.uridul.app.widget.HeartDesign.entries[i]
+            androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                androidx.compose.material3.Text("${d.number}", color = androidx.compose.ui.graphics.Color.White, modifier = androidx.compose.ui.Modifier.width(18.dp))
+                for (w in listOf(99, 249)) {
+                    val size = androidx.compose.ui.unit.DpSize(w.dp, 99.dp)
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { ctx ->
+                            android.widget.FrameLayout(ctx).apply {
+                                addView(com.uridul.app.widget.heartViews(ctx, d, face, today, size, clickable = false).apply(ctx, this))
+                            }
+                        },
+                        modifier = androidx.compose.ui.Modifier.size(size).border(1.dp, androidx.compose.ui.graphics.Color(0x55FFFFFF)),
+                    )
+                }
+            }
+        }
+    }
 }

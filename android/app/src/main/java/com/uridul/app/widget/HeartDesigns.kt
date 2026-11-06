@@ -1,120 +1,13 @@
 package com.uridul.app.widget
 
 import android.content.Context
-import android.graphics.Typeface
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
-import android.text.style.StyleSpan
 import android.util.TypedValue
 import android.widget.RemoteViews
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import com.uridul.app.R
-import com.uridul.app.domain.DDay
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-
-/**
- * 하트 위젯 디자인. 앱 메뉴 "하트 위젯 디자인" 이나 위젯을 길게 눌러 "설정" 에서 고른다.
- * key 는 저장 값이라 바꾸지 않는다.
- */
-enum class HeartDesign(val key: String, val number: Int, val title: String) {
-    CLASSIC("classic", 0, "지금 하트"),
-    PILL("pill", 1, "글래스 알약"),
-    INSIDE("inside", 2, "하트 속 숫자"),
-    ECG("ecg", 3, "심전도"),
-    RISE("rise", 4, "떠오르는 하트"),
-    MINIMAL("minimal", 5, "미니멀 D+"),
-    NAMES("names", 6, "두 하트 만나기"),
-    FILL("fill", 7, "채워지는 하트"),
-    CARD("card", 8, "핑크 카드 반짝이"),
-    NEON("neon", 9, "네온사인"),
-    ORBIT("orbit", 10, "궤도 하트"),
-    BUBBLE("bubble", 11, "말풍선"),
-    PIXEL("pixel", 12, "픽셀 하트"),
-    SERIF("serif", 13, "영문 타이포"),
-    CALENDAR("calendar", 14, "일력 한 장");
-
-    val label: String get() = if (number == 0) title else "$number $title"
-
-    companion object {
-        fun from(key: String?): HeartDesign = entries.firstOrNull { it.key == key } ?: CLASSIC
-    }
-}
-
-/** 디자인마다 다른 글자 (사귄 날·오늘에서 만든다) */
-internal data class HeartTexts(
-    val days: CharSequence,
-    val since: String = "",
-    val extra: String = "",
-    val extra2: String = "",
-    /** 채워지는 하트: 다음 100일까지 온 만큼 (0~100) */
-    val progress: Int = 0,
-)
-
-/**
- * 채워지는 하트의 진행 막대 값: 하트 그림은 칸의 아래 11% ~ 위 87.5% 에만 있어서,
- * 0~100 을 그 사이로 옮겨야 13% 가 "하트의 13%" 로 보인다.
- */
-internal fun fillLevel(progress: Int): Int = (11 + progress.coerceIn(0, 100) * 0.765f).toInt()
-
-/** 다음 100일 단위 기념일까지: (다음 기념일, 남은 날, 채운 정도 0~100). 시작 전이면 (100, 남은 날+100, 0) */
-internal fun nextHundred(dayNumber: Long): Triple<Long, Long, Int> {
-    if (dayNumber <= 0) return Triple(100L, 100L - dayNumber, 0)
-    val next = (dayNumber / 100 + 1) * 100
-    return Triple(next, next - dayNumber, (dayNumber % 100).toInt())
-}
-
-private val Short: DateTimeFormatter = DateTimeFormatter.ofPattern("yy.MM.dd")
-private val Dotted: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
-private val Spaced: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy. MM. dd")
-private val English: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd.yyyy")
-private val MonthDay: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd")
-
-/** 디자인별 글자 만들기 (연결 전이면 "우리둘" + 안내) */
-internal fun heartTexts(design: HeartDesign, face: HeartFace, today: LocalDate): HeartTexts {
-    val start = face.start ?: return when (design) {
-        HeartDesign.INSIDE, HeartDesign.ORBIT, HeartDesign.SERIF, HeartDesign.CALENDAR -> HeartTexts("♥", "앱에서 연결해 주세요")
-        HeartDesign.NAMES -> HeartTexts("우리둘", extra = face.myName ?: "나", extra2 = face.partnerName ?: "너")
-        else -> HeartTexts("우리둘", "앱에서 연결해 주세요")
-    }
-    val n = DDay.dayNumber(start, today, face.countFromOne)
-    val hero = DDay.heroText(start, today, face.countFromOne) // "113일" / "D-3"
-    val num = if (n < 0) "D$n" else "$n" // 숫자만
-    return when (design) {
-        HeartDesign.CLASSIC -> HeartTexts(hero, start.format(Short))
-        HeartDesign.PILL -> HeartTexts(hero, "${start.format(Dotted)} ~")
-        HeartDesign.INSIDE -> HeartTexts(num, if (n < 0) "사귀기 전 · ${start.format(Short)}" else "일째 사랑 중 · ${start.format(Short)}")
-        HeartDesign.ECG -> HeartTexts(hero, "${start.format(Short)}부터")
-        HeartDesign.RISE -> HeartTexts(hero, "우리 사귄 날 ${start.format(Short)}")
-        HeartDesign.MINIMAL -> HeartTexts(DDay.shortText(start, today, face.countFromOne), "since ${start.format(Spaced)}")
-        HeartDesign.NAMES -> HeartTexts(hero, extra = face.myName ?: "나", extra2 = face.partnerName ?: "너")
-        HeartDesign.FILL -> {
-            val (next, left, progress) = nextHundred(n)
-            HeartTexts(hero, if (left == 0L) "오늘 ${next}일!" else "${next}일까지 ${left}일", progress = progress)
-        }
-        HeartDesign.CARD -> HeartTexts(hero)
-        HeartDesign.NEON -> HeartTexts(hero, start.format(Short))
-        HeartDesign.ORBIT -> HeartTexts(num, if (n < 0) start.format(MonthDay) else "일 · ${start.format(MonthDay)}")
-        HeartDesign.BUBBLE -> HeartTexts(bubbleText(hero, n >= 0))
-        HeartDesign.PIXEL -> HeartTexts(hero, if (n < 0) start.format(Short) else "LV.$n ♥ ${start.format(Short)}")
-        HeartDesign.SERIF -> HeartTexts(num, "together since ${start.format(English)}", extra = if (n < 0) "" else if (n == 1L) "day" else "days")
-        HeartDesign.CALENDAR -> HeartTexts(num, if (n < 0) start.format(Short) else "일째 · ${start.format(Short)}")
-    }
-}
-
-/** 말풍선: "오늘로 113일째" (숫자만 크게, 분홍) */
-private fun bubbleText(hero: String, started: Boolean): CharSequence {
-    if (!started) return SpannableString(hero).apply { setSpan(ForegroundColorSpan(0xFFE63B74.toInt()), 0, hero.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-    val text = "오늘로 ${hero}째"
-    val s = text.indexOf(hero)
-    return SpannableString(text).apply {
-        setSpan(ForegroundColorSpan(0xFFE63B74.toInt()), s, s + hero.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        setSpan(RelativeSizeSpan(1.3f), s, s + hero.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        setSpan(StyleSpan(Typeface.BOLD), s, s + hero.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-    }
-}
 
 /**
  * 디자인 그리기 (지금 하트 CLASSIC 은 HeartWidget 의 heartRemoteViews 가 그린다).
@@ -143,23 +36,27 @@ internal object HeartDesigns {
     /** 글자 폭 (dp): 굵은 글꼴 기준 대략 */
     private fun tw(text: CharSequence, sizeDp: Float, spacing: Float = 1f) = textWidthEm(text.toString()) * sizeDp * spacing
 
+    /** 한 줄 높이 (글자 크기보다 약 20% 크다: 폴드8·에뮬레이터에서 글자 크기만으로 재면 낮은 칸에서 아래가 잘렸다) */
+    private fun lh(sizeDp: Float) = sizeDp * LINE_HEIGHT
+    private const val LINE_HEIGHT = 1.22f
+
     /** 기준 크기에서 이 디자인 내용이 차지하는 가로·세로 (dp) */
     fun baseSize(design: HeartDesign, t: HeartTexts): Pair<Float, Float> = when (design) {
         HeartDesign.CLASSIC -> 0f to 0f
-        HeartDesign.PILL -> (12 + 26 + 8 + maxOf(tw(t.days, 20f), tw(t.since, 11f)) + 16) to 49f
-        HeartDesign.INSIDE -> maxOf(78f, tw(t.since, 11f)) to 90f
-        HeartDesign.ECG -> (74 + 4 + maxOf(tw(t.days, 24f), tw(t.since, 11f))) to 38f
-        HeartDesign.RISE -> maxOf(100f, tw(t.days, 32f), tw(t.since, 11f)) to 60f
-        HeartDesign.MINIMAL -> maxOf(tw(t.days, 34f, 0.85f) + 15, tw(t.since, 11f, 1.3f)) to 50f
-        HeartDesign.NAMES -> maxOf(tw(t.extra, 13f) + 60 + tw(t.extra2, 13f), tw(t.days, 26f)) to 62f
-        HeartDesign.FILL -> (44 + 8 + maxOf(tw(t.days, 24f), tw(t.since, 11f))) to 44f
-        HeartDesign.CARD -> (16 + 22 + 8 + maxOf(tw("우리 사귄 지", 11f), tw(t.days, 22f)) + 18) to 53f
-        HeartDesign.NEON -> (34 + 6 + maxOf(tw(t.days, 26f), tw(t.since, 11f))) to 40f
+        HeartDesign.PILL -> (12 + 26 + 8 + maxOf(tw(t.days, 20f), tw(t.since, 11f)) + 16) to (16 + maxOf(26f, lh(20f) + 2 + lh(11f)))
+        HeartDesign.INSIDE -> maxOf(78f, tw(t.since, 11f)) to (78 + lh(11f))
+        HeartDesign.ECG -> (74 + 4 + maxOf(tw(t.days, 24f), tw(t.since, 11f))) to maxOf(30f, lh(24f) + 2 + lh(11f))
+        HeartDesign.RISE -> maxOf(100f, tw(t.days, 32f), tw(t.since, 11f)) to maxOf(60f, lh(32f) + 3 + lh(11f))
+        HeartDesign.MINIMAL -> maxOf(tw(t.days, 34f, 0.85f) + 15, tw(t.since, 11f, 1.3f)) to (lh(34f) + 4 + lh(11f))
+        HeartDesign.NAMES -> maxOf(tw(t.extra, 13f) + 60 + tw(t.extra2, 13f), tw(t.days, 26f)) to (34 + 2 + lh(26f))
+        HeartDesign.FILL -> (44 + 8 + maxOf(tw(t.days, 24f), tw(t.since, 11f))) to maxOf(44f, lh(24f) + 2 + lh(11f))
+        HeartDesign.CARD -> (16 + 22 + 8 + maxOf(tw("우리 사귄 지", 11f), tw(t.days, 22f)) + 18) to (20 + lh(11f) + lh(22f))
+        HeartDesign.NEON -> (34 + 6 + maxOf(tw(t.days, 26f), tw(t.since, 11f))) to (lh(26f) + 2 + lh(11f) + 6)
         HeartDesign.ORBIT -> 96f to 96f
-        HeartDesign.BUBBLE -> (14 + tw(t.days, 15f) + 5 + 16 + 12) to 46f
-        HeartDesign.PIXEL -> (36 + 10 + maxOf(tw(t.days, 24f, 1.15f), tw(t.since, 11f, 1.1f))) to 38f
-        HeartDesign.SERIF -> maxOf(tw(t.days, 38f) + 5 + tw(t.extra, 14f) + 18, tw(t.since, 11f, 1.15f)) to 53f
-        HeartDesign.CALENDAR -> maxOf(80f, tw(t.since, 11f) + 18) to 66f
+        HeartDesign.BUBBLE -> (14 + tw(t.days, 15f) + 5 + 16 + 12) to (18 + lh(14f * 1.3f) + 8)
+        HeartDesign.PIXEL -> (36 + 10 + maxOf(tw(t.days, 24f, 1.15f), tw(t.since, 11f, 1.1f))) to maxOf(32f, lh(24f) + 2 + lh(11f))
+        HeartDesign.SERIF -> maxOf(tw(t.days, 38f) + 5 + tw(t.extra, 14f) + 18, tw(t.since, 11f, 1.15f)) to (lh(38f) + 3 + lh(11f))
+        HeartDesign.CALENDAR -> maxOf(80f, tw(t.since, 11f) + 18) to (6 + lh(11f) + 3 + lh(28f) + lh(11f) + 5)
     }
 
     /** 위젯 칸에 맞춘 배율 (바깥 여백 4dp 씩 빼고, 조금 남게) */
@@ -234,7 +131,7 @@ internal object HeartDesigns {
                 text(R.id.heart_days, t.days, 28f); text(R.id.heart_since, t.since, 11f)
             }
         }
-        val desc = if (face.start == null) "우리둘: 앱을 열어 연결해 주세요" else "사귄 지 ${heartTexts(HeartDesign.CLASSIC, face, today).days}, ${face.start.format(Short)}부터"
+        val desc = if (face.start == null) "우리둘: 앱을 열어 연결해 주세요" else "사귄 지 ${face.daysText(today)}, ${face.start.format(Short)}부터"
         v.setContentDescription(R.id.heart_root, desc)
         return v
     }
