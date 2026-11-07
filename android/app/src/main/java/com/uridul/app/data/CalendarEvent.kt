@@ -37,7 +37,7 @@ data class CalendarEvent(
     val place: Place? = null,
     /** 시간 일정의 타임라인 */
     val timeline: List<TimeSlot> = emptyList(),
-    /** 알림: 몇 분 전 (null = 기본값, [Remind.OFF] = 끄기) */
+    /** 알림: null·0 = 당일 아침 알림에 넣기, [Remind.OFF] = 끄기 */
     val remind: Int? = null,
     /** 반복 (null = 반복 안 함) */
     val repeat: Repeat? = null,
@@ -185,54 +185,30 @@ enum class Repeat(val key: String) {
 }
 
 /**
- * 일정 알림 시간.
- *  - 시간 일정: 몇 분 전에 알릴지 (기본 30분 전). 하루 전(1440)이면 전날 같은 시각
- *  - 하루 종일 일정: 당일 아침 9시 알림에 들어간다(기본). 하루 전(1440)이면 전날 아침 9시에도
- *  - 끄기: 이 일정은 알리지 않는다 (아침 알림에서도 빠진다)
+ * 일정 알림: 일정이 있는 날 아침 9시에 그날 일정 제목을 모아 한 번만 알린다.
+ *  - 받기(기본): 그날 아침 알림에 이 일정 제목이 들어간다
+ *  - 끄기: 이 일정은 아침 알림에서 빠진다
+ * 예전 버전에서 고른 값(30분 전·하루 전 등)도 그대로 읽되 "받기" 로 본다.
  */
 object Remind {
     const val OFF = -1
+    const val ON_DAY = 0
+    /** 예전 버전의 "하루 전" (지금은 받기로 본다) */
     const val DAY_BEFORE = 1440
-    const val DEFAULT_TIMED = 30
-    /** 하루 종일 일정 기본값: 당일 아침 9시 (0분 전으로 둔다) */
-    const val DEFAULT_ALL_DAY = 0
 
     data class Option(val minutes: Int, val label: String)
 
-    val timedOptions = listOf(
+    val options = listOf(
+        Option(ON_DAY, "당일 아침 9시"),
         Option(OFF, "알림 끄기"),
-        Option(0, "시작할 때"),
-        Option(10, "10분 전"),
-        Option(30, "30분 전"),
-        Option(60, "1시간 전"),
-        Option(120, "2시간 전"),
-        Option(DAY_BEFORE, "하루 전"),
     )
 
-    val allDayOptions = listOf(
-        Option(OFF, "알림 끄기"),
-        Option(0, "당일 아침 9시"),
-        Option(DAY_BEFORE, "전날·당일 아침 9시"),
-    )
+    /** 저장할 수 있는 값 (예전 버전 값 포함: 서버에 이미 있는 일정을 버리지 않게) */
+    val allowed: Set<Int> = setOf(OFF, ON_DAY, 10, 30, 60, 120, DAY_BEFORE)
 
-    val allowed: Set<Int> = (timedOptions + allDayOptions).map { it.minutes }.toSet()
+    @Suppress("UNUSED_PARAMETER")
+    fun effective(remind: Int?, allDay: Boolean): Int = if (remind == OFF) OFF else ON_DAY
 
-    fun effective(remind: Int?, allDay: Boolean): Int = when {
-        remind == null || remind !in allowed -> if (allDay) DEFAULT_ALL_DAY else DEFAULT_TIMED
-        allDay && remind != OFF && remind != DAY_BEFORE -> DEFAULT_ALL_DAY
-        else -> remind
-    }
-
-    fun label(remind: Int?, allDay: Boolean): String {
-        val v = effective(remind, allDay)
-        return (if (allDay) allDayOptions else timedOptions).firstOrNull { it.minutes == v }?.label ?: "30분 전"
-    }
-
-    /** 알림 제목: "30분 뒤 일정이 있어요" 등 */
-    fun leadText(minutes: Int): String = when (minutes) {
-        0 -> "지금 일정이 시작돼요"
-        DAY_BEFORE -> "내일 이 시간에 일정이 있어요"
-        in 1..59 -> "${minutes}분 뒤 일정이 있어요"
-        else -> "${minutes / 60}시간 뒤 일정이 있어요"
-    }
+    fun label(remind: Int?, allDay: Boolean): String =
+        options.first { it.minutes == effective(remind, allDay) }.label
 }

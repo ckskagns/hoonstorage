@@ -58,6 +58,12 @@ class DemoActivity : ComponentActivity() {
             }
             return
         }
+        // 아침 알림 모양 점검 (가짜 제목): --es reminderDemo "영화 데이트|저녁 약속|카페"
+        intent.getStringExtra("reminderDemo")?.let { titles ->
+            Reminders.postDaily(applicationContext, Reminders.dailyTitles(emptyList(), titles.split("|")), LocalDate.now(), null)
+            finish()
+            return
+        }
         // 백업 점검: 실제 서버 데이터로 백업 파일을 앱 전용 폴더에 저장 → 다시 읽어 불러오기 요약 계산 (서버에 쓰지 않음)
         //   adb shell am start -n com.uridul.app/.DemoActivity --ez backupProbe true
         // 상대 일정 알림 점검: 바로 한 번 확인 (알림 설정과 상관없이)

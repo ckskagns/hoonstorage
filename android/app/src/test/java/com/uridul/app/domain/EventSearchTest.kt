@@ -12,7 +12,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 
 class EventSearchTest {
@@ -61,36 +60,32 @@ class EventSearchTest {
     }
 
     @Test
-    fun remindDefaultsAndOptions() {
-        assertEquals(30, Remind.effective(null, allDay = false))
-        assertEquals(0, Remind.effective(null, allDay = true))
-        assertEquals(60, Remind.effective(60, allDay = false))
-        // 하루 종일에는 없는 값이면 기본값 (당일 아침)
-        assertEquals(0, Remind.effective(60, allDay = true))
-        assertEquals(Remind.DAY_BEFORE, Remind.effective(Remind.DAY_BEFORE, allDay = true))
-        assertEquals(30, Remind.effective(999, allDay = false))
-        assertEquals("30분 뒤 일정이 있어요", Remind.leadText(30))
-        assertEquals("1시간 뒤 일정이 있어요", Remind.leadText(60))
-        assertEquals("내일 이 시간에 일정이 있어요", Remind.leadText(Remind.DAY_BEFORE))
+    fun remindIsOnDayOrOff() {
+        // 받기(당일 아침) 아니면 끄기. 예전 버전 값(30분 전·하루 전)도 받기로 본다
+        assertEquals(Remind.ON_DAY, Remind.effective(null, allDay = false))
+        assertEquals(Remind.ON_DAY, Remind.effective(null, allDay = true))
+        assertEquals(Remind.ON_DAY, Remind.effective(30, allDay = false))
+        assertEquals(Remind.ON_DAY, Remind.effective(Remind.DAY_BEFORE, allDay = true))
+        assertEquals(Remind.OFF, Remind.effective(Remind.OFF, allDay = false))
+        assertEquals("당일 아침 9시", Remind.label(60, allDay = false))
+        assertEquals("알림 끄기", Remind.label(Remind.OFF, allDay = true))
+        assertTrue(30 in Remind.allowed) // 서버에 이미 있는 예전 값도 읽는다
     }
 
     @Test
-    fun alarmsUseEachEventsChoice() {
-        val now = LocalDateTime.of(2026, 10, 28, 9, 0)
-        val events = listOf(
-            event("t1", "점심", today, LocalTime.of(12, 0)), // 기본 30분 전 → 11:30
-            event("t2", "운동", today, LocalTime.of(19, 0), remind = 60), // 18:00
-            event("t3", "꺼둠", today, LocalTime.of(20, 0), remind = Remind.OFF),
-            event("t4", "내일 아침", today.plusDays(1), LocalTime.of(8, 0), remind = Remind.DAY_BEFORE), // 오늘 08:00 → 이미 지남
-            event("t5", "모레 저녁", today.plusDays(2), LocalTime.of(19, 0), remind = Remind.DAY_BEFORE), // 내일 19:00
-            event("t6", "하루 종일", today, null),
-            event("t7", "멀리", today.plusDays(5), LocalTime.of(19, 0)),
-        )
-        val alarms = Reminders.alarmsFor(events, now).associate { it.event.id to it.at }
-        assertEquals(LocalDateTime.of(2026, 10, 28, 11, 30), alarms["t1"])
-        assertEquals(LocalDateTime.of(2026, 10, 28, 18, 0), alarms["t2"])
-        assertEquals(LocalDateTime.of(2026, 10, 29, 19, 0), alarms["t5"])
-        assertEquals(setOf("t1", "t2", "t5"), alarms.keys)
+    fun dailyTitleJoinsAndCuts() {
+        assertEquals("영화", Reminders.joinTitles(listOf("영화")))
+        assertEquals("영화, 저녁 약속", Reminders.joinTitles(listOf("영화", "저녁 약속")))
+        // 길면 잘라서 "…"
+        val long = Reminders.joinTitles(listOf("가나다라마바사", "아자차카타파하", "가나다라마바사아자"), max = 20)
+        assertEquals("가나다라마바사, 아자차카타파하, 가…", long)
+        assertTrue(long.length <= 20)
+        // 쉼표·빈칸 바로 뒤에서 잘리면 지운다
+        assertEquals("가나다라…", Reminders.joinTitles(listOf("가나다라", "마바사아"), max = 7))
+        // 이모지 가운데서 자르지 않는다
+        assertEquals("💕…", Reminders.joinTitles(listOf("💕💕💕"), max = 4))
+        // 기념일 먼저, 빈 제목·같은 제목은 한 번만
+        assertEquals(listOf("🎂 나나 생일", "영화"), Reminders.dailyTitles(listOf("🎂 나나 생일"), listOf("영화", " ", "영화")))
     }
 
     @Test

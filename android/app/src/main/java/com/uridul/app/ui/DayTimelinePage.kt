@@ -323,10 +323,9 @@ fun DayTimelinePage(
             onDismiss = { choosingMap = false },
             onChoose = { app ->
                 choosingMap = false
-                val e = edit ?: return@MapChooserDialog
+                if (edit == null) return@MapChooserDialog
                 PlaceInbox.expectEditor()
-                val q = e.draft.timeline.getOrNull(e.slot)?.title?.takeIf { it.isNotBlank() } ?: e.draft.title
-                MapLinks.startSearch(context, app, q.trim())
+                MapLinks.startSearch(context, app)
             },
         )
     }

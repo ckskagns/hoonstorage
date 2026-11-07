@@ -74,7 +74,7 @@ fun NotificationBell(
             }
             if (items.isEmpty()) {
                 Text(
-                    "아직 알림이 없어요 🌷\n일정 알림(아침 9시·일정 전)이 오면 여기에 모여요.",
+                    "아직 알림이 없어요 🌷\n일정 알림(일정 있는 날 아침 9시)이 오면 여기에 모여요.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),

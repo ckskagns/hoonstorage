@@ -258,8 +258,7 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                 findingSlot = null
                 // 지도 앱에서 공유하면 이 일정·이 줄에 바로 저장된다
                 PlaceInbox.expectEvent(event.id, slot)
-                val query = event.slots.getOrNull(slot)?.title?.takeIf { it.isNotBlank() } ?: event.title
-                MapLinks.startSearch(context, app, query)
+                MapLinks.startSearch(context, app)
             },
         )
     }

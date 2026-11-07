@@ -150,7 +150,7 @@ fun WishlistContent(
             onChoose = { app ->
                 choosingMap = false
                 PlaceInbox.expectWishlist()
-                MapLinks.startSearch(context, app, "")
+                MapLinks.startSearch(context, app)
             },
         )
     }

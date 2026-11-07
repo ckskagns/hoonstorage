@@ -420,7 +420,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else if (!Reminders.hasPermission(context)) {
             "폰 설정에서 우리둘 알림을 허용해야 알림이 와요"
         } else {
-            "일정 당일 아침 9시와 일정 전(기본 30분 전)에 알려드릴게요"
+            "일정이 있는 날 아침 9시에 그날 일정을 한 번 알려드릴게요"
         }
     }
 
@@ -485,8 +485,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         WidgetStore.saveEvents(context, events)
                         CalendarWidget().updateAll(context)
                         MonthWidget.refreshAll(context)
-                        // 시간 일정 알림(일정마다 고른 시간)을 다시 맞춘다 (추가·수정·삭제 반영)
-                        Reminders.scheduleTimed(context, events)
                     }
             }
         }

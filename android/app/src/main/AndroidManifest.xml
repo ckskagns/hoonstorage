@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 재부팅 후 자정 위젯 갱신 알람 재등록 -->
@@ -11,8 +12,12 @@
         android:maxSdkVersion="32" />
     <!-- 링크로 설치한 앱의 자체 업데이트: 새 버전 APK 설치 화면 열기 (사용자가 직접 허용해야 동작) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- 일정 알림 (아침 9시, 일정 30분 전). 처음 한 번 사용자에게 허용을 묻는다 -->
+    <!-- 일정 알림 (일정 있는 날 아침 9시). 처음 한 번 사용자에게 허용을 묻는다 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 장소 찾기: 지도 앱이 켜져 있는지 보기 (사용자가 폰 설정 "사용 정보 접근" 에서 허용했을 때만, 지도 앱 3개만 확인) -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- 지도 앱 연동: 설치 여부 확인과 장소 열기 (안드로이드 11+ 다른 앱 보기 제한) -->
     <queries>

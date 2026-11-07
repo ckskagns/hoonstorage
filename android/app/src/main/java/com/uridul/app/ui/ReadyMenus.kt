@@ -64,7 +64,7 @@ internal fun MainMenu(
         }
         HorizontalDivider()
         DropdownMenuItem(
-            text = { Text("일정 알림 (아침 9시·일정 전)") },
+            text = { Text("일정 알림 (일정 있는 날 아침 9시)") },
             trailingIcon = { Checkbox(checked = notifyEnabled, onCheckedChange = null) },
             onClick = { pick(MenuAction.ToggleNotify) },
         )

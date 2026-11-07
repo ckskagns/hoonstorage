@@ -139,9 +139,7 @@ fun EventEditorDialog(
             occurrence = initial.occurrence,
             color = color,
             category = category,
-            remind = initial.remind?.takeIf { r ->
-                if (allDay) com.uridul.app.data.Remind.allDayOptions.any { it.minutes == r } else true
-            },
+            remind = initial.remind,
         )
     }
 
@@ -346,9 +344,8 @@ fun EventEditorDialog(
             onDismiss = { choosingMap = false },
             onChoose = { app ->
                 choosingMap = false
-                val slotTitle = slots.getOrNull(placeTarget)?.title.orEmpty()
                 PlaceInbox.expectEditor()
-                MapLinks.startSearch(context, app, slotTitle.ifBlank { title }.trim())
+                MapLinks.startSearch(context, app)
             },
         )
     }

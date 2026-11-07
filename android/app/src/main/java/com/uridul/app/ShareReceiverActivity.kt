@@ -40,6 +40,8 @@ class ShareReceiverActivity : Activity() {
 
     private fun deliver(place: Place) {
         PlaceInbox.offer(place)
+        // 공유해 준 지도 앱은 켜져 있다 → 다음 장소 찾기 때 그 화면 그대로 연다
+        place.app?.let { com.uridul.app.ui.MapAppState.markSeen(this, it) }
         // 이미 열려 있는 우리둘 화면(일정 입력 중이면 그 창)으로 돌아간다
         startActivity(
             Intent(this, MainActivity::class.java)

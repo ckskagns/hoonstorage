@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 지도 앱 연동 (API 없이 각 앱의 연동 주소만 사용)
- *  - 찾기: 고른 지도 앱을 검색 상태로 연다 → 사용자가 장소를 고르고 "공유 → 우리둘" 하면 장소 칸이 채워진다
+ *  - 찾기: 고른 지도 앱을 켜져 있으면 그대로, 아니면 검색창으로 연다 → 사용자가 장소를 고르고 "공유 → 우리둘" 하면 장소 칸이 채워진다
  *  - 열기: 저장된 장소 링크를 그 지도 앱에서 바로 연다 (링크가 없으면 이름으로 검색)
  */
 object MapLinks {
@@ -53,21 +53,51 @@ object MapLinks {
         Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${app.packageName}"))
 
     /**
-     * 장소 찾기: 앱이 있으면 검색 화면, 없으면 설치 화면으로 안내.
+     * 장소 찾기 (일정 제목으로 검색하지 않는다):
+     *  - 그 지도 앱이 켜져 있으면(최근 앱에 남아 있으면) 보던 화면 그대로 앞으로 가져온다
+     *  - 켜져 있지 않으면 앱을 열고 검색창만 띄운다 (검색어 없이)
+     *  - 앱이 없으면 설치 화면으로 안내
      * @return 지도 앱을 열었으면 true
      */
-    fun startSearch(context: Context, app: MapApp, query: String): Boolean {
+    fun startSearch(context: Context, app: MapApp): Boolean {
         if (!isInstalled(context, app)) {
             Toast.makeText(context, "${app.label} 앱이 없어요. 설치 화면으로 이동할게요.", Toast.LENGTH_LONG).show()
-            start(context, storeIntent(app)) || start(context, webSearch(app, query))
+            start(context, storeIntent(app)) || start(context, webHome(app))
             return false
         }
-        if (start(context, searchIntent(context, app, query.ifBlank { "맛집" }))) {
+        val launch = context.packageManager.getLaunchIntentForPackage(app.packageName)
+        val opened = if (MapAppState.isRunning(context, app)) {
+            // 아이콘을 누른 것처럼: 이미 있는 화면을 그대로 앞으로
+            launch != null && start(context, launch)
+        } else {
+            start(context, emptySearchIntent(context, app)) || (launch != null && start(context, launch))
+        }
+        if (opened) {
+            MapAppState.markSeen(context, app)
             Toast.makeText(context, "장소를 고른 뒤 공유 → 우리둘 을 눌러 주세요", Toast.LENGTH_LONG).show()
             return true
         }
-        return start(context, webSearch(app, query))
+        return start(context, webHome(app))
     }
+
+    /** 검색어 없이 검색창만 (구글 지도는 그런 연동 주소가 없어서 앱 첫 화면: 맨 위가 검색창) */
+    private fun emptySearchIntent(context: Context, app: MapApp): Intent = when (app) {
+        MapApp.NAVER -> Intent(Intent.ACTION_VIEW, Uri.parse("nmap://search?query=&appname=${context.packageName}"))
+        MapApp.KAKAO -> Intent(Intent.ACTION_VIEW, Uri.parse("kakaomap://search?q="))
+        MapApp.GOOGLE -> context.packageManager.getLaunchIntentForPackage(app.packageName) ?: Intent()
+    }
+
+    /** 앱도 웹 검색도 안 될 때: 웹 지도 첫 화면 */
+    private fun webHome(app: MapApp): Intent = Intent(
+        Intent.ACTION_VIEW,
+        Uri.parse(
+            when (app) {
+                MapApp.NAVER -> "https://map.naver.com/"
+                MapApp.KAKAO -> "https://map.kakao.com/"
+                MapApp.GOOGLE -> "https://www.google.com/maps"
+            },
+        ),
+    )
 
     /** 저장된 장소 열기: 링크 → 그 지도 앱에서, 링크가 없으면 이름으로 검색 */
     fun open(context: Context, place: Place) {

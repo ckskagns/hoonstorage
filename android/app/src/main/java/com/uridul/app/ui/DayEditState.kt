@@ -79,7 +79,6 @@ import com.uridul.app.data.Couple
 import com.uridul.app.data.EventDraft
 import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
-import com.uridul.app.data.Remind
 import com.uridul.app.data.Repeat
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.toDraft
@@ -101,9 +100,7 @@ internal const val NEW_ID = "__new__"
 internal data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Boolean, val original: EventDraft?) {
 
     fun finalDraft(): EventDraft = if (slot < 0) {
-        // 하루 종일에 없는 알림 값(예: 1시간 전)은 기본값으로
-        val remind = draft.remind?.takeIf { r -> Remind.allDayOptions.any { it.minutes == r } }
-        draft.copy(time = null, timeline = emptyList(), remind = remind)
+        draft.copy(time = null, timeline = emptyList())
     } else {
         // 저장할 때는 시간 순으로 (대표 시작 시각·알림·정렬이 맞도록)
         val sorted = draft.timeline.sortedBy { it.start }

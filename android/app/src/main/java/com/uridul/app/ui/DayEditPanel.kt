@@ -389,7 +389,7 @@ private fun RepeatRow(repeat: Repeat?, date: LocalDate, seriesStart: LocalDate?,
     )
 }
 
-/** 알림 시간 고르기: [🔔 알림   30분 전 ▾] */
+/** 알림 받기·끄기: [🔔 알림   당일 아침 9시 ▾] */
 @Composable
 private fun RemindRow(remind: Int?, allDay: Boolean, onPick: (Int) -> Unit) {
     val current = Remind.effective(remind, allDay)
@@ -398,7 +398,7 @@ private fun RemindRow(remind: Int?, allDay: Boolean, onPick: (Int) -> Unit) {
         label = "알림",
         valueText = Remind.label(remind, allDay),
         active = current != Remind.OFF,
-        options = (if (allDay) Remind.allDayOptions else Remind.timedOptions).map { it.minutes to it.label },
+        options = Remind.options.map { it.minutes to it.label },
         selected = current,
         onPick = onPick,
     )
