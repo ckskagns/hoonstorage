@@ -1,6 +1,5 @@
 package com.uridul.app.ui
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -13,59 +12,37 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
 import com.uridul.app.data.PhotoMeta
 import com.uridul.app.domain.PhotoQuota
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.withContext
 
 /** 사진첩을 쓰는 곳(일정 카드·추억 슬라이드)이 함께 쓰는 값. 메인 화면에서 한 번 넣어 준다 */
 class PhotoHooks(
@@ -83,28 +60,6 @@ class PhotoHooks(
 )
 
 val LocalPhotos = compositionLocalOf { PhotoHooks() }
-
-/** 풀어 둔 작은 사진 (최대 16MB, 오래 안 본 것부터 버림) */
-private val photoCache = object : android.util.LruCache<String, ImageBitmap>(16 * 1024) {
-    override fun sizeOf(key: String, value: ImageBitmap): Int = (value.asAndroidBitmap().byteCount / 1024).coerceAtLeast(1)
-}
-
-/**
- * JPEG 바이트 → 화면 그림. 화면을 그리는 줄에서 풀지 않고 뒤에서 풀어서 넘길 때 끊기지 않게 하고,
- * 한 번 푼 사진은 기억해 둔다.
- */
-@Composable
-fun rememberPhotoBitmap(key: String, bytes: ByteArray?): ImageBitmap? {
-    val cacheKey = "$key:${bytes?.size}"
-    val state = produceState(initialValue = bytes?.let { photoCache.get(cacheKey) }, cacheKey) {
-        if (value == null && bytes != null) {
-            value = withContext(Dispatchers.Default) {
-                runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
-            }?.also { photoCache.put(cacheKey, it) }
-        }
-    }
-    return state.value
-}
 
 /**
  * 일정 카드의 사진첩 줄: [사진들…] [+ 사진]  ·  이번 주 7/25장

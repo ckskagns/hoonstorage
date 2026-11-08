@@ -1,6 +1,5 @@
 package com.uridul.app.ui
 
-import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,28 +21,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,7 +43,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -64,9 +53,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -80,8 +66,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.Couple
@@ -92,9 +76,7 @@ import com.uridul.app.data.Place
 import com.uridul.app.data.ReviewEntry
 import com.uridul.app.domain.Memories
 import com.uridul.app.domain.PhotoQuota
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -312,6 +294,9 @@ fun DiaryPost(
     val photos by remember(post.reviewId) { hooks.album(post.asEvent()) }.collectAsState(initial = emptyList())
     LaunchedEffect(photos.map { it.id }) { hooks.refreshWeek() }
     val pager = rememberPagerState { photos.size.coerceAtLeast(1) }
+    // 사진을 한 번이라도 넘기기 시작한 글만 옆 사진을 미리 받는다 (피드를 훑고 지나가는 글까지 받지 않게)
+    var swiped by remember(post.reviewId) { mutableStateOf(false) }
+    LaunchedEffect(pager.isScrollInProgress) { if (pager.isScrollInProgress) swiped = true }
     val addPhoto = rememberAddPhoto(post, photos)
     var writing by remember { mutableStateOf(false) }
     val mine = review?.entries?.get(myUid)
@@ -345,13 +330,11 @@ fun DiaryPost(
             if (photos.isEmpty()) {
                 PostArt(post, Modifier.fillMaxSize().clickable { onOpenViewer(0) })
             } else {
-                // 옆 사진도 미리 받아 둬서 넘기자마자 선명하게
-                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
+                // 넘기기 시작하면 옆 사진도 미리 받아 둬서 넘기자마자 선명하게
+                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = if (swiped) 1 else 0) { page ->
                     val meta = photos.getOrNull(page) ?: return@HorizontalPager
                     // 큰 사진(상세 화면과 같은 것)을 받아 보여주고, 받는 동안은 작은 사진
-                    val full = rememberFullPhoto(meta)
-                    val thumb = rememberPhotoBitmap(meta.id, meta.thumb)
-                    val bmp = full ?: thumb
+                    val bmp = rememberSharpPhoto(meta).bitmap
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -461,25 +444,5 @@ internal fun PhotoDeleteDialog(photo: PhotoMeta, onConfirm: () -> Unit, onDismis
         confirmButton = { TextButton(onClick = onConfirm) { Text("지우기", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )
-}
-
-/** 풀어 둔 큰 사진 (최대 64MB·앱 메모리의 1/8, 오래 안 본 것부터 버림). 옆으로 넘겼다 돌아와도 다시 받지 않게 */
-private val fullPhotoCache = object : android.util.LruCache<String, ImageBitmap>(
-    (Runtime.getRuntime().maxMemory() / 1024 / 8).toInt().coerceIn(32 * 1024, 64 * 1024),
-) {
-    override fun sizeOf(key: String, value: ImageBitmap): Int = (value.asAndroidBitmap().byteCount / 1024).coerceAtLeast(1)
-}
-
-/** 큰 사진: 볼 때 받아와서 풀어 둔다 (받는 동안은 null) */
-@Composable
-internal fun rememberFullPhoto(meta: PhotoMeta): ImageBitmap? {
-    val hooks = LocalPhotos.current
-    val full by produceState(fullPhotoCache.get(meta.id), meta.id) {
-        if (value != null) return@produceState
-        value = withContext(Dispatchers.Default) {
-            hooks.loadFull(meta.id)?.let { b -> runCatching { BitmapFactory.decodeByteArray(b, 0, b.size)?.asImageBitmap() }.getOrNull() }
-        }?.also { fullPhotoCache.put(meta.id, it) }
-    }
-    return full
 }
 

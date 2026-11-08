@@ -66,9 +66,10 @@ object MapLinks {
             return false
         }
         val launch = context.packageManager.getLaunchIntentForPackage(app.packageName)
-        val opened = if (MapAppState.isRunning(context, app)) {
-            // 아이콘을 누른 것처럼: 이미 있는 화면을 그대로 앞으로
-            launch != null && start(context, launch)
+        val resume = launch != null && MapAppState.isRunning(context, app)
+        val opened = if (resume) {
+            // 아이콘을 누른 것처럼: 이미 있는 화면을 그대로 앞으로 (안 되면 검색창으로)
+            start(context, launch!!) || start(context, emptySearchIntent(context, app))
         } else {
             start(context, emptySearchIntent(context, app)) || (launch != null && start(context, launch))
         }

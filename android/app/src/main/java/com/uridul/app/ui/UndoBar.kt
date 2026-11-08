@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.uridul.app.data.CalendarEvent
 import kotlinx.coroutines.delay
 
 /** "되돌리기" 안내가 떠 있는 시간 */
