@@ -345,9 +345,13 @@ fun DiaryPost(
             if (photos.isEmpty()) {
                 PostArt(post, Modifier.fillMaxSize().clickable { onOpenViewer(0) })
             } else {
-                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                // 옆 사진도 미리 받아 둬서 넘기자마자 선명하게
+                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
                     val meta = photos.getOrNull(page) ?: return@HorizontalPager
-                    val bmp = rememberPhotoBitmap(meta.id, meta.thumb)
+                    // 큰 사진(상세 화면과 같은 것)을 받아 보여주고, 받는 동안은 작은 사진
+                    val full = rememberFullPhoto(meta)
+                    val thumb = rememberPhotoBitmap(meta.id, meta.thumb)
+                    val bmp = full ?: thumb
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -459,8 +463,10 @@ internal fun PhotoDeleteDialog(photo: PhotoMeta, onConfirm: () -> Unit, onDismis
     )
 }
 
-/** 풀어 둔 큰 사진 (최대 32MB, 오래 안 본 것부터 버림). 옆으로 넘겼다 돌아와도 다시 받지 않게 */
-private val fullPhotoCache = object : android.util.LruCache<String, ImageBitmap>(32 * 1024) {
+/** 풀어 둔 큰 사진 (최대 64MB·앱 메모리의 1/8, 오래 안 본 것부터 버림). 옆으로 넘겼다 돌아와도 다시 받지 않게 */
+private val fullPhotoCache = object : android.util.LruCache<String, ImageBitmap>(
+    (Runtime.getRuntime().maxMemory() / 1024 / 8).toInt().coerceIn(32 * 1024, 64 * 1024),
+) {
     override fun sizeOf(key: String, value: ImageBitmap): Int = (value.asAndroidBitmap().byteCount / 1024).coerceAtLeast(1)
 }
 
