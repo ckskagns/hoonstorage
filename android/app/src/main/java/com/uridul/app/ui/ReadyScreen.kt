@@ -147,7 +147,6 @@ fun ReadyScreen(
     var showingDeleted by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf(false) }
     var pickingTheme by remember { mutableStateOf(false) }
-    var adminOpen by remember { mutableStateOf(false) }
     var pickingColors by remember { mutableStateOf(false) }
     val uiSettings by AppSettings.state.collectAsState()
     val appContext = androidx.compose.ui.platform.LocalContext.current
@@ -278,7 +277,6 @@ fun ReadyScreen(
                                     MenuAction.HeartDesign -> runCatching {
                                         appContext.startActivity(android.content.Intent(appContext, com.uridul.app.HeartWidgetConfigActivity::class.java))
                                     }
-                                    MenuAction.Admin -> adminOpen = couple.isAdmin(myUid)
                                     MenuAction.Deleted -> showingDeleted = true
                                     MenuAction.BackupSave -> exportLauncher.launch(com.uridul.app.data.Backup.fileName(LocalDate.now()))
                                     MenuAction.BackupLoad -> importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
@@ -532,9 +530,6 @@ fun ReadyScreen(
         }
     }
 
-    if (adminOpen) {
-        AdminDialog(coupleId = couple.id, myUid = myUid, onDismiss = { adminOpen = false })
-    }
     if (pickingTheme) {
         ThemeModeDialog(
             current = uiSettings.theme,

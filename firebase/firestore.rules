@@ -285,35 +285,6 @@ service cloud.firestore {
         allow delete: if isAssetMember();
       }
 
-      // AI 비서 설정: couples/{coupleId}/aiConfig/assistant { enabled, apiKey(Claude API 키), updatedBy, updatedAt }
-      //  (예전 제미나이 문서 gemini 는 새로 쓸 수 없고, 관리자가 지울 수만 있다)
-      //  - 바꾸기(켜기/끄기·키 넣기/지우기): 관리자(커플 공간을 만든 사람 = 멤버 목록 첫 번째)만
-      //  - 읽기: 관리자는 언제나, 상대는 AI 가 켜져 있을 때만 (꺼져 있으면 상대 폰은 키를 받을 수 없다)
-      match /aiConfig/{docId} {
-        function aiCouple() {
-          return get(/databases/$(database)/documents/couples/$(coupleId)).data;
-        }
-
-        function isAiMember() {
-          return signedIn() && request.auth.uid in aiCouple().members;
-        }
-
-        function isAiAdmin() {
-          return signedIn() && aiCouple().members[0] == request.auth.uid;
-        }
-
-        function validAi(d) {
-          return d.keys().hasOnly(['enabled', 'apiKey', 'updatedBy', 'updatedAt'])
-            && d.enabled is bool
-            && (!('apiKey' in d) || (d.apiKey is string && d.apiKey.size() >= 20 && d.apiKey.size() <= 300))
-            && d.updatedBy == request.auth.uid;
-        }
-
-        allow read: if isAiAdmin() || (isAiMember() && resource.data.enabled == true);
-        allow create, update: if isAiAdmin() && docId == 'assistant' && validAi(request.resource.data);
-        allow delete: if isAiAdmin();
-      }
-
       // 가계부 분류 학습표: 정리한 가맹점 이름(문서 이름) → 분류. 분류를 고치면 다음부터 자동으로 그 분류
       match /ledgerMerchants/{merchantKey} {
         function isMerchantMember() {
