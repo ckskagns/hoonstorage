@@ -1,5 +1,6 @@
 package com.uridul.app.ui
 
+import com.uridul.app.ai.isAdmin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +28,7 @@ import java.time.LocalDate
 /** 메뉴에서 고른 것 */
 internal enum class MenuAction {
     Profile, StartDate, ToggleCountFromOne, Invite,
-    ToggleNotify, TogglePartnerAlerts, Theme, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
+    ToggleNotify, TogglePartnerAlerts, Theme, Colors, HeartDesign, Admin, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
 }
 
 /** 오른쪽 위 ⋮ 메뉴 */
@@ -95,6 +96,10 @@ internal fun MainMenu(
             text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
             onClick = { pick(MenuAction.CheckUpdate) },
         )
+        // 관리자(커플 공간을 만든 사람) 폰에만 보인다
+        if (couple.isAdmin(myUid)) {
+            DropdownMenuItem(text = { Text("관리자 설정") }, onClick = { pick(MenuAction.Admin) })
+        }
         DropdownMenuItem(text = { Text("로그아웃") }, onClick = { pick(MenuAction.SignOut) })
     }
 }
