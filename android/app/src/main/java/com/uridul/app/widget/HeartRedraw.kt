@@ -2,8 +2,6 @@ package com.uridul.app.widget
 
 import android.content.Context
 import android.provider.Settings
-import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
 import androidx.core.content.edit
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -83,7 +81,8 @@ internal object HeartRedraw {
     fun signature(context: Context, face: HeartFace, today: LocalDate, design: HeartDesign): String =
         signatureOf(stamp(context), face, today, design)
 
-    private fun stamp(context: Context): String {
+    /** 그림 판 (위젯 여러 개를 볼 때는 한 번만 구해 signatureOf 에 넘긴다: 앱 설치 정보 읽기를 줄이려고) */
+    fun stamp(context: Context): String {
         val installed = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime }.getOrDefault(0L)
         val boots = runCatching { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT) }.getOrDefault(-1)
         return "$installed/$boots"
@@ -121,10 +120,13 @@ internal object HeartRedraw {
         val today = LocalDate.now()
         val manager = GlanceAppWidgetManager(context)
         val widget = HeartWidget()
-        for (id in manager.getGlanceIds(HeartWidget::class.java)) {
+        val ids = manager.getGlanceIds(HeartWidget::class.java)
+        if (ids.isEmpty()) return
+        val stamp = stamp(context)
+        for (id in ids) {
             val appWidgetId = manager.getAppWidgetId(id)
             val design = HeartDesignStore.forWidget(context, appWidgetId)
-            if (isDrawn(context, appWidgetId, signature(context, face, today, design))) continue
+            if (isDrawn(context, appWidgetId, signatureOf(stamp, face, today, design))) continue
             updateAppWidgetState(context, id) {
                 face.writeTo(it)
                 it[HeartFace.KEY_DESIGN] = design.key

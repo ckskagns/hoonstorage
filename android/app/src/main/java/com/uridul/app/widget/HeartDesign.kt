@@ -6,7 +6,6 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
-import androidx.compose.runtime.key
 import com.uridul.app.domain.DDay
 import java.time.LocalDate
 

@@ -7,13 +7,8 @@ import android.content.Intent
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -79,8 +74,9 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val face = HeartRedraw.lastFace(context)
         val today = LocalDate.now()
+        val stamp = HeartRedraw.stamp(context)
         val stale = appWidgetIds.filter {
-            !HeartRedraw.isDrawn(context, it, HeartRedraw.signature(context, face, today, HeartDesignStore.forWidget(context, it)))
+            !HeartRedraw.isDrawn(context, it, HeartRedraw.signatureOf(stamp, face, today, HeartDesignStore.forWidget(context, it)))
         }.toIntArray()
         if (stale.isNotEmpty()) super.onUpdate(context, appWidgetManager, stale)
     }

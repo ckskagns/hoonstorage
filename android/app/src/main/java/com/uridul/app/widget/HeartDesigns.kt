@@ -4,9 +4,7 @@ import android.content.Context
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
-import androidx.compose.foundation.layout.height
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import com.uridul.app.R
 import java.time.LocalDate
 
@@ -51,7 +49,8 @@ internal object HeartDesigns {
             HeartDesign.INSIDE -> maxOf(78f, tw(t.since, 11f)) to (78 + sub(0f))
             HeartDesign.ECG -> (74 + 4 + maxOf(tw(t.days, 24f), tw(t.since, 11f))) to maxOf(30f, lh(24f) + sub(2f))
             HeartDesign.RISE -> maxOf(100f, tw(t.days, 32f), tw(t.since, 11f)) to maxOf(60f, lh(32f) + sub(3f))
-            HeartDesign.MINIMAL -> maxOf(tw(t.days, 34f, 0.85f) + 15, tw(t.since, 11f, 1.3f)) to (lh(34f) + sub(4f))
+            // 가는 글자라도 글자 간격(0.05em)이 있어 굵은 글꼴 폭과 비슷하다 (0.85 로 잡으면 날짜 줄이 없을 때 하트가 칸 밖으로 잘림)
+            HeartDesign.MINIMAL -> maxOf(tw(t.days, 34f, 1.05f) + 15, tw(t.since, 11f, 1.3f)) to (lh(34f) + sub(4f))
             HeartDesign.NAMES -> maxOf(tw(t.extra, 13f) + 60 + tw(t.extra2, 13f), tw(t.days, 26f)) to (34 + 2 + lh(26f))
             HeartDesign.FILL -> (44 + 8 + maxOf(tw(t.days, 24f), tw(t.since, 11f))) to maxOf(44f, lh(24f) + sub(2f))
             HeartDesign.CARD -> (16 + 22 + 8 + maxOf(tw("우리 사귄 지", 11f), tw(t.days, 22f)) + 18) to (20 + lh(11f) + lh(22f))
