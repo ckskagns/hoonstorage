@@ -302,14 +302,14 @@ service cloud.firestore {
         }
 
         function validAi(d) {
-          return d.keys().hasOnly([enabled, geminiKey, updatedBy, updatedAt])
+          return d.keys().hasOnly(['enabled', 'geminiKey', 'updatedBy', 'updatedAt'])
             && d.enabled is bool
-            && (!(geminiKey in d) || (d.geminiKey is string && d.geminiKey.size() >= 20 && d.geminiKey.size() <= 200))
+            && (!('geminiKey' in d) ||(d.geminiKey is string && d.geminiKey.size() >= 20 && d.geminiKey.size() <= 200))
             && d.updatedBy == request.auth.uid;
         }
 
         allow read: if isAiAdmin() || (isAiMember() && resource.data.enabled == true);
-        allow create, update: if isAiAdmin() && docId == gemini && validAi(request.resource.data);
+        allow create, update: if isAiAdmin() && docId == 'gemini' && validAi(request.resource.data);
         allow delete: if isAiAdmin();
       }
 
