@@ -81,12 +81,18 @@ object GeminiClient {
         val text = when {
             body.contains("API_KEY_INVALID") || body.contains("API key not valid", ignoreCase = true) ->
                 "키가 올바르지 않아요. 키를 다시 붙여 넣어 주세요"
+            code == 402 -> "결제 문제로 막혔어요 (크레딧·결제 계정·지출 한도 확인)"
             code == 429 -> "사용량 한도(이번 달 지출 한도 또는 분당 횟수)에 걸렸어요. 잠시 뒤에 다시 해 주세요"
             code == 401 || code == 403 -> "이 키로는 제미나이를 쓸 수 없어요 (권한·결제 연결 확인)"
             code == 404 -> "제미나이 모델을 찾지 못했어요"
             code >= 500 -> "제미나이 서버가 잠시 바빠요. 잠시 뒤에 다시 해 주세요"
             else -> "제미나이 오류가 났어요"
         }
-        return if (status.isNotEmpty()) "$text ($code $status)" else "$text ($code)"
+        val head = if (status.isNotEmpty()) "$text ($code $status)" else "$text ($code)"
+        // 구글이 알려 준 이유 (키 값은 들어 있지 않다) — 원인을 찾기 쉽게 앞부분만 함께
+        val reason = runCatching { JSONObject(body).getJSONObject("error").optString("message") }.getOrDefault("")
+            .replace(Regex("""AIza[0-9A-Za-z_\-]{10,}"""), "(키)")
+            .take(200)
+        return if (reason.isNotBlank()) "$head\n$reason" else head
     }
 }
