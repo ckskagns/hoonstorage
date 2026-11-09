@@ -32,6 +32,9 @@ data class Couple(
 ) {
     val isPaired: Boolean get() = members.size >= 2
 
+    /** 관리자 = 커플 공간을 만든 사람(멤버 목록 첫 번째). 관리자 기능(AI 켜기/끄기·키 관리 등)은 관리자만 */
+    fun isAdmin(uid: String): Boolean = members.firstOrNull() == uid
+
     /** 내가 커플 공간을 만든 사람인지 (색 역할 구분) */
     fun isCreator(myUid: String): Boolean = members.firstOrNull() == myUid
 

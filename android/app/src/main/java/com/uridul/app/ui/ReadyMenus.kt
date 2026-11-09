@@ -1,6 +1,5 @@
 package com.uridul.app.ui
 
-import com.uridul.app.ai.isAdmin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

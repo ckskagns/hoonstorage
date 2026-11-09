@@ -1,6 +1,5 @@
 package com.uridul.app.ui
 
-import com.uridul.app.ai.isAdmin
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size

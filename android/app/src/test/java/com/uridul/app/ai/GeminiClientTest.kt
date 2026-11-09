@@ -17,6 +17,7 @@ class GeminiClientTest {
         val part = body.getJSONArray("contents").getJSONObject(0).getJSONArray("parts").getJSONObject(0)
         assertEquals("안녕", part.getString("text"))
         assertEquals("user", body.getJSONArray("contents").getJSONObject(0).getString("role"))
+        assertEquals(GeminiClient.MAX_OUTPUT_TOKENS, body.getJSONObject("generationConfig").getInt("maxOutputTokens"))
     }
 
     @Test fun readsTextParts() {

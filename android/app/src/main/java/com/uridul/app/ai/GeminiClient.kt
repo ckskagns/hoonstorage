@@ -51,6 +51,9 @@ object GeminiClient {
         }.getOrElse { Reply.Error("인터넷 연결을 확인해 주세요", -1) }
     }
 
+    /** 한 번에 받을 답의 최대 길이 (토큰). 한 번 부를 때 나올 수 있는 요금을 제한한다 */
+    const val MAX_OUTPUT_TOKENS = 4096
+
     internal fun requestBody(prompt: String): String = JSONObject()
         .put(
             "contents",
@@ -58,6 +61,7 @@ object GeminiClient {
                 JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", prompt))),
             ),
         )
+        .put("generationConfig", JSONObject().put("maxOutputTokens", MAX_OUTPUT_TOKENS))
         .toString()
 
     /** 답 글자만 꺼내기 (여러 조각이면 이어 붙임) */

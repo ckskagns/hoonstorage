@@ -3,14 +3,7 @@ package com.uridul.app.ai
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.uridul.app.data.Couple
 import kotlinx.coroutines.tasks.await
-
-/**
- * 관리자 = 커플 공간을 만든 사람(멤버 목록의 첫 번째, 후이).
- * 관리자 기능(AI 켜기/끄기, 키 넣기·보기·지우기 등)은 관리자 폰에만 보이고, 서버 규칙도 관리자만 바꿀 수 있게 막는다.
- */
-fun Couple.isAdmin(uid: String): Boolean = members.firstOrNull() == uid
 
 /** AI 비서 설정 (couples/{coupleId}/aiConfig/gemini) */
 data class AiConfig(
