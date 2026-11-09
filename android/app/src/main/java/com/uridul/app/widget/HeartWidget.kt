@@ -30,14 +30,14 @@ import com.uridul.app.MainActivity
 import com.uridul.app.R
 import com.uridul.app.data.WidgetStore
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 /**
  * "사귄 날" 하트 위젯. 홈 화면 + 잠금 화면(One UI 시계 아래, 굿락 LockStar).
  * 디자인 15가지(지금 하트 + 14종, HeartDesigns.kt)를 앱 메뉴나 위젯 "설정"에서 고른다. 아래는 지금 하트.
  *
  *   [♥♥] 103일
- *        26.07.17
+ *
+ * 사귄 날짜는 보이지 않는다 (하트와 디데이만). 아랫줄은 연결 전 안내("앱에서 연결해 주세요")에만 쓴다.
  *
  * - 겹친 빨간 미니 하트 두 개가 번갈아 콩닥이고, 뛰는 하트가 앞으로 나온다
  *   (위젯 호스트가 애니메이션을 막으면 멈춘 하트로 보인다).
@@ -93,7 +93,6 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 
-private val ShortDate: DateTimeFormatter = DateTimeFormatter.ofPattern("yy.MM.dd")
 
 /** 겹친 하트 두 개(가로:세로 = 30:24) 너비 비율 */
 private const val HEART_ASPECT = 30f / 24f
@@ -165,16 +164,17 @@ private fun heartRemoteViews(
     size: DpSize,
 ): RemoteViews {
     val days = face.daysText(today) ?: "우리둘"
-    val since = face.start?.format(ShortDate) ?: "앱에서 연결해 주세요"
+    // 사귄 날짜는 보이지 않는다 (하트와 디데이만). 아랫줄은 연결 전 안내에만 쓴다
+    val guide = if (face.start == null) "앱에서 연결해 주세요" else null
     val layout = heartLayout(size.width.value, size.height.value, days)
 
     return RemoteViews(context.packageName, R.layout.widget_heart).apply {
         setTextViewText(R.id.heart_days, days)
         // 글꼴 크기 설정과 상관없이 칸에 맞도록 dp 단위로 지정
         setTextViewTextSize(R.id.heart_days, TypedValue.COMPLEX_UNIT_DIP, layout.textDp)
-        setTextViewText(R.id.heart_since, since)
+        setTextViewText(R.id.heart_since, guide ?: "")
         setTextViewTextSize(R.id.heart_since, TypedValue.COMPLEX_UNIT_DIP, (layout.textDp * 0.36f).coerceIn(10f, 16f))
-        setViewVisibility(R.id.heart_since, if (layout.showSince) View.VISIBLE else View.GONE)
+        setViewVisibility(R.id.heart_since, if (guide != null && layout.showSince) View.VISIBLE else View.GONE)
 
         // 보이는 하트 크기 ≈ 숫자 글자 높이
         setViewLayoutHeight(R.id.heart_anim, layout.textDp * HEART_SCALE, TypedValue.COMPLEX_UNIT_DIP)
@@ -189,7 +189,7 @@ private fun heartRemoteViews(
 
         setContentDescription(
             R.id.heart_root,
-            if (face.start == null) "우리둘: 앱을 열어 연결해 주세요" else "사귄 지 $days, ${since}부터",
+            if (face.start == null) "우리둘: 앱을 열어 연결해 주세요" else "사귄 지 $days",
         )
     }
 }

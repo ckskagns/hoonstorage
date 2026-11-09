@@ -9,7 +9,6 @@ import android.text.style.StyleSpan
 import androidx.compose.runtime.key
 import com.uridul.app.domain.DDay
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 /**
  * 하트 위젯 디자인. 앱 메뉴 "하트 위젯 디자인" 이나 위젯을 길게 눌러 "설정" 에서 고른다.
@@ -62,11 +61,6 @@ internal fun nextHundred(dayNumber: Long): Triple<Long, Long, Int> {
     return Triple(next, next - dayNumber, (dayNumber % 100).toInt())
 }
 
-internal val Short: DateTimeFormatter = DateTimeFormatter.ofPattern("yy.MM.dd")
-private val Dotted: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
-private val Spaced: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy. MM. dd")
-private val English: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd.yyyy")
-private val MonthDay: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd")
 
 /** 디자인별 글자 만들기 (연결 전이면 "우리둘" + 안내) */
 internal fun heartTexts(design: HeartDesign, face: HeartFace, today: LocalDate): HeartTexts {
@@ -78,25 +72,26 @@ internal fun heartTexts(design: HeartDesign, face: HeartFace, today: LocalDate):
     val n = DDay.dayNumber(start, today, face.countFromOne)
     val hero = DDay.heroText(start, today, face.countFromOne) // "113일" / "D-3"
     val num = if (n < 0) "D$n" else "$n" // 숫자만
+    // 사귄 날짜(26.07.17 등)는 보이지 않는다: 하트 그림과 디데이만. 숫자만 크게 쓰는 디자인은 "일째" 같은 단위만 남긴다
     return when (design) {
-        HeartDesign.CLASSIC -> HeartTexts(hero, start.format(Short))
-        HeartDesign.PILL -> HeartTexts(hero, "${start.format(Dotted)} ~")
-        HeartDesign.INSIDE -> HeartTexts(num, if (n < 0) "사귀기 전 · ${start.format(Short)}" else "일째 사랑 중 · ${start.format(Short)}")
-        HeartDesign.ECG -> HeartTexts(hero, "${start.format(Short)}부터")
-        HeartDesign.RISE -> HeartTexts(hero, "우리 사귄 날 ${start.format(Short)}")
-        HeartDesign.MINIMAL -> HeartTexts(DDay.shortText(start, today, face.countFromOne), "since ${start.format(Spaced)}")
+        HeartDesign.CLASSIC -> HeartTexts(hero)
+        HeartDesign.PILL -> HeartTexts(hero)
+        HeartDesign.INSIDE -> HeartTexts(num, if (n < 0) "사귀기 전" else "일째 사랑 중")
+        HeartDesign.ECG -> HeartTexts(hero)
+        HeartDesign.RISE -> HeartTexts(hero)
+        HeartDesign.MINIMAL -> HeartTexts(DDay.shortText(start, today, face.countFromOne))
         HeartDesign.NAMES -> HeartTexts(hero, extra = face.myName ?: "나", extra2 = face.partnerName ?: "너")
         HeartDesign.FILL -> {
             val (next, left, progress) = nextHundred(n)
             HeartTexts(hero, if (left == 0L) "오늘 ${next}일!" else "${next}일까지 ${left}일", progress = progress)
         }
         HeartDesign.CARD -> HeartTexts(hero)
-        HeartDesign.NEON -> HeartTexts(hero, start.format(Short))
-        HeartDesign.ORBIT -> HeartTexts(num, if (n < 0) start.format(MonthDay) else "일 · ${start.format(MonthDay)}")
+        HeartDesign.NEON -> HeartTexts(hero)
+        HeartDesign.ORBIT -> HeartTexts(num, if (n < 0) "" else "일")
         HeartDesign.BUBBLE -> HeartTexts(bubbleText(hero, n >= 0))
-        HeartDesign.PIXEL -> HeartTexts(hero, if (n < 0) start.format(Short) else "LV.$n ♥ ${start.format(Short)}")
-        HeartDesign.SERIF -> HeartTexts(num, "together since ${start.format(English)}", extra = if (n < 0) "" else if (n == 1L) "day" else "days")
-        HeartDesign.CALENDAR -> HeartTexts(num, if (n < 0) start.format(Short) else "일째 · ${start.format(Short)}")
+        HeartDesign.PIXEL -> HeartTexts(hero)
+        HeartDesign.SERIF -> HeartTexts(num, extra = if (n < 0) "" else if (n == 1L) "day" else "days")
+        HeartDesign.CALENDAR -> HeartTexts(num, if (n < 0) "" else "일째")
     }
 }
 
