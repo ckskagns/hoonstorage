@@ -19,6 +19,30 @@ class ClaudeClientTest {
         assertTrue(ClaudeClient.errorText(418).contains("(418)"))
     }
 
+    @Test fun requestShape() {
+        val body = org.json.JSONObject(ClaudeClient.requestBody("안녕"))
+        assertEquals(ClaudeClient.MODEL, body.getString("model"))
+        assertEquals(ClaudeClient.MAX_OUTPUT_TOKENS, body.getInt("max_tokens"))
+        assertEquals("default", body.getString("fallbacks"))
+        val msg = body.getJSONArray("messages").getJSONObject(0)
+        assertEquals("user", msg.getString("role"))
+        assertEquals("안녕", msg.getString("content"))
+        // 2026-10-21 버전에서는 temperature 등을 보내면 거절된다
+        assertFalse(body.has("temperature") || body.has("top_p") || body.has("top_k"))
+    }
+
+    @Test fun readsTextBlocksOnly() {
+        val ok = """{"content":[{"type":"thinking","thinking":""},{"type":"text","text":"안녕하세요, "},{"type":"text","text":"우리둘!"}],"stop_reason":"end_turn"}"""
+        assertEquals(AiReply.Text("안녕하세요, 우리둘!"), ClaudeClient.parseReply(ok))
+        val refused = """{"content":[],"stop_reason":"refusal"}"""
+        assertTrue((ClaudeClient.parseReply(refused) as AiReply.Error).message.contains("답하지 않았어요"))
+        assertTrue(ClaudeClient.parseReply("깨진 글") is AiReply.Error)
+        assertEquals(
+            "Your credit balance is too low",
+            ClaudeClient.errorMessage("""{"type":"error","error":{"type":"billing_error","message":"Your credit balance is too low"}}"""),
+        )
+    }
+
     @Test fun reasonHidesKey() {
         val r = ClaudeClient.reasonOf("invalid x-api-key: sk-ant-api03-test0abcdefghij")
         assertFalse(r.contains("test0abcdefghij"))

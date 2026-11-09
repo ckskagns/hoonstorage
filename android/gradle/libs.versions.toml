@@ -12,7 +12,6 @@ googleServices = "4.4.3"
 credentials = "1.5.0"
 googleid = "1.1.1"
 coroutines = "1.10.2"
-anthropic = "3.2.0"
 junit = "4.13.2"
 
 [libraries]
@@ -35,7 +34,6 @@ androidx-credentials = { group = "androidx.credentials", name = "credentials", v
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
-anthropic-java = { group = "com.anthropic", name = "anthropic-java", version.ref = "anthropic" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

@@ -85,8 +85,6 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
-    // AI 비서: Claude API (공식 Java SDK, Kotlin 에서 사용)
-    implementation(libs.anthropic.java)
 
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
