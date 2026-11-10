@@ -10,55 +10,10 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.core.os.BundleCompat
-import androidx.datastore.preferences.core.MutablePreferences
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
-import com.uridul.app.data.WidgetSnapshot
 import com.uridul.app.data.WidgetStore
-import com.uridul.app.domain.DDay
 import java.time.LocalDate
-
-/** 하트 위젯에 보이는 내용을 정하는 값: 사귄 날(없으면 연결 전), 첫날을 1일로 셀지, 두 사람 이름 */
-internal data class HeartFace(
-    val start: LocalDate?,
-    val countFromOne: Boolean = true,
-    val myName: String? = null,
-    val partnerName: String? = null,
-) {
-
-    /** "113일" / "D-3", 연결 전이면 null */
-    fun daysText(today: LocalDate): String? = start?.let { DDay.heroText(it, today, countFromOne) }
-
-    /** 위젯 상태(다시 그리기 신호와 함께 넣은 값)에 적기 */
-    fun writeTo(p: MutablePreferences) {
-        p[KEY_SET] = true
-        if (start != null) p[KEY_START] = start.toString() else p.remove(KEY_START)
-        p[KEY_COUNT1] = countFromOne
-        if (myName != null) p[KEY_ME] = myName else p.remove(KEY_ME)
-        if (partnerName != null) p[KEY_PARTNER] = partnerName else p.remove(KEY_PARTNER)
-    }
-
-    companion object {
-        private val KEY_SET = booleanPreferencesKey("heart_face_set")
-        private val KEY_START = stringPreferencesKey("heart_start")
-        private val KEY_COUNT1 = booleanPreferencesKey("heart_count_from_one")
-        private val KEY_ME = stringPreferencesKey("heart_me")
-        private val KEY_PARTNER = stringPreferencesKey("heart_partner")
-        /** 디자인을 바꾸면 위젯 상태도 바뀌어 다시 그려지게 */
-        val KEY_DESIGN = stringPreferencesKey("heart_design")
-
-        fun of(snapshot: WidgetSnapshot?) = HeartFace(snapshot?.startDate, snapshot?.countFromOne ?: true, snapshot?.myName, snapshot?.partnerName)
-
-        /** 위젯 상태에 적힌 값 (한 번도 적지 않았으면 null) */
-        fun from(p: Preferences): HeartFace? {
-            if (p[KEY_SET] != true) return null
-            return HeartFace(p[KEY_START]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }, p[KEY_COUNT1] ?: true, p[KEY_ME], p[KEY_PARTNER])
-        }
-    }
-}
 
 /**
  * 하트 위젯은 보이는 내용(디데이 숫자·날짜·이름)·디자인·앱 버전이 바뀌거나 폰을 다시 켰을 때만 다시 그린다.
@@ -117,6 +72,28 @@ internal object HeartRedraw {
         return HeartFace(start, p.getBoolean(KEY_LAST_COUNT1, true), p.getString(KEY_LAST_ME, null), p.getString(KEY_LAST_PARTNER, null))
     }
 
+    /**
+     * 정기 갱신(6시간)·재부팅: 그대로인 위젯은 건너뛰고, 그린 적 있는 위젯은 바로 다시 그린다.
+     * Glance 로 처음 그려야 하는 위젯(새로 놓은 것, 칸 크기를 아직 모르는 것)만 돌려준다.
+     */
+    fun refreshStale(context: Context, appWidgetIds: IntArray): IntArray {
+        val face = lastFace(context)
+        val today = LocalDate.now()
+        val stamp = stamp(context)
+        return appWidgetIds.filter { id ->
+            val design = HeartDesignStore.forWidget(context, id)
+            val sig = signatureOf(stamp, face, today, design)
+            when {
+                isDrawn(context, id, sig) -> false
+                wasDrawn(context, id) && drawNow(context, id, face, today, design) -> {
+                    remember(context, id, sig, face)
+                    false
+                }
+                else -> true
+            }
+        }.toIntArray()
+    }
+
     fun forget(context: Context, appWidgetIds: IntArray) {
         prefs(context).edit { appWidgetIds.forEach { remove(it.toString()) } }
     }
@@ -124,10 +101,10 @@ internal object HeartRedraw {
     /**
      * 내용·디자인이 바뀐 하트 위젯만 다시 그린다 (바뀐 값을 위젯 상태에 함께 넣어서).
      *
-     * 디데이 숫자만 바뀐 경우(자정)는 Glance 를 거치지 않고 바로 그려 넣는다 ([drawNow]).
-     * Glance 는 그리기를 WorkManager 작업으로 미루는데, 밤에 폰이 절전(Doze)이면 자정 알람이 제때 울려도
-     * 작업이 몇 시간 뒤에 돈다. 위젯마다 따로 돌아서 잠금 화면 위젯은 117일, AOD 위젯은 아직 116일처럼
-     * 화면을 켜고 끌 때마다 숫자가 오락가락했다 (2026-11-10).
+     * 디데이 숫자만 바뀐 경우(자정)는 Glance 를 거치지 않고 자정 알람 안에서 바로 그려 넣는다 ([drawNow]).
+     * Glance 는 그리기를 알람 처리가 끝난 뒤의 WorkManager 작업으로 돌리고 위젯마다 따로 그려서,
+     * 삼성처럼 백그라운드 앱을 바로 얼리는 폰에서는 위젯마다 바뀌는 시각이 어긋날 수 있다.
+     * (2026-11-10 "116일/117일 오락가락" 신고 때 폴드8 은 자정 6초 뒤 두 위젯 모두 제때 그렸음: 이것은 대비책)
      */
     suspend fun updateChanged(context: Context) {
         val face = HeartFace.of(WidgetStore.load(context))
@@ -171,7 +148,7 @@ internal object HeartRedraw {
     }
 
     /** 이 위젯을 한 번이라도 그린 적이 있는지 (새로 놓은 위젯은 Glance 로 처음 그린다) */
-    fun wasDrawn(context: Context, appWidgetId: Int): Boolean = prefs(context).contains(appWidgetId.toString())
+    private fun wasDrawn(context: Context, appWidgetId: Int): Boolean = prefs(context).contains(appWidgetId.toString())
 
     /** 위젯 칸 크기들 (Glance 의 SizeMode.Exact 와 같은 방법: 홈이 알려준 크기, 없으면 세로·가로 화면 크기) */
     internal fun sizesOf(options: Bundle?): List<SizeF> {

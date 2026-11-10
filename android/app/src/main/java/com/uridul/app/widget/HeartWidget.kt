@@ -75,21 +75,7 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
      * 날짜만 바뀐 위젯은 바로 그려 넣고 (Glance 작업은 절전 중에 밀린다), 새로 놓은 위젯만 Glance 로 그린다.
      */
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        val face = HeartRedraw.lastFace(context)
-        val today = LocalDate.now()
-        val stamp = HeartRedraw.stamp(context)
-        val rest = appWidgetIds.filter { id ->
-            val design = HeartDesignStore.forWidget(context, id)
-            val sig = HeartRedraw.signatureOf(stamp, face, today, design)
-            when {
-                HeartRedraw.isDrawn(context, id, sig) -> false
-                HeartRedraw.wasDrawn(context, id) && HeartRedraw.drawNow(context, id, face, today, design) -> {
-                    HeartRedraw.remember(context, id, sig, face)
-                    false
-                }
-                else -> true
-            }
-        }.toIntArray()
+        val rest = HeartRedraw.refreshStale(context, appWidgetIds)
         if (rest.isNotEmpty()) super.onUpdate(context, appWidgetManager, rest)
     }
 

@@ -28,9 +28,10 @@ object Widgets {
     val KeyAdd = ActionParameters.Key<Boolean>(MainExtras.ADD_EVENT)
 
     suspend fun updateAll(context: Context) {
-        DDayWidget().updateAll(context)
-        // 하트 위젯은 숫자·날짜가 바뀔 때만 (AOD 에서 다시 그리면 하트가 멈춘다)
+        // 하트 위젯은 숫자·날짜가 바뀔 때만 (AOD 에서 다시 그리면 하트가 멈춘다).
+        // 맨 먼저: 잠금 화면·AOD 에 보이는 위젯이라 자정 알람이 깨워 준 짧은 시간 안에 바로 그려 넣는다
         HeartRedraw.updateChanged(context)
+        DDayWidget().updateAll(context)
         CalendarWidget().updateAll(context)
         MonthWidget.refreshAll(context)
         PhotoWidget().updateAll(context)
