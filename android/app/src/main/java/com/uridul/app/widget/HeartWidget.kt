@@ -70,15 +70,27 @@ class HeartWidgetReceiver : GlanceAppWidgetReceiver() {
         MidnightScheduler.schedule(context)
     }
 
-    /** 홈·잠금 화면의 정기 갱신(6시간)도 내용이 그대로면 건너뛴다 (새로 놓은 위젯은 그린다) */
+    /**
+     * 홈·잠금 화면의 정기 갱신(6시간)도 내용이 그대로면 건너뛴다.
+     * 날짜만 바뀐 위젯은 바로 그려 넣고 (Glance 작업은 절전 중에 밀린다), 새로 놓은 위젯만 Glance 로 그린다.
+     */
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val face = HeartRedraw.lastFace(context)
         val today = LocalDate.now()
         val stamp = HeartRedraw.stamp(context)
-        val stale = appWidgetIds.filter {
-            !HeartRedraw.isDrawn(context, it, HeartRedraw.signatureOf(stamp, face, today, HeartDesignStore.forWidget(context, it)))
+        val rest = appWidgetIds.filter { id ->
+            val design = HeartDesignStore.forWidget(context, id)
+            val sig = HeartRedraw.signatureOf(stamp, face, today, design)
+            when {
+                HeartRedraw.isDrawn(context, id, sig) -> false
+                HeartRedraw.wasDrawn(context, id) && HeartRedraw.drawNow(context, id, face, today, design) -> {
+                    HeartRedraw.remember(context, id, sig, face)
+                    false
+                }
+                else -> true
+            }
         }.toIntArray()
-        if (stale.isNotEmpty()) super.onUpdate(context, appWidgetManager, stale)
+        if (rest.isNotEmpty()) super.onUpdate(context, appWidgetManager, rest)
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {

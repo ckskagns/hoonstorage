@@ -54,9 +54,11 @@ class CalendarWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = WidgetStore.load(context)
         val events = Widgets.fetchUpcomingEvents(context, snapshot) ?: WidgetStore.loadEvents(context)
-        val today = LocalDate.now()
-        val upcoming = CalendarMath.upcoming(events, today, limit = 20)
-        provideContent { WidgetSettingsScope { CalendarContent(snapshot, upcoming, today) } }
+        // 오늘은 그릴 때마다 다시 읽는다 (자정을 넘긴 그리기 세션이 어제 기준으로 그리지 않게)
+        provideContent {
+            val today = LocalDate.now()
+            WidgetSettingsScope { CalendarContent(snapshot, CalendarMath.upcoming(events, today, limit = 20), today) }
+        }
     }
 
     companion object {

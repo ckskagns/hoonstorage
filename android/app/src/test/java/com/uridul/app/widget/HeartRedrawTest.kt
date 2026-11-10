@@ -18,6 +18,15 @@ class HeartRedrawTest {
         assertNull(HeartFace(null).daysText(today))
     }
 
+    @Test fun daysAroundMidnight() {
+        // 2026-11-10 신고: 116일/117일이 오락가락 → 계산은 날짜마다 하나뿐 (11-09 = 116일, 11-10 = 117일)
+        assertEquals("116일", face.daysText(LocalDate.of(2026, 11, 9)))
+        assertEquals("117일", face.daysText(LocalDate.of(2026, 11, 10)))
+        assertEquals("1일", face.daysText(start))
+        assertEquals("D-1", face.daysText(start.minusDays(1)))
+        assertEquals("116일", face.copy(countFromOne = false).daysText(LocalDate.of(2026, 11, 10)))
+    }
+
     @Test fun sameDaySameSignature() {
         // 15분마다 상대 일정 확인·앱 열기: 같은 날·같은 사귄 날이면 다시 그리지 않는다
         assertEquals(HeartRedraw.signatureOf("1/5", face, today), HeartRedraw.signatureOf("1/5", face, today))

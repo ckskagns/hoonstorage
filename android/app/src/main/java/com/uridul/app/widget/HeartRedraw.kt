@@ -1,8 +1,15 @@
 package com.uridul.app.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.os.Bundle
 import android.provider.Settings
+import android.util.SizeF
+import android.widget.RemoteViews
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import androidx.core.os.BundleCompat
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -114,7 +121,14 @@ internal object HeartRedraw {
         prefs(context).edit { appWidgetIds.forEach { remove(it.toString()) } }
     }
 
-    /** 내용·디자인이 바뀐 하트 위젯만 다시 그린다 (바뀐 값을 위젯 상태에 함께 넣어서) */
+    /**
+     * 내용·디자인이 바뀐 하트 위젯만 다시 그린다 (바뀐 값을 위젯 상태에 함께 넣어서).
+     *
+     * 디데이 숫자만 바뀐 경우(자정)는 Glance 를 거치지 않고 바로 그려 넣는다 ([drawNow]).
+     * Glance 는 그리기를 WorkManager 작업으로 미루는데, 밤에 폰이 절전(Doze)이면 자정 알람이 제때 울려도
+     * 작업이 몇 시간 뒤에 돈다. 위젯마다 따로 돌아서 잠금 화면 위젯은 117일, AOD 위젯은 아직 116일처럼
+     * 화면을 켜고 끌 때마다 숫자가 오락가락했다 (2026-11-10).
+     */
     suspend fun updateChanged(context: Context) {
         val face = HeartFace.of(WidgetStore.load(context))
         val today = LocalDate.now()
@@ -123,15 +137,56 @@ internal object HeartRedraw {
         val ids = manager.getGlanceIds(HeartWidget::class.java)
         if (ids.isEmpty()) return
         val stamp = stamp(context)
+        // 사귄 날·이름·첫날 세는 법이 그대로면 날짜만 바뀐 것: 바로 그리기로 충분하다
+        val sameFace = face == lastFace(context)
         for (id in ids) {
             val appWidgetId = manager.getAppWidgetId(id)
             val design = HeartDesignStore.forWidget(context, appWidgetId)
-            if (isDrawn(context, appWidgetId, signatureOf(stamp, face, today, design))) continue
+            val sig = signatureOf(stamp, face, today, design)
+            if (isDrawn(context, appWidgetId, sig)) continue
             updateAppWidgetState(context, id) {
                 face.writeTo(it)
                 it[HeartFace.KEY_DESIGN] = design.key
             }
-            widget.update(context, id)
+            val drawn = drawNow(context, appWidgetId, face, today, design)
+            if (drawn) remember(context, appWidgetId, sig, face)
+            // 내용이 바뀌었으면 Glance 도 새 값으로 다시 그린다 (살아 있는 그리기 세션이 옛 값을 들고 있을 수 있어서)
+            if (!drawn || !sameFace) widget.update(context, id)
         }
+    }
+
+    /**
+     * 위젯 칸 크기(세로·가로 화면 모두)에 맞춰 지금 바로 그려 넣는다. 위젯 칸 크기를 아직 모르면 false (Glance 로 그린다).
+     * 하트 위젯은 원래 일반 위젯 레이아웃(RemoteViews)이라 Glance 가 그린 것과 같은 그림이다.
+     */
+    fun drawNow(context: Context, appWidgetId: Int, face: HeartFace, today: LocalDate, design: HeartDesign): Boolean {
+        val manager = AppWidgetManager.getInstance(context)
+        val sizes = runCatching { sizesOf(manager.getAppWidgetOptions(appWidgetId)) }.getOrDefault(emptyList())
+        if (sizes.isEmpty()) return false
+        fun draw(s: SizeF) = heartViews(context, design, face, today, DpSize(s.width.dp, s.height.dp), clickable = true)
+        return runCatching {
+            val views = if (sizes.size == 1) draw(sizes[0]) else RemoteViews(sizes.associateWith { draw(it) })
+            manager.updateAppWidget(appWidgetId, views)
+        }.isSuccess
+    }
+
+    /** 이 위젯을 한 번이라도 그린 적이 있는지 (새로 놓은 위젯은 Glance 로 처음 그린다) */
+    fun wasDrawn(context: Context, appWidgetId: Int): Boolean = prefs(context).contains(appWidgetId.toString())
+
+    /** 위젯 칸 크기들 (Glance 의 SizeMode.Exact 와 같은 방법: 홈이 알려준 크기, 없으면 세로·가로 화면 크기) */
+    internal fun sizesOf(options: Bundle?): List<SizeF> {
+        if (options == null) return emptyList()
+        BundleCompat.getParcelableArrayList(options, AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF::class.java)
+            ?.filter { it.width > 0f && it.height > 0f }
+            ?.distinct()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        val minW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+        val maxW = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
+        val minH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+        val maxH = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
+        return listOf(SizeF(minW.toFloat(), maxH.toFloat()), SizeF(maxW.toFloat(), minH.toFloat()))
+            .filter { it.width > 0f && it.height > 0f }
+            .distinct()
     }
 }

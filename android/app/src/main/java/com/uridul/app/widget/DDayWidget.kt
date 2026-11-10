@@ -51,8 +51,8 @@ class DDayWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = WidgetStore.load(context)
-        val today = LocalDate.now()
-        provideContent { WidgetSettingsScope { WidgetContent(snapshot, today) } }
+        // 오늘은 그릴 때마다 다시 읽는다 (자정 직전에 열린 그리기 세션이 자정 갱신을 받으면 어제 숫자를 그렸다)
+        provideContent { WidgetSettingsScope { WidgetContent(snapshot, LocalDate.now()) } }
     }
 
     companion object {
