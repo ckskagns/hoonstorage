@@ -1,9 +1,9 @@
 {
-    "versionCode":  18,
-    "versionName":  "0.16.0",
-    "notes":  "하트 위젯: 사귄 날짜를 빼고 하트와 디데이만 보이게 (15가지 디자인 모두), 미니멀 D+ 하트가 칸 밖으로 잘리던 것 고침",
-    "size":  48906342,
-    "sha256":  "75ef5745aaa9400fba3d7f13fbf5a190c701897d178d84b249ae90cab9876c94",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.16.0/uridul.apk",
-    "releasedAt":  "2026-11-09T14:53:21+09:00"
+    "versionCode":  19,
+    "versionName":  "0.17.0",
+    "notes":  "하트 위젯 디데이가 자정에 바로 바뀌도록 (잠금 화면·AOD 위젯을 한꺼번에 먼저 다시 그림), 디데이·일정 위젯 날짜 처리 정리",
+    "size":  48922726,
+    "sha256":  "28b7c0f9a490f38b482c26b8b4d4281624922e6dea676e1cf32dbb7bfcb0aefe",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.17.0/uridul.apk",
+    "releasedAt":  "2026-11-10T16:33:41+09:00"
 }
