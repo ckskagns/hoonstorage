@@ -98,7 +98,8 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
         val done = mutableSetOf<String>()
         // 같은 가맹점 결제가 여러 건이면 학습표는 한 번만 읽는다
         val learnedCache = mutableMapOf<String, String?>()
-        for (c in pending) {
+        // 시각 순서대로: 잔액으로 입금을 계산할 때 앞 결제의 잔액부터 맞춰야 한다
+        for (c in pending.sortedBy { it.postedAt }) {
             val name = c.parsed.payerName
             // 알림 속 이름: 내 이름이거나, 전에 "나"로 고른 (가려진) 이름이면 나 / "상대"로 고른 이름이면 상대 이름 / 모르면 그 이름 그대로
             val role = name?.let { PaymentInbox.payerRole(ctx, it) }

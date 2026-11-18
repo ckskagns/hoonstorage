@@ -121,13 +121,16 @@ class EventRepository(private val db: FirebaseFirestore) {
             "memo" to draft.memo.trim(),
             // 하루 종일 일정은 일정 하나에 장소 하나, 시간 일정은 시간대마다 장소
             "place" to if (draft.time == null) placeMap(draft.place) else null,
-            "timeline" to if (draft.time == null) null else draft.timeline.take(TimeSlot.MAX_SLOTS).map { s ->
-                mapOf(
+            "timeline" to if (draft.time == null) null else draft.timeline.take(TimeSlot.MAX_TOTAL_SLOTS).map { s ->
+                mutableMapOf<String, Any?>(
                     "start" to s.start.format(TimeFormat),
                     "end" to s.end?.format(TimeFormat),
                     "title" to s.title.trim().take(TimeSlot.TITLE_MAX),
                     "place" to placeMap(s.place),
-                )
+                ).apply {
+                    // 여러 날 일정의 날짜별 시간대: 첫날부터 며칠째
+                    s.day?.let { put("day", it) }
+                }
             },
             // 알림 시간 (몇 분 전, 끄기 -1). 기본값이면 비워 둔다
             "remind" to draft.remind?.takeIf { it in Remind.allowed },
@@ -194,6 +197,7 @@ class EventRepository(private val db: FirebaseFirestore) {
                     end = (m["end"] as? String)?.let { runCatching { LocalTime.parse(it, TimeFormat) }.getOrNull() },
                     title = (m["title"] as? String).orEmpty(),
                     place = parsePlace(m["place"]),
+                    day = (m["day"] as? Number)?.toInt()?.takeIf { it in 0 until CalendarEvent.MAX_SPAN_DAYS.toInt() },
                 )
             },
             remind = (get("remind") as? Number)?.toInt()?.takeIf { it in Remind.allowed },

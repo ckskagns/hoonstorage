@@ -10,6 +10,7 @@ import com.uridul.app.data.Place
 import com.uridul.app.data.Repeat
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.toDraft
+import com.uridul.app.data.normalized
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -26,9 +27,8 @@ internal data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Bo
     fun finalDraft(): EventDraft = if (slot < 0) {
         draft.copy(time = null, timeline = emptyList())
     } else {
-        // 저장할 때는 시간 순으로 (대표 시작 시각·알림·정렬이 맞도록)
-        val sorted = draft.timeline.sortedBy { it.start }
-        draft.copy(time = sorted.firstOrNull()?.start, place = null, timeline = sorted)
+        // 저장할 때는 날짜·시간 순으로 (대표 시작 시각·알림·정렬이 맞도록)
+        draft.copy(time = draft.timeline.firstOrNull()?.start, place = null).normalized()
     }
 
     fun updateSlot(change: (TimeSlot) -> TimeSlot): SlotEdit {
@@ -46,16 +46,17 @@ internal data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Bo
     }
 
     fun setEnd(t: LocalTime): SlotEdit = updateSlot { s ->
-        val multiDay = draft.endDate.isAfter(draft.date)
-        // 하루 일정은 끝이 시작보다 늦어야 한다 (최소 15분)
-        s.copy(end = if (multiDay || t.isAfter(s.start)) t else clampTime(s.start.toSecondOfDay() / 60 + 15))
+        // 끝이 시작보다 늦어야 한다 (최소 15분). 예전 여러 날 일정의 한 줄만 마지막 날 시각이라 그대로
+        val legacySpan = draft.endDate.isAfter(draft.date) && s.day == null
+        s.copy(end = if (legacySpan || t.isAfter(s.start)) t else clampTime(s.start.toSecondOfDay() / 60 + 15))
     }
 
-    fun addSlot(): SlotEdit {
-        val last = draft.timeline.maxByOrNull { it.start }
-        val from = last?.end ?: last?.start?.plusHours(1) ?: LocalTime.of(19, 0)
+    /** 시간대 하나 더. [day] = 여러 날 일정에서 며칠째 (하루 일정은 null) */
+    fun addSlot(day: Int? = null): SlotEdit {
+        val last = draft.timeline.filter { it.dayIndex == (day ?: 0) }.maxByOrNull { it.start }
+        val from = last?.end ?: last?.start?.plusHours(1) ?: if (day != null) LocalTime.of(10, 0) else LocalTime.of(19, 0)
         val to = clampTime(from.toSecondOfDay() / 60 + 60)
-        val list = draft.timeline + TimeSlot(from, if (to.isAfter(from)) to else LocalTime.of(23, 59))
+        val list = draft.timeline + TimeSlot(from, if (to.isAfter(from)) to else LocalTime.of(23, 59), day = day)
         return copy(draft = draft.copy(timeline = list), slot = list.lastIndex)
     }
 
@@ -68,7 +69,8 @@ internal data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Bo
     fun toggleAllDay(allDay: Boolean): SlotEdit = if (allDay) {
         copy(draft = draft.copy(place = draft.place ?: draft.timeline.getOrNull(slot)?.place), slot = -1)
     } else {
-        val list = draft.timeline.ifEmpty { listOf(TimeSlot(LocalTime.of(19, 0), LocalTime.of(20, 0), "", draft.place)) }
+        val multiDay = draft.endDate.isAfter(draft.date)
+        val list = draft.timeline.ifEmpty { listOf(TimeSlot(LocalTime.of(19, 0), LocalTime.of(20, 0), "", draft.place, day = if (multiDay) 0 else null)) }
         copy(draft = draft.copy(timeline = list), slot = 0)
     }
 
@@ -80,7 +82,8 @@ internal data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Bo
 }
 
 internal fun editOf(event: CalendarEvent, slot: Int = 0): SlotEdit {
-    val d = event.toDraft()
+    // 예전 여러 날 일정(시작~끝 한 줄)은 첫날 시간대로
+    val d = event.toDraft().normalized()
     return SlotEdit(d, if (event.allDay) -1 else slot.coerceIn(0, (d.timeline.size - 1).coerceAtLeast(0)), false, d)
 }
 
@@ -163,7 +166,8 @@ internal object EditCodec {
                         .put("start", s.start.toString())
                         .put("end", s.end?.toString() ?: JSONObject.NULL)
                         .put("title", s.title)
-                        .put("place", placeJson(s.place)),
+                        .put("place", placeJson(s.place))
+                        .put("day", s.day ?: JSONObject.NULL),
                 )
             }
         })
@@ -191,6 +195,7 @@ internal object EditCodec {
                     end = if (s.isNull("end")) null else LocalTime.parse(s.getString("end")),
                     title = s.getString("title"),
                     place = parsePlace(s, "place"),
+                    day = if (!s.has("day") || s.isNull("day")) null else s.getInt("day"),
                 )
             },
         )

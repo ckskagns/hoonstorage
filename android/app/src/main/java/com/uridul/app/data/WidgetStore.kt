@@ -130,7 +130,8 @@ object WidgetStore {
                                     .put("title", s.title)
                                     .put("placeName", s.place?.name ?: JSONObject.NULL)
                                     .put("placeUrl", s.place?.url ?: JSONObject.NULL)
-                                    .put("placeApp", s.place?.app?.key ?: JSONObject.NULL),
+                                    .put("placeApp", s.place?.app?.key ?: JSONObject.NULL)
+                                    .put("day", s.day ?: JSONObject.NULL),
                             )
                         }
                     }),
@@ -182,6 +183,7 @@ object WidgetStore {
                                             if (s.isNull("placeUrl")) null else s.optString("placeUrl"),
                                             MapApp.from(if (s.isNull("placeApp")) null else s.optString("placeApp")),
                                         ),
+                                        day = if (!s.has("day") || s.isNull("day")) null else s.getInt("day"),
                                     )
                                 }.getOrNull()
                             }

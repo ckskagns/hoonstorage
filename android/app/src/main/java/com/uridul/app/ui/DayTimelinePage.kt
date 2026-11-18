@@ -282,6 +282,7 @@ fun DayTimelinePage(
                                     myUid,
                                 ),
                                 categoryLabel = { c -> couple.categoryLabel(c) },
+                                pageDate = date,
                                 // 편집 칸은 화면의 절반 남짓까지만 (위의 시간표가 보이도록)
                                 maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.55f).dp,
                             )

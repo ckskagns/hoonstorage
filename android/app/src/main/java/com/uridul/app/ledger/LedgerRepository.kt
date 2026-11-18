@@ -145,28 +145,53 @@ class LedgerRepository(private val db: FirebaseFirestore) {
             put("createdBy", uid)
             put("createdAt", FieldValue.serverTimestamp())
         }
-        db.runTransaction { tx ->
-            val here = tx.get(entries(coupleId).document(id))
-            val before = tx.get(entries(coupleId).document(prevId))
-            if (!here.exists() && !before.exists()) tx.set(entries(coupleId).document(id), data)
-            null
-        }.await()
         // 알림에 잔액이 있으면 그 자산의 최신 잔액으로.
         // 체크카드 결제 알림의 잔액은 카드가 빠져나가는 통장의 잔액이라, 연결된 통장이 있으면 그쪽에 적는다
         val balance = p.balance
-        val assetId = capture.assetId
-        if (balance != null && assetId != null) {
-            runCatching {
-                val target = assets(coupleId).document(assetId).get().await().getString("linkedAssetId")
-                    ?: LedgerAsset.defaults.firstOrNull { it.id == assetId }?.linkedAssetId
-                    ?: assetId
-                assets(coupleId).document(target).update(
-                    mapOf("lastBalance" to balance, "lastBalanceAt" to capture.postedAt, "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()),
-                ).await()
+        val account = if (balance != null) capture.assetId?.let { balanceAccount(coupleId, it) } else null
+        val gapId = BalanceGap.entryId(id)
+        db.runTransaction { tx ->
+            val here = tx.get(entries(coupleId).document(id))
+            val before = tx.get(entries(coupleId).document(prevId))
+            val accountDoc = account?.let { tx.get(assets(coupleId).document(it)) }
+            val gapDoc = if (accountDoc != null) tx.get(entries(coupleId).document(gapId)) else null
+            // 이미 있으면 다른 폰이 먼저 올리면서 잔액도 맞췄다
+            if (here.exists() || before.exists()) return@runTransaction null
+            tx.set(entries(coupleId).document(id), data)
+            if (balance == null || account == null || accountDoc == null || !accountDoc.exists()) return@runTransaction null
+            val lastAt = accountDoc.getLong("lastBalanceAt")
+            // 늦게 올라온 옛 알림이면 잔액을 되돌리지 않는다
+            if (lastAt != null && capture.postedAt < lastAt) return@runTransaction null
+            // 입금 알림이 오지 않으니, 지난 잔액보다 더 남아 있으면 그 사이 들어온 돈으로 적는다
+            val gap = if (lastAt != null && capture.postedAt > lastAt) {
+                BalanceGap.missingIncome(accountDoc.getLong("lastBalance"), p.kind, p.amount, balance)
+            } else {
+                null
             }
-        }
+            if (gap != null && gapDoc?.exists() != true) {
+                val income = BalanceGap.entry(gap, entry, account, uid)
+                tx.set(
+                    entries(coupleId).document(gapId),
+                    entryData(income, uid).apply {
+                        put("createdBy", uid)
+                        put("createdAt", FieldValue.serverTimestamp())
+                    },
+                )
+            }
+            tx.update(
+                assets(coupleId).document(account),
+                mapOf("lastBalance" to balance, "lastBalanceAt" to capture.postedAt, "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()),
+            )
+            null
+        }.await()
         return true
     }
+
+    /** 잔액을 적을 자산: 카드면 빠져나가는 통장 (못 읽으면 기본 자산 표, 그래도 없으면 그 자산) */
+    private suspend fun balanceAccount(coupleId: String, assetId: String): String =
+        runCatching { assets(coupleId).document(assetId).get().await().getString("linkedAssetId") }.getOrNull()
+            ?: LedgerAsset.defaults.firstOrNull { it.id == assetId }?.linkedAssetId
+            ?: assetId
 
     private suspend fun hasNearbyExpense(coupleId: String, capture: PaymentCapture): Boolean {
         val amount = capture.parsed.amount ?: return false

@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.toSeriesDates
+import com.uridul.app.data.normalized
 import androidx.lifecycle.lifecycleScope
 import com.uridul.app.data.Couple
 import com.uridul.app.data.WidgetSnapshot
@@ -150,6 +151,17 @@ class DemoActivity : ComponentActivity() {
             ev("10", -2, "영화 데이트", "19:30", partner),
             ev("11", -9, "선릉감자탕 저녁", "18:30", me).copy(place = com.uridul.app.data.Place("선릉감자탕", null, com.uridul.app.data.MapApp.NAVER)),
             ev("12", -20, "한강 산책", null, partner),
+            // 각자 일정(앞으로 있을 날): 후기를 바로 남길 수 있는지
+            ev("14", 2, "test0 집돌이 프로젝트", "13:00", me).copy(category = com.uridul.app.data.EventCategory.CREATOR),
+            // 4박5일 여행: 날짜별 타임라인과 장소
+            ev("13", 5, "test0 부산 4박5일", "10:00", me, days = 4).copy(
+                timeline = listOf(
+                    com.uridul.app.data.TimeSlot(LocalTime.of(10, 0), LocalTime.of(12, 30), "KTX", day = 0),
+                    com.uridul.app.data.TimeSlot(LocalTime.of(15, 0), LocalTime.of(16, 0), "체크인", com.uridul.app.data.Place("해운대 호텔", null, com.uridul.app.data.MapApp.NAVER), day = 0),
+                    com.uridul.app.data.TimeSlot(LocalTime.of(9, 0), LocalTime.of(11, 0), "광안리 산책", day = 1),
+                    com.uridul.app.data.TimeSlot(LocalTime.of(18, 0), null, "돼지국밥", com.uridul.app.data.Place("서면 국밥집", null, com.uridul.app.data.MapApp.KAKAO), day = 3),
+                ),
+            ),
             // 반복 일정: 매주 같은 요일 운동 (열흘 전부터)
             ev("9", -10, "같이 운동", "07:30", partner).copy(repeat = com.uridul.app.data.Repeat.WEEKLY),
         )
@@ -275,7 +287,7 @@ class DemoActivity : ComponentActivity() {
                     onOpenRequestHandled = { request = null },
                     onMonthChange = { month = it },
                     onSaveEvent = { input ->
-                        val draft = input.toSeriesDates()
+                        val draft = input.toSeriesDates().normalized()
                         if (CalendarMath.validate(draft) != null) {
                             false
                         } else {

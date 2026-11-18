@@ -43,7 +43,7 @@ fun EventCategoryPicker(
         }
         if (!selected.together) {
             Text(
-                "각자 일정은 후기·추억 모음에 나오지 않아요",
+                "각자 일정은 추억 모음에 나오지 않아요 (후기는 남길 수 있어요)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

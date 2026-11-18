@@ -106,7 +106,17 @@ fun EventDetailSheet(
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    event.slots.forEach { slot ->
+                    event.slots.forEachIndexed { i, slot ->
+                        // 여러 날 일정의 날짜별 타임라인: 날이 바뀔 때마다 "N일차 · 날짜"
+                        if (event.perDayPlan && (i == 0 || event.slots[i - 1].dayIndex != slot.dayIndex)) {
+                            Text(
+                                "${slot.dayIndex + 1}일차 · ${event.date.plusDays(slot.dayIndex.toLong()).format(KoreanMonthDay)}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = if (i == 0) 0.dp else 6.dp),
+                            )
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("♥", style = MaterialTheme.typography.labelMedium, color = strong)
                             Spacer(Modifier.width(10.dp))
@@ -141,12 +151,10 @@ fun EventDetailSheet(
                 onPick = { c -> if (c != event.color) onSave(event.toDraft().copy(color = c)) },
             )
 
-            // 지난 일정(오늘 포함)이면 후기·사진첩 (후기는 우리둘 일정만)
-            if (!event.date.isAfter(rememberToday())) {
-                HorizontalDivider()
-                if (event.category.together) ReviewStrip(event = event, couple = couple, myUid = myUid)
-                AlbumStrip(event = event, couple = couple, myUid = myUid)
-            }
+            // 후기·사진첩: 날짜가 지나지 않아도, 각자 일정이어도 바로 남길 수 있다
+            HorizontalDivider()
+            ReviewStrip(event = event, couple = couple, myUid = myUid)
+            AlbumStrip(event = event, couple = couple, myUid = myUid)
 
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f)) {

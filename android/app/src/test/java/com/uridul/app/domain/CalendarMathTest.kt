@@ -2,6 +2,7 @@ package com.uridul.app.domain
 
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.EventDraft
+import com.uridul.app.data.normalized
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -126,5 +127,47 @@ class CalendarMathTest {
         // 여러 날 일정은 시간대 하나만 (끝 시각은 마지막 날이라 시작보다 빨라도 됨)
         assertNull(CalendarMath.validate(draft(day.plusDays(2), slot("16:00", "09:00"))))
         assertNotNull(CalendarMath.validate(draft(day.plusDays(1), slot("16:00", "17:00"), slot("18:00", "19:00"))))
+    }
+
+    /** 4박5일처럼 여러 날 일정은 날마다 타임라인 (시간대마다 며칠째) */
+    @Test
+    fun perDayTimeline() {
+        val day = LocalDate.of(2026, 11, 15)
+        fun slot(d: Int, a: String, b: String?) = com.uridul.app.data.TimeSlot(LocalTime.parse(a), b?.let(LocalTime::parse), "할 일$d", day = d)
+        fun draft(end: LocalDate, vararg slots: com.uridul.app.data.TimeSlot) =
+            EventDraft(title = "test0 여행", date = day, endDate = end, time = slots.firstOrNull()?.start, memo = "", timeline = slots.toList())
+        val trip = day.plusDays(4)
+
+        assertNull(CalendarMath.validate(draft(trip, slot(0, "10:00", "12:00"), slot(0, "13:00", "14:00"), slot(2, "09:00", "10:00"), slot(4, "15:00", null))))
+        // 날짜별 시간대는 끝이 시작보다 늦어야 한다
+        assertNotNull(CalendarMath.validate(draft(trip, slot(1, "16:00", "09:00"))))
+        // 기간 밖의 날
+        assertNotNull(CalendarMath.validate(draft(trip, slot(5, "10:00", "11:00"))))
+        // 하루 12개, 모두 60개까지
+        assertNotNull(CalendarMath.validate(draft(trip, *Array(13) { slot(0, "10:00", "11:00") })))
+        assertNull(CalendarMath.validate(draft(trip, *Array(60) { slot(it % 5, "10:00", "11:00") })))
+        assertNotNull(CalendarMath.validate(draft(day.plusDays(9), *Array(61) { slot(it % 10, "10:00", "11:00") })))
+    }
+
+    @Test
+    fun normalizeTimeline() {
+        val day = LocalDate.of(2026, 11, 15)
+        fun s(a: String, b: String?, d: Int? = null) = com.uridul.app.data.TimeSlot(LocalTime.parse(a), b?.let(LocalTime::parse), day = d)
+        fun draft(end: LocalDate, vararg slots: com.uridul.app.data.TimeSlot) =
+            EventDraft(title = "t", date = day, endDate = end, time = slots.firstOrNull()?.start, memo = "", timeline = slots.toList())
+
+        // 예전 여러 날 일정 한 줄(첫날 16시 ~ 마지막 날 9시) → 첫날 시간대, 끝은 비움
+        val legacy = draft(day.plusDays(2), s("16:00", "09:00")).normalized()
+        assertEquals(listOf(s("16:00", null, 0)), legacy.timeline)
+        assertNull(CalendarMath.validate(legacy))
+        // 날짜·시간 순, 기간 밖은 버림
+        val trip = draft(day.plusDays(1), s("15:00", "16:00", 1), s("09:00", "10:00", 1), s("20:00", "21:00", 0), s("10:00", "11:00", 3)).normalized()
+        assertEquals(listOf(0 to "20:00", 1 to "09:00", 1 to "15:00"), trip.timeline.map { it.dayIndex to it.start.toString() })
+        assertEquals(LocalTime.of(20, 0), trip.time)
+        // 하루 일정이 되면 첫날 것만, 며칠째 없이
+        val single = draft(day, s("15:00", "16:00", 1), s("09:00", "10:00", 0)).normalized()
+        assertEquals(listOf(s("09:00", "10:00")), single.timeline)
+        // 하루 종일이면 타임라인 없음
+        assertEquals(emptyList<Any>(), draft(day.plusDays(1)).copy(time = null, timeline = listOf(s("09:00", null, 0))).normalized().timeline)
     }
 }

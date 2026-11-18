@@ -135,8 +135,8 @@ service cloud.firestore {
             && (!('place' in d) || d.place == null || validPlace(d.place))
             // 알림: 몇 분 전 (-1 끄기 ~ 1440 하루 전)
             && (!('remind' in d) || d.remind == null || (d.remind is int && d.remind >= -1 && d.remind <= 1440))
-            // 타임라인: 시간대 목록 (시작·끝·내용·장소), 하루 최대 12개
-            && (!('timeline' in d) || d.timeline == null || (d.timeline is list && d.timeline.size() <= 12))
+            // 타임라인: 시간대 목록 (시작·끝·내용·장소, 여러 날 일정은 며칠째). 하루 12개, 여러 날 일정은 모두 합쳐 60개
+            && (!('timeline' in d) || d.timeline == null || (d.timeline is list && d.timeline.size() <= 60))
             && d.title is string && d.title.size() > 0 && d.title.size() <= 100
             && isDay(d.date) && isDay(d.endDate) && d.endDate >= d.date
             && d.allDay is bool

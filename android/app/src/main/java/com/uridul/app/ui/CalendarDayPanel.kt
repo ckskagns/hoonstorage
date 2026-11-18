@@ -83,7 +83,7 @@ internal fun DayPanel(
                 }
             }
         } else {
-            events.forEach { EventCard(it, couple, myUid, onEdit) }
+            events.forEach { EventCard(it, couple, myUid, onEdit, day) }
         }
     }
 }
@@ -95,7 +95,7 @@ internal fun DayPanel(
  * 카드를 누르면 상세 보기(기본 캘린더처럼), 장소 태그를 누르면 그 지도 앱에서 바로 열림.
  */
 @Composable
-private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdit: (CalendarEvent) -> Unit) {
+private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdit: (CalendarEvent) -> Unit, day: LocalDate = event.date) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val mine = event.createdBy == myUid
     val color = if (mine) CoupleColors.mine else CoupleColors.partner
@@ -176,7 +176,17 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                         onOpen = { MapLinks.open(context, it) },
                     )
                 } else {
-                    event.slots.forEachIndexed { i, slot ->
+                    // 여러 날 일정을 날짜별로 짰으면 이 날 시간대만 (며칠째인지 함께)
+                    val shown = if (event.perDayPlan) event.slotsOn(day) else event.slots.withIndex().toList()
+                    if (event.perDayPlan) {
+                        val n = java.time.temporal.ChronoUnit.DAYS.between(event.date, day) + 1
+                        Text(
+                            if (shown.isEmpty()) "${n}일차 · 이 날 타임라인 없음" else "${n}일차 타임라인",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    shown.forEach { (i, slot) ->
                         TimelineLine(
                             timeText = slotTimeText(event, slot),
                             title = slot.title,
@@ -198,11 +208,9 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                     modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                 )
             }
-            // 지난 일정(오늘 포함)이면 한 줄 후기 (후기는 둘이 함께한 우리둘 일정만)
-            if (!event.date.isAfter(rememberToday())) {
-                if (event.category.together) ReviewStrip(event = event, couple = couple, myUid = myUid)
-                AlbumStrip(event = event, couple = couple, myUid = myUid)
-            }
+            // 한 줄 후기·사진첩: 날짜가 지나지 않아도, 각자 일정이어도 바로 남길 수 있다
+            ReviewStrip(event = event, couple = couple, myUid = myUid)
+            AlbumStrip(event = event, couple = couple, myUid = myUid)
         }
     }
 
@@ -258,7 +266,8 @@ private fun TimelineLine(
 internal fun slotTimeText(event: CalendarEvent, slot: com.uridul.app.data.TimeSlot): String {
     val startText = slot.start.format(KoreanTime)
     val endText = slot.end?.format(KoreanTime)
-    return if (event.isMultiDay) {
+    // 예전 여러 날 일정의 한 줄만 "첫날 시작 ~ 마지막 날 끝" (날짜별 타임라인은 그 날의 시각)
+    return if (event.isMultiDay && slot.day == null) {
         val from = "${event.date.monthValue}.${event.date.dayOfMonth} $startText"
         if (endText == null) from else "$from ~ ${event.endDate.monthValue}.${event.endDate.dayOfMonth} $endText"
     } else {

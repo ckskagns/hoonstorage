@@ -109,15 +109,20 @@ object CalendarMath {
                 "여러 날 일정은 ${CalendarEvent.MAX_SPAN_DAYS}일까지 만들 수 있어요."
             draft.repeat != null && ChronoUnit.DAYS.between(draft.date, draft.endDate) > draft.repeat.maxSpanDays ->
                 "${draft.repeat.short} 반복은 ${draft.repeat.maxSpanDays + 1}일보다 짧은 일정만 만들 수 있어요."
-            draft.time != null && draft.timeline.size > TimeSlot.MAX_SLOTS ->
-                "시간대는 ${TimeSlot.MAX_SLOTS}개까지 넣을 수 있어요."
-            draft.time != null && draft.date != draft.endDate && draft.timeline.size > 1 ->
-                "여러 날 일정은 시간대를 하나만 넣을 수 있어요."
+            // 하루에 12개 (여러 날 일정은 날마다 12개, 모두 합쳐 60개)
+            draft.time != null && draft.timeline.groupingBy { it.dayIndex }.eachCount().values.any { it > TimeSlot.MAX_SLOTS } ->
+                "시간대는 하루에 ${TimeSlot.MAX_SLOTS}개까지 넣을 수 있어요."
+            draft.time != null && draft.timeline.size > TimeSlot.MAX_TOTAL_SLOTS ->
+                "시간대는 모두 ${TimeSlot.MAX_TOTAL_SLOTS}개까지 넣을 수 있어요."
+            draft.time != null && draft.date != draft.endDate && draft.timeline.size > 1 && draft.timeline.any { it.day == null } ->
+                "여러 날 일정은 날짜별로 시간대를 넣어 주세요."
+            draft.time != null && draft.timeline.any { it.dayIndex > ChronoUnit.DAYS.between(draft.date, draft.endDate) } ->
+                "일정 기간 밖의 날에 시간대가 있어요."
             draft.timeline.any { it.title.length > TimeSlot.TITLE_MAX } ->
                 "시간대 내용은 ${TimeSlot.TITLE_MAX}자까지 쓸 수 있어요."
-            // 하루 일정은 끝나는 시각이 시작보다 늦어야 한다 (여러 날 일정은 마지막 날 시각이라 비교하지 않음)
-            draft.time != null && draft.date == draft.endDate &&
-                draft.timeline.any { s -> s.end != null && !s.end.isAfter(s.start) } ->
+            // 끝나는 시각이 시작보다 늦어야 한다 (예전 여러 날 일정의 한 줄은 마지막 날 시각이라 비교하지 않음)
+            draft.time != null &&
+                draft.timeline.any { s -> (draft.date == draft.endDate || s.day != null) && s.end != null && !s.end.isAfter(s.start) } ->
                 "끝나는 시간이 시작 시간보다 빨라요."
             else -> null
         }

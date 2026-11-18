@@ -54,6 +54,7 @@ import com.uridul.app.data.EventDraft
 import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
 import com.uridul.app.data.TimeSlot
+import com.uridul.app.data.normalized
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -89,7 +90,9 @@ fun EventEditorDialog(
     var endDate by rememberSaveable { mutableStateOf(initial.endDate.toString()) }
     var allDay by rememberSaveable { mutableStateOf(initial.time == null) }
     // 타임라인·하루 종일 장소는 화면 회전에도 남도록 글자로 저장해 둔다
-    var slotsJson by rememberSaveable { mutableStateOf(SlotCodec.encode(initial.timeline)) }
+    // 예전 여러 날 일정(시작~끝 한 줄)은 첫날 시간대로 바꿔서 보여준다
+    val startingDraft = remember(initial) { initial.normalized() }
+    var slotsJson by rememberSaveable { mutableStateOf(SlotCodec.encode(startingDraft.timeline)) }
     var dayPlaceJson by rememberSaveable { mutableStateOf(SlotCodec.encodePlace(initial.place)) }
     var memo by rememberSaveable { mutableStateOf(initial.memo) }
     /** 장소를 찾고 있는 줄 (-1: 하루 종일 줄) */
@@ -144,14 +147,19 @@ fun EventEditorDialog(
     }
 
     val save: () -> Unit = {
-        // 저장할 때는 시간대를 시간 순으로 (대표 시작 시각·알림이 맞도록)
-        val d = buildDraft()
-        val sorted = d.timeline.sortedBy { it.start }
-        if (onSave(d.copy(timeline = sorted, time = sorted.firstOrNull()?.start ?: d.time))) onDismiss()
+        // 저장할 때는 시간대를 날짜·시간 순으로 (대표 시작 시각·알림이 맞도록)
+        if (onSave(buildDraft().normalized())) onDismiss()
     }
     // 뒤로 가기·취소: 바꾼 내용이 있으면 한 번 더 묻는다 (키보드 내리려다 내용이 날아가는 것 방지)
     val requestClose: () -> Unit = {
-        if (buildDraft() != initial) confirmDiscard = true else onDismiss()
+        if (buildDraft().normalized() != startingDraft) confirmDiscard = true else onDismiss()
+    }
+    /** 이 날(며칠째)에 시간대 하나 더: 그 날 마지막 시간대 끝부터 1시간 (첫 시간대면 여러 날 일정은 오전 10시) */
+    fun addSlot(day: Int?) {
+        val last = slots.filter { it.dayIndex == (day ?: 0) }.maxByOrNull { it.start }
+        val from = last?.end ?: last?.start?.plusHours(1) ?: if (day != null) LocalTime.of(10, 0) else LocalTime.of(19, 0)
+        val to = if (from.hour >= 23) LocalTime.of(23, 59) else from.plusHours(1)
+        setSlots(slots + TimeSlot(from, to, day = day))
     }
     val findPlace: (Int) -> Unit = { index ->
         placeTarget = index
@@ -245,7 +253,7 @@ fun EventEditorDialog(
                                         // 시간대 장소를 하루 종일 장소로 옮긴다
                                         if (dayPlace == null) dayPlaceJson = SlotCodec.encodePlace(slots.firstOrNull()?.place)
                                     } else if (slots.isEmpty()) {
-                                        setSlots(listOf(TimeSlot(LocalTime.of(19, 0), LocalTime.of(20, 0), "", dayPlace)))
+                                        setSlots(listOf(TimeSlot(LocalTime.of(19, 0), LocalTime.of(20, 0), "", dayPlace, day = if (multiDay) 0 else null)))
                                     }
                                     allDay = checked
                                 },
@@ -272,12 +280,7 @@ fun EventEditorDialog(
                                 }
                             }
                         } else {
-                            Text(
-                                if (multiDay) "시간 (첫날 시작 ~ 마지막 날 끝)" else "타임라인",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            slots.forEachIndexed { i, slot ->
+                            val slotRow: @Composable (Int, TimeSlot) -> Unit = { i, slot ->
                                 SlotRow(
                                     slot = slot,
                                     removable = slots.size > 1,
@@ -290,17 +293,31 @@ fun EventEditorDialog(
                                     onRemove = { setSlots(slots.toMutableList().also { it.removeAt(i) }) },
                                 )
                             }
-                            // 하루 일정만 시간대를 여러 개 (여러 날 일정은 시작~끝 한 줄)
-                            if (!multiDay && slots.size < TimeSlot.MAX_SLOTS) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val last = slots.lastOrNull()
-                                        val from = (last?.end ?: last?.start?.plusHours(1) ?: LocalTime.of(19, 0))
-                                        val to = if (from.hour >= 23) LocalTime.of(23, 59) else from.plusHours(1)
-                                        setSlots(slots + TimeSlot(from, to))
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text("+ 시간대 추가") }
+                            if (multiDay) {
+                                // 여러 날 일정(여행 등): 날마다 따로 타임라인과 장소
+                                val span = java.time.temporal.ChronoUnit.DAYS.between(start, end).toInt()
+                                Text("날짜별 타임라인", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                for (day in 0..span) {
+                                    val daySlots = slots.withIndex().filter { it.value.dayIndex == day }.sortedBy { it.value.start }
+                                    Text(
+                                        "${day + 1}일차 · ${start.plusDays(day.toLong()).format(KoreanMonthDay)}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 4.dp),
+                                    )
+                                    daySlots.forEach { (i, slot) -> slotRow(i, slot) }
+                                    if (daySlots.size < TimeSlot.MAX_SLOTS && slots.size < TimeSlot.MAX_TOTAL_SLOTS) {
+                                        OutlinedButton(onClick = { addSlot(day) }, modifier = Modifier.fillMaxWidth()) {
+                                            Text("+ ${day + 1}일차 시간대 추가")
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text("타임라인", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                                slots.forEachIndexed { i, slot -> slotRow(i, slot) }
+                                if (slots.size < TimeSlot.MAX_SLOTS) {
+                                    OutlinedButton(onClick = { addSlot(null) }, modifier = Modifier.fillMaxWidth()) { Text("+ 시간대 추가") }
+                                }
                             }
                         }
 
@@ -386,8 +403,15 @@ fun EventEditorDialog(
             onConfirm = {
                 val newEnd = maxOf(it, start)
                 endDate = newEnd.toString()
-                // 여러 날 일정이 되면 시간대는 한 줄만 남긴다
-                if (newEnd.isAfter(start) && slots.size > 1) setSlots(slots.take(1))
+                // 기간이 바뀌면 시간대를 그 기간에 맞춘다 (여러 날이 되면 지금 시간대는 첫날로, 줄면 빠진 날의 시간대는 버린다)
+                val span = java.time.temporal.ChronoUnit.DAYS.between(start, newEnd).toInt()
+                setSlots(
+                    if (span == 0) {
+                        slots.filter { it.dayIndex == 0 }.map { it.copy(day = null) }
+                    } else {
+                        slots.map { s -> s.copy(day = s.dayIndex) }.filter { s -> s.dayIndex <= span }
+                    }.ifEmpty { slots.take(1).map { it.copy(day = if (span == 0) null else 0) } },
+                )
                 picker = null
             },
         )
@@ -526,7 +550,8 @@ private object SlotCodec {
                     .put("start", s.start.toString())
                     .put("end", s.end?.toString() ?: JSONObject.NULL)
                     .put("title", s.title)
-                    .put("place", encodePlace(s.place).ifEmpty { JSONObject.NULL }),
+                    .put("place", encodePlace(s.place).ifEmpty { JSONObject.NULL })
+                    .put("day", s.day ?: JSONObject.NULL),
             )
         }
     }.toString()
@@ -540,6 +565,7 @@ private object SlotCodec {
                 end = if (o.isNull("end")) null else LocalTime.parse(o.getString("end")),
                 title = o.optString("title"),
                 place = if (o.isNull("place")) null else decodePlace(o.getString("place")),
+                day = if (!o.has("day") || o.isNull("day")) null else o.getInt("day"),
             )
         }
     }.getOrDefault(emptyList())

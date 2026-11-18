@@ -36,10 +36,10 @@ object DayTimeline {
         events.filter { it.occursOn(day) && (it.allDay || it.isMultiDay) }
             .sortedWith(compareBy({ it.date }, { it.title }))
 
-    /** 시간표에 그릴 블록: 그날 하루 일정의 시간대들 */
+    /** 시간표에 그릴 블록: 그날 하루 일정의 시간대들 + 날짜별로 짠 여러 날 일정의 그 날 시간대 */
     fun blocks(events: List<CalendarEvent>, day: LocalDate): List<Block> =
-        events.filter { it.occursOn(day) && !it.allDay && !it.isMultiDay }
-            .flatMap { e -> e.slots.mapIndexed { i, s -> block(e, i, s.start.toSecondOfDay() / 60, s.end?.let { it.toSecondOfDay() / 60 }, s.title, s.place) } }
+        events.filter { it.occursOn(day) && !it.allDay && (!it.isMultiDay || it.perDayPlan) }
+            .flatMap { e -> e.slotsOn(day).map { (i, s) -> block(e, i, s.start.toSecondOfDay() / 60, s.end?.let { it.toSecondOfDay() / 60 }, s.title, s.place) } }
             .sortedWith(compareBy({ it.startMin }, { it.endMin }))
 
     fun block(event: CalendarEvent, slotIndex: Int, start: Int, end: Int?, slotTitle: String, place: Place?): Block {

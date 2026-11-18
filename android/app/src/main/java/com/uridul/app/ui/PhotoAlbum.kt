@@ -74,7 +74,7 @@ fun AlbumStrip(
     thumbSize: androidx.compose.ui.unit.Dp = 64.dp,
     modifier: Modifier = Modifier,
     /** 크게 보기에서 후기 줄을 보일지 (각자 일정·후기 창 안이면 false) */
-    allowReview: Boolean = event.category.together,
+    allowReview: Boolean = true,
 ) {
     val hooks = LocalPhotos.current
     val photos by remember(event.id, event.date) { hooks.album(event) }.collectAsState(initial = emptyList())

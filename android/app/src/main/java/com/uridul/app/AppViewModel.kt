@@ -17,6 +17,7 @@ import com.uridul.app.data.DeletedEvents
 import com.uridul.app.data.UndoItem
 import com.uridul.app.data.DateReview
 import com.uridul.app.data.ReviewEntry
+import com.uridul.app.data.normalized
 import com.uridul.app.domain.Memories
 import com.uridul.app.data.toSeriesDates
 import com.uridul.app.domain.Recurrence
@@ -186,7 +187,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveEvent(input: EventDraft): Boolean {
         // 반복 일정의 어느 날을 고쳤으면 원래 첫 날 기준으로 저장 (반복 전체가 함께 바뀐다)
-        val draft = input.toSeriesDates()
+        // 타임라인 정리: 하루 일정은 시간 순, 여러 날 일정은 날짜별로
+        val draft = input.toSeriesDates().normalized()
         CalendarMath.validate(draft)?.let {
             _message.value = it
             return false

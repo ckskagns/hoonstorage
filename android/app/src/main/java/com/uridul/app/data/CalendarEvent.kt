@@ -5,18 +5,30 @@ import java.time.LocalTime
 
 /**
  * 타임라인 한 줄: 시작~끝 시간, 내용(선택), 장소(선택).
- * 여러 날 일정이면 한 줄만 쓰고, 시작은 첫날·끝은 마지막 날의 시각이다.
+ *
+ * 여러 날 일정(예: 4박5일 여행)은 날마다 따로 타임라인을 둔다: [day] = 첫날부터 며칠째(0 = 첫날).
+ * 예전 여러 날 일정은 [day] 없이 한 줄만 있고, 시작은 첫날·끝은 마지막 날의 시각이다
+ * (고칠 때 첫날 시간대로 바꾼다: [EventDraft.normalized]).
  */
 data class TimeSlot(
     val start: LocalTime,
     val end: LocalTime? = null,
     val title: String = "",
     val place: Place? = null,
+    /** 여러 날 일정에서 첫날부터 며칠째 (0 = 첫날). 하루 일정·예전 여러 날 일정은 null */
+    val day: Int? = null,
 ) {
+    /** 며칠째 (하루 일정은 0) */
+    val dayIndex: Int get() = day ?: 0
+
     companion object {
         const val TITLE_MAX = 100
         /** 하루에 넣을 수 있는 시간대 수 */
         const val MAX_SLOTS = 12
+        /** 여러 날 일정 전체에 넣을 수 있는 시간대 수 (서버 규칙과 같게) */
+        const val MAX_TOTAL_SLOTS = 60
+        /** 날짜·시간 순서 */
+        val ORDER: Comparator<TimeSlot> = compareBy({ it.dayIndex }, { it.start })
     }
 }
 
@@ -71,6 +83,23 @@ data class CalendarEvent(
 
     fun occursOn(day: LocalDate): Boolean = !day.isBefore(date) && !day.isAfter(endDate)
 
+    /** 여러 날 일정을 날마다 따로 짠 타임라인인지 (예전 여러 날 일정은 시작~끝 한 줄) */
+    val perDayPlan: Boolean get() = isMultiDay && time != null && timeline.any { it.day != null }
+
+    /**
+     * 그 날의 시간대 (번호 = [slots] 안의 위치).
+     * 하루 일정은 모두, 날짜별 타임라인이면 그 날 것만, 예전 여러 날 일정은 없음(하루 종일 칸에 보인다).
+     */
+    fun slotsOn(day: LocalDate): List<IndexedValue<TimeSlot>> = when {
+        !occursOn(day) -> emptyList()
+        !isMultiDay -> slots.withIndex().toList()
+        !perDayPlan -> emptyList()
+        else -> {
+            val index = java.time.temporal.ChronoUnit.DAYS.between(date, day).toInt()
+            slots.withIndex().filter { it.value.dayIndex == index }
+        }
+    }
+
     companion object {
         const val TITLE_MAX = 100
         const val MEMO_MAX = 1000
@@ -99,6 +128,26 @@ data class EventDraft(
     /** 분류 (기본 우리둘) */
     val category: EventCategory = EventCategory.US,
 )
+
+/**
+ * 저장할 모양으로 타임라인 정리.
+ *  - 하루 일정: 며칠째 칸을 지우고 시간 순 (다른 날 시간대는 버린다)
+ *  - 여러 날 일정: 시간대마다 며칠째를 두고, 기간 밖의 날은 버린다. 예전 한 줄(며칠째 없음)은 첫날 시간대로
+ *    (끝 시각이 마지막 날 시각이라 시작보다 빠르면 끝을 비운다)
+ *  - 하루 종일: 타임라인 없음
+ */
+fun EventDraft.normalized(): EventDraft {
+    if (time == null) return copy(timeline = emptyList())
+    val span = java.time.temporal.ChronoUnit.DAYS.between(date, endDate).toInt()
+    val list = if (span <= 0) {
+        timeline.filter { it.dayIndex == 0 }.map { it.copy(day = null) }.sortedBy { it.start }
+    } else {
+        timeline.map { s -> if (s.day == null) s.copy(day = 0, end = s.end?.takeIf { it.isAfter(s.start) }) else s }
+            .filter { it.dayIndex in 0..span }
+            .sortedWith(TimeSlot.ORDER)
+    }
+    return copy(timeline = list, time = list.firstOrNull()?.start ?: time)
+}
 
 /** 저장된 일정을 수정용 입력값으로 (펼친 반복 일정이면 그 날 기준 + 원래 첫 날을 함께 기억) */
 fun CalendarEvent.toDraft(): EventDraft =
@@ -134,7 +183,7 @@ enum class EventCategory(val key: String) {
     CREATOR("creator"),
     PARTNER("partner");
 
-    /** 둘이 함께하는 일정만 후기·추억에 나온다 */
+    /** 둘이 함께하는 일정만 추억 모음에 나온다 (후기·사진첩은 분류와 상관없이 남길 수 있다) */
     val together: Boolean get() = this == US
 
     companion object {

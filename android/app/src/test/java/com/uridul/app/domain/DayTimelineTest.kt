@@ -31,6 +31,25 @@ class DayTimelineTest {
         assertEquals(listOf("trip", "allday").sorted(), DayTimeline.allDayEvents(events, day).map { it.id }.sorted())
     }
 
+    /** 날짜별로 짠 여러 날 일정은 그 날 시간대가 시간표에 (첫날 시간대는 둘째 날에 안 보임) */
+    @Test
+    fun perDayTripBlocks() {
+        val trip = event(
+            "trip",
+            TimeSlot(t("10:00"), t("12:00"), "체크인", day = 0),
+            TimeSlot(t("09:00"), t("10:00"), "아침", day = 1),
+            TimeSlot(t("14:00"), t("15:00"), "카페", day = 1),
+            end = day.plusDays(2),
+        )
+        assertEquals(listOf("trip#0"), DayTimeline.blocks(listOf(trip), day).map { it.key })
+        assertEquals(listOf("trip#1", "trip#2"), DayTimeline.blocks(listOf(trip), day.plusDays(1)).map { it.key })
+        assertEquals(emptyList<String>(), DayTimeline.blocks(listOf(trip), day.plusDays(2)).map { it.key })
+        assertEquals("trip · 아침", DayTimeline.blocks(listOf(trip), day.plusDays(1))[0].title)
+        // 여행 전체는 위쪽 하루 종일 칸에도 그대로
+        assertEquals(listOf("trip"), DayTimeline.allDayEvents(listOf(trip), day.plusDays(1)).map { it.id })
+        assertEquals(listOf(1, 2), trip.slotsOn(day.plusDays(1)).map { it.index })
+    }
+
     @Test
     fun overlappingBlocksGoSideBySide() {
         val events = listOf(

@@ -84,10 +84,15 @@ internal fun EditPanel(
     defaultColor: com.uridul.app.data.EventColor = com.uridul.app.data.EventColor.PINK,
     /** 분류 이름 ("우리둘", "후이 일정", "나나 일정") */
     categoryLabel: (com.uridul.app.data.EventCategory) -> String = { it.key },
+    /** 이 하루 페이지의 날 (여러 날 일정은 이 날의 타임라인만 고친다) */
+    pageDate: LocalDate = edit.draft.date,
 ) {
     val d = edit.draft
     val allDay = edit.slot < 0
     val multiDay = d.endDate.isAfter(d.date)
+    val span = java.time.temporal.ChronoUnit.DAYS.between(d.date, d.endDate).toInt()
+    /** 여러 날 일정에서 이 페이지가 며칠째인지 (하루 일정은 null) */
+    val dayIndex = if (multiDay) java.time.temporal.ChronoUnit.DAYS.between(d.date, pageDate).toInt().coerceIn(0, span) else null
     Surface(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -145,10 +150,19 @@ internal fun EditPanel(
                     onRemoveTable = null,
                 )
             } else {
+                if (dayIndex != null) {
+                    Text(
+                        "${dayIndex + 1}일차 · ${d.date.plusDays(dayIndex.toLong()).format(KoreanMonthDay)} 타임라인",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 d.timeline.forEachIndexed { i, slot ->
+                    // 여러 날 일정은 이 날 시간대만
+                    if (dayIndex != null && slot.dayIndex != dayIndex) return@forEachIndexed
                     SlotTable(
-                        startLabel = if (multiDay) "시작(첫날)" else "시작",
-                        endLabel = if (multiDay) "끝(마지막 날)" else "끝",
+                        startLabel = "시작",
+                        endLabel = "끝",
                         start = slot.start,
                         end = slot.end ?: slot.start.plusMinutes(60),
                         enabled = true,
@@ -161,10 +175,11 @@ internal fun EditPanel(
                         onRemoveTable = if (d.timeline.size > 1) ({ onChange(edit.copy(slot = i).removeSlot()) }) else null,
                     )
                 }
-                // 표 밑에 다시 [+ 일정 추가] (여러 날 일정은 시작~끝 하나만)
-                if (!multiDay && d.timeline.size < TimeSlot.MAX_SLOTS) {
-                    OutlinedButton(onClick = { onChange(edit.addSlot()) }, modifier = Modifier.fillMaxWidth()) {
-                        Text("+ 일정 추가")
+                // 표 밑에 다시 [+ 일정 추가] (여러 날 일정은 이 날에)
+                val todayCount = d.timeline.count { dayIndex == null || it.dayIndex == dayIndex }
+                if (todayCount < TimeSlot.MAX_SLOTS && d.timeline.size < TimeSlot.MAX_TOTAL_SLOTS) {
+                    OutlinedButton(onClick = { onChange(edit.addSlot(dayIndex)) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (dayIndex != null) "+ ${dayIndex + 1}일차 일정 추가" else "+ 일정 추가")
                     }
                 }
             }
