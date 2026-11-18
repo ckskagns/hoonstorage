@@ -170,4 +170,21 @@ class CalendarMathTest {
         // 하루 종일이면 타임라인 없음
         assertEquals(emptyList<Any>(), draft(day.plusDays(1)).copy(time = null, timeline = listOf(s("09:00", null, 0))).normalized().timeline)
     }
+
+    @Test
+    fun nextSlotAndDayHelpers() {
+        val day = LocalDate.of(2026, 11, 23)
+        fun s(a: String, b: String?, d: Int? = null) = com.uridul.app.data.TimeSlot(LocalTime.parse(a), b?.let(LocalTime::parse), day = d)
+        // 하루 일정: 첫 시간대는 저녁 7시, 다음은 마지막 끝부터 1시간
+        assertEquals(s("19:00", "20:00"), com.uridul.app.data.TimeSlot.next(emptyList(), null))
+        assertEquals(s("20:30", "21:30"), com.uridul.app.data.TimeSlot.next(listOf(s("19:00", "20:30")), null))
+        // 여러 날 일정: 그 날 첫 시간대는 오전 10시, 다른 날 시간대는 보지 않음
+        assertEquals(s("10:00", "11:00", 2), com.uridul.app.data.TimeSlot.next(listOf(s("19:00", "20:00", 0)), 2))
+        assertEquals(s("16:00", "17:00", 0), com.uridul.app.data.TimeSlot.next(listOf(s("15:00", "16:00", 0), s("09:00", "10:00", 1)), 0))
+        // 끝이 없으면 시작 1시간 뒤부터, 자정을 넘으면 밤 11:59 까지
+        assertEquals(s("21:00", "22:00"), com.uridul.app.data.TimeSlot.next(listOf(s("20:00", null)), null))
+        assertEquals(s("23:30", "23:59"), com.uridul.app.data.TimeSlot.next(listOf(s("22:00", "23:30")), null))
+        assertEquals(4, com.uridul.app.data.daysBetween(day, day.plusDays(4)))
+        assertEquals("2일차 · 11월 24일 (화)", com.uridul.app.ui.tripDayLabel(day, 1))
+    }
 }

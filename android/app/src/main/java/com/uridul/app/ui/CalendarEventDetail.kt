@@ -110,7 +110,7 @@ fun EventDetailSheet(
                         // 여러 날 일정의 날짜별 타임라인: 날이 바뀔 때마다 "N일차 · 날짜"
                         if (event.perDayPlan && (i == 0 || event.slots[i - 1].dayIndex != slot.dayIndex)) {
                             Text(
-                                "${slot.dayIndex + 1}일차 · ${event.date.plusDays(slot.dayIndex.toLong()).format(KoreanMonthDay)}",
+                                tripDayLabel(event.date, slot.dayIndex),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,

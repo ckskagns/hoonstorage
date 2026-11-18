@@ -179,7 +179,7 @@ private fun EventCard(event: CalendarEvent, couple: Couple, myUid: String, onEdi
                     // 여러 날 일정을 날짜별로 짰으면 이 날 시간대만 (며칠째인지 함께)
                     val shown = if (event.perDayPlan) event.slotsOn(day) else event.slots.withIndex().toList()
                     if (event.perDayPlan) {
-                        val n = java.time.temporal.ChronoUnit.DAYS.between(event.date, day) + 1
+                        val n = com.uridul.app.data.daysBetween(event.date, day) + 1
                         Text(
                             if (shown.isEmpty()) "${n}일차 · 이 날 타임라인 없음" else "${n}일차 타임라인",
                             style = MaterialTheme.typography.labelMedium,

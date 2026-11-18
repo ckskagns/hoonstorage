@@ -73,6 +73,9 @@ fun FullScreenDialogBars() {
 val KoreanTime: DateTimeFormatter = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
 val KoreanMonthDay: DateTimeFormatter = DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN)
 
+/** 여러 날 일정의 그 날: "2일차 · 11월 24일 (화)" ([index] 0 = 첫날) */
+fun tripDayLabel(start: java.time.LocalDate, index: Int): String = "${index + 1}일차 · ${start.plusDays(index.toLong()).format(KoreanMonthDay)}"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StartDatePickerDialog(

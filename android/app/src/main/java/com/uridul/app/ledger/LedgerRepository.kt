@@ -150,7 +150,7 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         val balance = p.balance
         val account = if (balance != null) capture.assetId?.let { balanceAccount(coupleId, it) } else null
         val gapId = BalanceGap.entryId(id)
-        db.runTransaction { tx ->
+        val withBalance = runCatching { db.runTransaction { tx ->
             val here = tx.get(entries(coupleId).document(id))
             val before = tx.get(entries(coupleId).document(prevId))
             val accountDoc = account?.let { tx.get(assets(coupleId).document(it)) }
@@ -183,15 +183,27 @@ class LedgerRepository(private val db: FirebaseFirestore) {
                 mapOf("lastBalance" to balance, "lastBalanceAt" to capture.postedAt, "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()),
             )
             null
-        }.await()
+        }.await() }
+        // 잔액 적기가 막혀도(자산 문서 문제 등) 결제 기록은 올린다: 예전처럼 거래만
+        if (withBalance.isFailure) {
+            db.runTransaction { tx ->
+                val here = tx.get(entries(coupleId).document(id))
+                val before = tx.get(entries(coupleId).document(prevId))
+                if (!here.exists() && !before.exists()) tx.set(entries(coupleId).document(id), data)
+                null
+            }.await()
+        }
         return true
     }
 
-    /** 잔액을 적을 자산: 카드면 빠져나가는 통장 (못 읽으면 기본 자산 표, 그래도 없으면 그 자산) */
-    private suspend fun balanceAccount(coupleId: String, assetId: String): String =
-        runCatching { assets(coupleId).document(assetId).get().await().getString("linkedAssetId") }.getOrNull()
-            ?: LedgerAsset.defaults.firstOrNull { it.id == assetId }?.linkedAssetId
-            ?: assetId
+    /**
+     * 잔액을 적을 자산: 카드면 빠져나가는 통장.
+     * 기본 자산(데이트 통장·모임카드·현금)은 연결이 정해져 있어 서버를 읽지 않는다 (결제 알림마다 읽기 1번 줄임).
+     */
+    private suspend fun balanceAccount(coupleId: String, assetId: String): String {
+        LedgerAsset.defaults.firstOrNull { it.id == assetId }?.let { return it.linkedAssetId ?: it.id }
+        return runCatching { assets(coupleId).document(assetId).get().await().getString("linkedAssetId") }.getOrNull() ?: assetId
+    }
 
     private suspend fun hasNearbyExpense(coupleId: String, capture: PaymentCapture): Boolean {
         val amount = capture.parsed.amount ?: return false

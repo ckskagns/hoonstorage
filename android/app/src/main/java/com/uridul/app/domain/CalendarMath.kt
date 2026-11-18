@@ -116,7 +116,7 @@ object CalendarMath {
                 "시간대는 모두 ${TimeSlot.MAX_TOTAL_SLOTS}개까지 넣을 수 있어요."
             draft.time != null && draft.date != draft.endDate && draft.timeline.size > 1 && draft.timeline.any { it.day == null } ->
                 "여러 날 일정은 날짜별로 시간대를 넣어 주세요."
-            draft.time != null && draft.timeline.any { it.dayIndex > ChronoUnit.DAYS.between(draft.date, draft.endDate) } ->
+            draft.time != null && draft.timeline.any { it.dayIndex > com.uridul.app.data.daysBetween(draft.date, draft.endDate) } ->
                 "일정 기간 밖의 날에 시간대가 있어요."
             draft.timeline.any { it.title.length > TimeSlot.TITLE_MAX } ->
                 "시간대 내용은 ${TimeSlot.TITLE_MAX}자까지 쓸 수 있어요."

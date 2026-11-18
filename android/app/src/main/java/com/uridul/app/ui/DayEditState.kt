@@ -1,8 +1,5 @@
 package com.uridul.app.ui
 
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.EventDraft
 import com.uridul.app.data.MapApp
@@ -53,10 +50,7 @@ internal data class SlotEdit(val draft: EventDraft, val slot: Int, val isNew: Bo
 
     /** 시간대 하나 더. [day] = 여러 날 일정에서 며칠째 (하루 일정은 null) */
     fun addSlot(day: Int? = null): SlotEdit {
-        val last = draft.timeline.filter { it.dayIndex == (day ?: 0) }.maxByOrNull { it.start }
-        val from = last?.end ?: last?.start?.plusHours(1) ?: if (day != null) LocalTime.of(10, 0) else LocalTime.of(19, 0)
-        val to = clampTime(from.toSecondOfDay() / 60 + 60)
-        val list = draft.timeline + TimeSlot(from, if (to.isAfter(from)) to else LocalTime.of(23, 59), day = day)
+        val list = draft.timeline + TimeSlot.next(draft.timeline, day)
         return copy(draft = draft.copy(timeline = list), slot = list.lastIndex)
     }
 
@@ -118,6 +112,41 @@ internal fun EventDraft.toPreview(createdBy: String): CalendarEvent = CalendarEv
     category = category,
 )
 
+/** 편집 창 상태 저장용: 시간대·장소 ↔ JSON (하루 페이지 편집 칸과 일정 편집 창이 함께 쓴다) */
+internal object SlotJson {
+    fun place(p: Place?): Any = p?.let {
+        JSONObject().put("name", it.name).put("url", it.url ?: JSONObject.NULL).put("app", it.app?.key ?: JSONObject.NULL)
+    } ?: JSONObject.NULL
+
+    fun parsePlace(o: JSONObject, key: String): Place? = if (!o.has(key) || o.isNull(key)) null else o.getJSONObject(key).let {
+        Place(it.getString("name"), if (it.isNull("url")) null else it.getString("url"), MapApp.from(if (it.isNull("app")) null else it.getString("app")))
+    }
+
+    fun slots(list: List<TimeSlot>): JSONArray = JSONArray().also { arr ->
+        list.forEach { s ->
+            arr.put(
+                JSONObject()
+                    .put("start", s.start.toString())
+                    .put("end", s.end?.toString() ?: JSONObject.NULL)
+                    .put("title", s.title)
+                    .put("place", place(s.place))
+                    .put("day", s.day ?: JSONObject.NULL),
+            )
+        }
+    }
+
+    fun parseSlots(arr: JSONArray): List<TimeSlot> = (0 until arr.length()).map { i ->
+        val s = arr.getJSONObject(i)
+        TimeSlot(
+            start = LocalTime.parse(s.getString("start")),
+            end = if (s.isNull("end")) null else LocalTime.parse(s.getString("end")),
+            title = s.optString("title"),
+            place = parsePlace(s, "place"),
+            day = if (!s.has("day") || s.isNull("day")) null else s.getInt("day"),
+        )
+    }
+}
+
 /** 편집 상태 저장용 JSON */
 internal object EditCodec {
     fun encode(e: SlotEdit): String = JSONObject()
@@ -137,14 +166,6 @@ internal object EditCodec {
         )
     }.getOrNull()
 
-    private fun placeJson(p: Place?): Any = p?.let {
-        JSONObject().put("name", it.name).put("url", it.url ?: JSONObject.NULL).put("app", it.app?.key ?: JSONObject.NULL)
-    } ?: JSONObject.NULL
-
-    private fun parsePlace(o: JSONObject, key: String): Place? = if (o.isNull(key)) null else o.getJSONObject(key).let {
-        Place(it.getString("name"), if (it.isNull("url")) null else it.getString("url"), MapApp.from(if (it.isNull("app")) null else it.getString("app")))
-    }
-
     private fun draftJson(d: EventDraft): JSONObject = JSONObject()
         .put("id", d.id ?: JSONObject.NULL)
         .put("title", d.title)
@@ -152,25 +173,14 @@ internal object EditCodec {
         .put("endDate", d.endDate.toString())
         .put("time", d.time?.toString() ?: JSONObject.NULL)
         .put("memo", d.memo)
-        .put("place", placeJson(d.place))
+        .put("place", SlotJson.place(d.place))
         .put("remind", d.remind ?: JSONObject.NULL)
         .put("repeat", d.repeat?.key ?: JSONObject.NULL)
         .put("color", d.color?.key ?: JSONObject.NULL)
         .put("category", d.category.key)
         .put("seriesStart", d.seriesStart?.toString() ?: JSONObject.NULL)
         .put("occurrence", d.occurrence?.toString() ?: JSONObject.NULL)
-        .put("timeline", JSONArray().also { arr ->
-            d.timeline.forEach { s ->
-                arr.put(
-                    JSONObject()
-                        .put("start", s.start.toString())
-                        .put("end", s.end?.toString() ?: JSONObject.NULL)
-                        .put("title", s.title)
-                        .put("place", placeJson(s.place))
-                        .put("day", s.day ?: JSONObject.NULL),
-                )
-            }
-        })
+        .put("timeline", SlotJson.slots(d.timeline))
 
     private fun parseDraft(o: JSONObject): EventDraft {
         val arr = o.getJSONArray("timeline")
@@ -181,23 +191,14 @@ internal object EditCodec {
             endDate = LocalDate.parse(o.getString("endDate")),
             time = if (o.isNull("time")) null else LocalTime.parse(o.getString("time")),
             memo = o.getString("memo"),
-            place = parsePlace(o, "place"),
+            place = SlotJson.parsePlace(o, "place"),
             remind = if (o.has("remind") && !o.isNull("remind")) o.getInt("remind") else null,
             repeat = Repeat.from(if (!o.has("repeat") || o.isNull("repeat")) null else o.getString("repeat")),
             color = com.uridul.app.data.EventColor.fromOrNull(if (!o.has("color") || o.isNull("color")) null else o.getString("color")),
             category = com.uridul.app.data.EventCategory.from(if (!o.has("category") || o.isNull("category")) null else o.getString("category")),
             seriesStart = if (!o.has("seriesStart") || o.isNull("seriesStart")) null else LocalDate.parse(o.getString("seriesStart")),
             occurrence = if (!o.has("occurrence") || o.isNull("occurrence")) null else LocalDate.parse(o.getString("occurrence")),
-            timeline = (0 until arr.length()).map { i ->
-                val s = arr.getJSONObject(i)
-                TimeSlot(
-                    start = LocalTime.parse(s.getString("start")),
-                    end = if (s.isNull("end")) null else LocalTime.parse(s.getString("end")),
-                    title = s.getString("title"),
-                    place = parsePlace(s, "place"),
-                    day = if (!s.has("day") || s.isNull("day")) null else s.getInt("day"),
-                )
-            },
+            timeline = SlotJson.parseSlots(arr),
         )
     }
 }

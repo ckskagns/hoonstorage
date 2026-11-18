@@ -51,6 +51,7 @@ import com.uridul.app.data.Place
 import com.uridul.app.data.Remind
 import com.uridul.app.data.Repeat
 import com.uridul.app.data.TimeSlot
+import com.uridul.app.data.daysBetween
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -90,9 +91,8 @@ internal fun EditPanel(
     val d = edit.draft
     val allDay = edit.slot < 0
     val multiDay = d.endDate.isAfter(d.date)
-    val span = java.time.temporal.ChronoUnit.DAYS.between(d.date, d.endDate).toInt()
     /** 여러 날 일정에서 이 페이지가 며칠째인지 (하루 일정은 null) */
-    val dayIndex = if (multiDay) java.time.temporal.ChronoUnit.DAYS.between(d.date, pageDate).toInt().coerceIn(0, span) else null
+    val dayIndex = if (multiDay) daysBetween(d.date, pageDate).coerceIn(0, daysBetween(d.date, d.endDate)) else null
     Surface(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -152,7 +152,7 @@ internal fun EditPanel(
             } else {
                 if (dayIndex != null) {
                     Text(
-                        "${dayIndex + 1}일차 · ${d.date.plusDays(dayIndex.toLong()).format(KoreanMonthDay)} 타임라인",
+                        "${tripDayLabel(d.date, dayIndex)} 타임라인",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )

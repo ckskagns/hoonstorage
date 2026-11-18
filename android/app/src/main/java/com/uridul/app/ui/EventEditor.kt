@@ -51,10 +51,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.EventDraft
-import com.uridul.app.data.MapApp
 import com.uridul.app.data.Place
 import com.uridul.app.data.TimeSlot
 import com.uridul.app.data.normalized
+import com.uridul.app.data.daysBetween
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -102,8 +102,9 @@ fun EventEditorDialog(
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
 
-    val slots = SlotCodec.decode(slotsJson)
-    val dayPlace = SlotCodec.decodePlace(dayPlaceJson)
+    // 글자 → 시간대: 바뀔 때만 다시 푼다 (입력할 때마다 다시 그려져도 매번 풀지 않게)
+    val slots = remember(slotsJson) { SlotCodec.decode(slotsJson) }
+    val dayPlace = remember(dayPlaceJson) { SlotCodec.decodePlace(dayPlaceJson) }
     val start = LocalDate.parse(date)
     val end = LocalDate.parse(endDate)
     val multiDay = end.isAfter(start)
@@ -154,13 +155,8 @@ fun EventEditorDialog(
     val requestClose: () -> Unit = {
         if (buildDraft().normalized() != startingDraft) confirmDiscard = true else onDismiss()
     }
-    /** 이 날(며칠째)에 시간대 하나 더: 그 날 마지막 시간대 끝부터 1시간 (첫 시간대면 여러 날 일정은 오전 10시) */
-    fun addSlot(day: Int?) {
-        val last = slots.filter { it.dayIndex == (day ?: 0) }.maxByOrNull { it.start }
-        val from = last?.end ?: last?.start?.plusHours(1) ?: if (day != null) LocalTime.of(10, 0) else LocalTime.of(19, 0)
-        val to = if (from.hour >= 23) LocalTime.of(23, 59) else from.plusHours(1)
-        setSlots(slots + TimeSlot(from, to, day = day))
-    }
+    /** 이 날(며칠째)에 시간대 하나 더 */
+    fun addSlot(day: Int?) = setSlots(slots + TimeSlot.next(slots, day))
     val findPlace: (Int) -> Unit = { index ->
         placeTarget = index
         choosingMap = true
@@ -295,12 +291,12 @@ fun EventEditorDialog(
                             }
                             if (multiDay) {
                                 // 여러 날 일정(여행 등): 날마다 따로 타임라인과 장소
-                                val span = java.time.temporal.ChronoUnit.DAYS.between(start, end).toInt()
+                                val span = daysBetween(start, end)
                                 Text("날짜별 타임라인", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                                 for (day in 0..span) {
                                     val daySlots = slots.withIndex().filter { it.value.dayIndex == day }.sortedBy { it.value.start }
                                     Text(
-                                        "${day + 1}일차 · ${start.plusDays(day.toLong()).format(KoreanMonthDay)}",
+                                        tripDayLabel(start, day),
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(top = 4.dp),
@@ -404,7 +400,7 @@ fun EventEditorDialog(
                 val newEnd = maxOf(it, start)
                 endDate = newEnd.toString()
                 // 기간이 바뀌면 시간대를 그 기간에 맞춘다 (여러 날이 되면 지금 시간대는 첫날로, 줄면 빠진 날의 시간대는 버린다)
-                val span = java.time.temporal.ChronoUnit.DAYS.between(start, newEnd).toInt()
+                val span = daysBetween(start, newEnd)
                 setSlots(
                     if (span == 0) {
                         slots.filter { it.dayIndex == 0 }.map { it.copy(day = null) }
@@ -541,45 +537,15 @@ internal fun TimePickerDialog(
     )
 }
 
-/** 입력 창 상태 저장용: 타임라인·장소를 글자(JSON)로 */
+/** 입력 창 상태 저장용: 타임라인·장소를 글자(JSON)로 (모양은 하루 페이지 편집 칸과 같은 [SlotJson]) */
 private object SlotCodec {
-    fun encode(slots: List<TimeSlot>): String = JSONArray().also { arr ->
-        slots.forEach { s ->
-            arr.put(
-                JSONObject()
-                    .put("start", s.start.toString())
-                    .put("end", s.end?.toString() ?: JSONObject.NULL)
-                    .put("title", s.title)
-                    .put("place", encodePlace(s.place).ifEmpty { JSONObject.NULL })
-                    .put("day", s.day ?: JSONObject.NULL),
-            )
-        }
-    }.toString()
+    fun encode(slots: List<TimeSlot>): String = SlotJson.slots(slots).toString()
 
-    fun decode(raw: String): List<TimeSlot> = runCatching {
-        val arr = JSONArray(raw)
-        (0 until arr.length()).map { i ->
-            val o = arr.getJSONObject(i)
-            TimeSlot(
-                start = LocalTime.parse(o.getString("start")),
-                end = if (o.isNull("end")) null else LocalTime.parse(o.getString("end")),
-                title = o.optString("title"),
-                place = if (o.isNull("place")) null else decodePlace(o.getString("place")),
-                day = if (!o.has("day") || o.isNull("day")) null else o.getInt("day"),
-            )
-        }
-    }.getOrDefault(emptyList())
+    fun decode(raw: String): List<TimeSlot> = runCatching { SlotJson.parseSlots(JSONArray(raw)) }.getOrDefault(emptyList())
 
-    fun encodePlace(p: Place?): String = p?.let {
-        JSONObject()
-            .put("name", it.name)
-            .put("url", it.url ?: JSONObject.NULL)
-            .put("app", it.app?.key ?: JSONObject.NULL)
-            .toString()
-    }.orEmpty()
+    fun encodePlace(p: Place?): String = if (p == null) "" else SlotJson.place(p).toString()
 
     fun decodePlace(raw: String): Place? = if (raw.isEmpty()) null else runCatching {
-        val o = JSONObject(raw)
-        Place(o.getString("name"), if (o.isNull("url")) null else o.getString("url"), MapApp.from(if (o.isNull("app")) null else o.getString("app")))
+        SlotJson.parsePlace(JSONObject().put("p", JSONObject(raw)), "p")
     }.getOrNull()
 }

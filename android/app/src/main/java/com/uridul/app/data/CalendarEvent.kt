@@ -29,8 +29,22 @@ data class TimeSlot(
         const val MAX_TOTAL_SLOTS = 60
         /** 날짜·시간 순서 */
         val ORDER: Comparator<TimeSlot> = compareBy({ it.dayIndex }, { it.start })
+
+        /**
+         * 시간대 하나 더: 그 날 마지막 시간대 끝부터 1시간.
+         * 첫 시간대면 하루 일정은 저녁 7시, 여러 날 일정(day 있음)은 오전 10시. 끝이 자정을 넘으면 밤 11:59.
+         */
+        fun next(slots: List<TimeSlot>, day: Int?): TimeSlot {
+            val last = slots.filter { it.dayIndex == (day ?: 0) }.maxByOrNull { it.start }
+            val from = last?.end ?: last?.start?.plusHours(1) ?: if (day != null) LocalTime.of(10, 0) else LocalTime.of(19, 0)
+            val to = from.plusHours(1).takeIf { it.isAfter(from) } ?: LocalTime.of(23, 59)
+            return TimeSlot(from, to, day = day)
+        }
     }
 }
+
+/** 시작일부터 끝나는 날까지 며칠 (하루 일정 0) */
+fun daysBetween(start: LocalDate, end: LocalDate): Int = java.time.temporal.ChronoUnit.DAYS.between(start, end).toInt()
 
 /**
  * 공유 캘린더 일정 하나.
@@ -95,7 +109,7 @@ data class CalendarEvent(
         !isMultiDay -> slots.withIndex().toList()
         !perDayPlan -> emptyList()
         else -> {
-            val index = java.time.temporal.ChronoUnit.DAYS.between(date, day).toInt()
+            val index = daysBetween(date, day)
             slots.withIndex().filter { it.value.dayIndex == index }
         }
     }
@@ -138,7 +152,7 @@ data class EventDraft(
  */
 fun EventDraft.normalized(): EventDraft {
     if (time == null) return copy(timeline = emptyList())
-    val span = java.time.temporal.ChronoUnit.DAYS.between(date, endDate).toInt()
+    val span = daysBetween(date, endDate)
     val list = if (span <= 0) {
         timeline.filter { it.dayIndex == 0 }.map { it.copy(day = null) }.sortedBy { it.start }
     } else {

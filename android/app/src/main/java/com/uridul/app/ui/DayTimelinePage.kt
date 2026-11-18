@@ -206,7 +206,8 @@ fun DayTimelinePage(
                         AllDayRow(allDay, myUid, edit?.draft?.id ?: if (edit?.isNew == true && edit.slot < 0) NEW_ID else null) { e ->
                             // 아직 저장 안 한 새 일정(미리보기)을 누르면 지금 편집을 그대로 둔다
                             if (e.id == NEW_ID) return@AllDayRow
-                            guard { error = null; setEdit(editOf(e)) }
+                            // 날짜별로 짠 여러 날 일정은 이 날 첫 시간대를 고르고 연다 (다른 날 시간대로 스크롤되지 않게)
+                            guard { error = null; setEdit(editOf(e, e.slotsOn(date).firstOrNull()?.index ?: 0)) }
                         }
                     }
                     HorizontalDivider(Modifier.padding(top = 6.dp))
