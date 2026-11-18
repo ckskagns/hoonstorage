@@ -1,9 +1,9 @@
 {
-    "versionCode":  19,
-    "versionName":  "0.17.0",
-    "notes":  "하트 위젯 디데이가 자정에 바로 바뀌도록 (잠금 화면·AOD 위젯을 한꺼번에 먼저 다시 그림), 디데이·일정 위젯 날짜 처리 정리",
-    "size":  48922726,
-    "sha256":  "28b7c0f9a490f38b482c26b8b4d4281624922e6dea676e1cf32dbb7bfcb0aefe",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.17.0/uridul.apk",
-    "releasedAt":  "2026-11-10T16:33:41+09:00"
+    "versionCode":  20,
+    "versionName":  "0.18.0",
+    "notes":  "후기: 각자 일정·날짜 전 일정에도 바로 후기 남기기 / 가계부: 결제 알림 잔액으로 들어온 돈(입금) 자동 기록 / 여러 날 일정: 날짜별 타임라인과 장소",
+    "size":  48939110,
+    "sha256":  "fe2f0f8d885fa48a3fbf0943008b7fb287e46679acc257ed6adb9fdfdcbd8e15",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.18.0/uridul.apk",
+    "releasedAt":  "2026-11-18T17:59:46+09:00"
 }
