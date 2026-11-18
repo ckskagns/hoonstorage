@@ -33,7 +33,10 @@ class DebugPaymentReceiver : BroadcastReceiver() {
             "chat" -> "친구" to "[토스뱅크] 체크카드 국내 결제\n테스트님의 CHCH 카드\n4,560원 결제 | test0대화방\n잔액 1원"
             else -> "토스뱅크" to "[토스뱅크] 체크카드 국내 결제\n테스트님의 CHCH 카드\n1,230원 결제 | test0시험상점\n잔액 11,230원"
         }
-        val body = if (merchant != null) body0.replace("test0시험상점", merchant) else body0
+        val named = if (merchant != null) body0.replace("test0시험상점", merchant) else body0
+        // 잔액으로 입금 계산 시험: --el balance 68770 처럼 결제 뒤 잔액을 바꿔 넣는다
+        val balance = intent.getLongExtra("balance", -1L)
+        val body = if (balance >= 0) named.replace(Regex("""잔액 [\d,]+원"""), "잔액 %,d원".format(balance)) else named
         val now = System.currentTimeMillis()
         val builder = Notification.Builder(context, "debug").setSmallIcon(android.R.drawable.ic_dialog_info).setWhen(now)
         if (sample == "pay_msg") {
