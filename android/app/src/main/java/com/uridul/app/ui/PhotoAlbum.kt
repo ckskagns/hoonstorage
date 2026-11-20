@@ -57,6 +57,10 @@ class PhotoHooks(
     val refreshWeek: () -> Unit = {},
     /** 추억 슬라이드 배경 사진 (일정ID_날짜 → 작은 사진) */
     val memoryThumbs: Map<String, ByteArray> = emptyMap(),
+    /** 사진 달력: 날짜 → 그날 대표 사진 (불러온 달만) */
+    val dayPhotos: Map<java.time.LocalDate, com.uridul.app.data.DayPhoto> = emptyMap(),
+    /** 사진 달력에 보일 달의 사진 불러오기 */
+    val loadMonthPhotos: (java.time.YearMonth) -> Unit = {},
 )
 
 val LocalPhotos = compositionLocalOf { PhotoHooks() }

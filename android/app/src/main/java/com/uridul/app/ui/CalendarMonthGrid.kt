@@ -44,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,6 +124,11 @@ internal fun MonthCalendar(
         }
     }
     val shownMonth = monthOf(pagerState.currentPage)
+    // 사진 달력: 지난 날 칸에 그날 일기 사진 (머리글 📷 로 켜고 끈다, 이 폰에만 저장)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val uiSettings by com.uridul.app.data.AppSettings.state.collectAsState()
+    val photoMode = uiSettings.photoCalendar
+    val photoHooks = LocalPhotos.current
 
     Card(
         modifier = modifier,
@@ -131,6 +137,8 @@ internal fun MonthCalendar(
         Column(Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
             // 머리글: < 2026년 10월 >
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                // 오른쪽 사진 단추만큼 비워서 제목이 가운데에 오게
+                Spacer(Modifier.width(PhotoToggleSize))
                 IconButton(onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "이전 달")
                 }
@@ -161,6 +169,7 @@ internal fun MonthCalendar(
                 IconButton(onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달")
                 }
+                PhotoModeToggle(photoMode) { on -> com.uridul.app.data.AppSettings.update(context) { it.copy(photoCalendar = on) } }
             }
             // 요일
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -187,7 +196,11 @@ internal fun MonthCalendar(
                 val pageMonth = monthOf(page)
                 val grid = remember(pageMonth) { CalendarMath.monthGrid(pageMonth) }
                 val specials = remember(grid, specialsFor) { specialsFor(grid) }
-                MonthGrid(pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, onAddRange, fillHeight, onTapDay)
+                if (photoMode) LaunchedEffect(pageMonth) { photoHooks.loadMonthPhotos(pageMonth) }
+                MonthGrid(
+                    pageMonth, grid, events, specials, selected, today, myUid, onSelect, onAdd, onAddRange, fillHeight, onTapDay,
+                    photos = if (photoMode) photoHooks.dayPhotos else emptyMap(),
+                )
             }
         }
     }
@@ -222,6 +235,8 @@ private fun MonthGrid(
     onAddRange: (LocalDate, LocalDate) -> Unit,
     fillHeight: Boolean,
     onTapDay: ((LocalDate) -> Unit)?,
+    /** 사진 달력: 날짜 → 그날 대표 사진 (사진 달력을 끄면 비어 있다) */
+    photos: Map<LocalDate, com.uridul.app.data.DayPhoto> = emptyMap(),
 ) {
             val tap: (LocalDate) -> Unit = onTapDay ?: { day -> if (day == selected) onAdd(day) else onSelect(day) }
             val latestTap by rememberUpdatedState(tap)
@@ -277,6 +292,7 @@ private fun MonthGrid(
                                         lanes = layout.lanesUsed[col],
                                         hiddenBars = layout.bars.count { col in it.startCol..it.endCol && it.lane >= maxLabels },
                                         myUid = myUid,
+                                        photo = photos[day],
                                         showLabels = showLabels,
                                         maxLabels = maxLabels,
                                         // 손짓은 달력 전체에서 받는다 (dayGestures). 여기는 화면 읽기(TalkBack)용 동작
@@ -382,6 +398,8 @@ private fun DayCell(
     /** 칸이 모자라 안 보이는 막대 수 */
     hiddenBars: Int,
     myUid: String,
+    /** 사진 달력: 그날 대표 사진 (있으면 칸에 사진을 깐다) */
+    photo: com.uridul.app.data.DayPhoto?,
     showLabels: Boolean,
     maxLabels: Int,
     onClick: () -> Unit,
@@ -412,6 +430,7 @@ private fun DayCell(
         if (isToday) append(", 오늘")
         special?.let { append(", ${it.title}") }
         if (allCount > 0) append(", 일정 ${allCount}개")
+        if (photo != null) append(", 사진 ${photo.count}장")
         if (isSelected) append(", 한 번 더 누르면 일정 추가")
     }
     val rangeColor = scheme.primary.copy(alpha = 0.28f)
@@ -427,6 +446,14 @@ private fun DayCell(
         label = "day-bg",
     )
     val numberScale = bounceScale(isSelected, selectedScale = 1.15f)
+    if (photo != null) {
+        PhotoDayCell(
+            day = day, photo = photo, inMonth = inMonth, isToday = isToday, isSelected = isSelected,
+            inRange = inRange, numberScale = numberScale, dayStyle = dayStyle, smallStyle = smallStyle,
+            description = description, onClick = onClick, onLongClick = onLongClick, modifier = modifier,
+        )
+        return
+    }
     Column(
         modifier
             .padding(1.dp)

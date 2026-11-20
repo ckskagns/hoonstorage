@@ -45,10 +45,12 @@ data class UiSettings(
     val mine: EventColor = EventColor.PINK,
     /** 상대 일정 색 (기본 하늘) */
     val partner: EventColor = EventColor.SKY,
+    /** 달력 지난 날 칸에 그날 일기 사진을 깔기 (기본 켬) */
+    val photoCalendar: Boolean = true,
 )
 
 /**
- * 이 폰에만 저장하는 화면 설정 (화면 모드, 일정 색). 앱·위젯이 함께 읽는다.
+ * 이 폰에만 저장하는 화면 설정 (화면 모드, 일정 색, 사진 달력). 앱·위젯이 함께 읽는다.
  */
 object AppSettings {
     private const val PREFS = "ui_settings"
@@ -65,6 +67,7 @@ object AppSettings {
                 theme = ThemeMode.from(p.getString("theme", null)),
                 mine = EventColor.from(p.getString("mine", null), EventColor.PINK),
                 partner = EventColor.from(p.getString("partner", null), EventColor.SKY),
+                photoCalendar = p.getBoolean("photoCalendar", true),
             )
             loaded = true
         }
@@ -78,6 +81,7 @@ object AppSettings {
             .putString("theme", next.theme.key)
             .putString("mine", next.mine.key)
             .putString("partner", next.partner.key)
+            .putBoolean("photoCalendar", next.photoCalendar)
             .apply()
     }
 }

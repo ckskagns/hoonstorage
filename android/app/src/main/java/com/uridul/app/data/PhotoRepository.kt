@@ -127,6 +127,11 @@ class PhotoRepository(private val db: FirebaseFirestore) {
         photos(coupleId).whereGreaterThanOrEqualTo("date", from.toString()).whereLessThanOrEqualTo("date", to.toString())
             .get().await().documents.mapNotNull { it.toMeta() }
 
+    /** 기간 안 사진 수 (사진 달력이 저장해 둔 달이 그대로인지 볼 때). 사진을 받지 않고 개수만 센다 */
+    suspend fun countRange(coupleId: String, from: LocalDate, to: LocalDate): Int =
+        photos(coupleId).whereGreaterThanOrEqualTo("date", from.toString()).whereLessThanOrEqualTo("date", to.toString())
+            .count().get(com.google.firebase.firestore.AggregateSource.SERVER).await().count.toInt()
+
     /** 이번 주에 올린(아직 남아 있는) 사진 수. 사진을 받지 않고 개수만 센다 */
     suspend fun countWeek(coupleId: String, week: String): Int =
         photos(coupleId).whereEqualTo("week", week).count().get(com.google.firebase.firestore.AggregateSource.SERVER).await().count.toInt()

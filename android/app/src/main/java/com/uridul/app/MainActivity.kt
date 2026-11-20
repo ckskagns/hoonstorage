@@ -101,6 +101,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val weekPhotos by viewModel.photos.weekPhotoCount.collectAsStateWithLifecycle()
     val photoUploading by viewModel.photos.photoUploading.collectAsStateWithLifecycle()
     val memoryPhotos by viewModel.photos.memoryPhotos.collectAsStateWithLifecycle()
+    val dayPhotos by viewModel.photos.dayPhotos.collectAsStateWithLifecycle()
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -160,6 +161,8 @@ private fun UridulRoot(viewModel: AppViewModel) {
                 onDelete = viewModel.photos::deletePhoto,
                 loadFull = viewModel.photos::loadPhoto,
                 memoryThumbs = memoryPhotos,
+                dayPhotos = dayPhotos,
+                loadMonthPhotos = { m -> viewModel.photos.loadMonthPhotos(m) },
                 refreshWeek = viewModel.photos::refreshWeekPhotoCount,
             ),
         ) { ReadyScreen(

@@ -239,6 +239,12 @@ class DemoActivity : ComponentActivity() {
                         demoPhotos += com.uridul.app.data.PhotoMeta("dp$i", "11", today.minusDays(9), thisWeek, p.thumb, p.width, p.height, me, System.currentTimeMillis() + i)
                     }
                 }
+                val demoCalendarPhotos = remember {
+                    listOf(2L, 3L, 3L, 3L, 6L, 13L).mapIndexed { i, ago ->
+                        val p = demoPhoto(i + 1)
+                        com.uridul.app.data.PhotoMeta("dc$i", "cal$i", today.minusDays(ago), "", p.thumb, p.width, p.height, me, i.toLong())
+                    }
+                }
                 val photoHooks = com.uridul.app.ui.PhotoHooks(
                     album = { e -> androidx.compose.runtime.snapshotFlow { demoPhotos.filter { it.eventId == e.id && it.date == e.date } } },
                     weekUsed = demoPhotos.count { it.week == thisWeek },
@@ -256,6 +262,9 @@ class DemoActivity : ComponentActivity() {
                     onDelete = { p -> demoPhotos.removeAll { it.id == p.id } },
                     loadFull = { id -> demoFull[id] },
                     memoryThumbs = demoPhotos.groupBy { it.albumKey }.mapValues { (_, l) -> l.first().thumb },
+                    // 사진 달력: 데모 사진 + 다른 날 몇 장 (칸 모양 확인용)
+                    dayPhotos = com.uridul.app.domain.PhotoDays.covers(demoPhotos + demoCalendarPhotos)
+                        .mapValues { (_, c) -> com.uridul.app.data.DayPhoto(c.photo.id, c.photo.thumb, c.count) },
                 )
                 androidx.compose.runtime.CompositionLocalProvider(com.uridul.app.ui.LocalReviews provides hooks, com.uridul.app.ui.LocalPhotos provides photoHooks) {
                 ReadyScreen(

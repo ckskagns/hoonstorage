@@ -7,7 +7,13 @@ import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.ImportPreview
 import com.uridul.app.data.PhotoMeta
 import com.uridul.app.data.PhotoProcessor
+import com.uridul.app.data.DayPhoto
+import com.uridul.app.data.PhotoMonthCache
 import com.uridul.app.domain.Memories
+import com.uridul.app.domain.PhotoDays
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.update
 import com.uridul.app.domain.PhotoQuota
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -123,6 +129,7 @@ class PhotoController internal constructor(private val f: FeatureScope) {
                     if (uris.size > room) append(" (남은 ${room}장만, 나머지 ${uris.size - room}장은 빼고)")
                 }
                 refreshMemoryPhotos()
+                if (done > 0) loadMonthPhotos(java.time.YearMonth.from(event.date), force = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -146,6 +153,7 @@ class PhotoController internal constructor(private val f: FeatureScope) {
                         "사진을 지웠어요"
                     }
                     refreshMemoryPhotos()
+                    loadMonthPhotos(java.time.YearMonth.from(photo.date), force = true)
                 }
                 .onFailure { e -> f.message = (e as? Exception)?.let(f.errorText) ?: "사진을 지우지 못했어요." }
             refreshWeekPhotoCount()
@@ -156,6 +164,59 @@ class PhotoController internal constructor(private val f: FeatureScope) {
     suspend fun loadPhoto(id: String): ByteArray? {
         val ready = f.ready() ?: return null
         return runCatching { f.container.photos?.fetchPhoto(ready.couple.id, id) }.getOrNull()
+    }
+
+    private val _dayPhotos = MutableStateFlow<Map<LocalDate, DayPhoto>>(emptyMap())
+    /** 사진 달력: 날짜 → 그날 대표 사진·사진 수 (불러온 달만) */
+    val dayPhotos: StateFlow<Map<LocalDate, DayPhoto>> = _dayPhotos.asStateFlow()
+
+    /** 달마다 마지막으로 서버에 사진 수를 물은 시각 (같은 달을 오갈 때 매번 묻지 않게) */
+    private val monthCheckedAt = java.util.concurrent.ConcurrentHashMap<java.time.YearMonth, Long>()
+
+    /**
+     * 사진 달력에 보일 달의 대표 사진들: 폰에 저장해 둔 것을 먼저 보여주고,
+     * 서버에 그 달 사진 "수"만 물어 같으면 끝, 다르면(또는 처음이면) 그 달 사진을 받아 다시 저장한다.
+     * @param force 내가 올리거나 지운 직후: 수를 묻지 않고 바로 다시 받는다
+     */
+    fun loadMonthPhotos(month: java.time.YearMonth, force: Boolean = false) {
+        val ready = f.ready() ?: return
+        val repo = f.container.photos ?: return
+        val now = System.currentTimeMillis()
+        if (!PhotoDays.mayHavePhotos(month, LocalDate.now())) return
+        val last = monthCheckedAt[month]
+        if (!force && last != null && now - last < PhotoDays.RECHECK_MS) return
+        monthCheckedAt[month] = now
+        val coupleId = ready.couple.id
+        f.scope.launch {
+            try {
+                val from = month.atDay(1)
+                val to = month.atEndOfMonth()
+                val saved = withContext(Dispatchers.IO) { PhotoMonthCache.read(f.app, coupleId, month) }
+                if (saved != null) publishMonth(month, saved.days)
+                if (!force) {
+                    val count = repo.countRange(coupleId, from, to)
+                    if (PhotoDays.cacheValid(saved?.count, saved?.savedAt ?: 0, count, now)) return@launch
+                    if (count == 0) {
+                        withContext(Dispatchers.IO) { PhotoMonthCache.write(f.app, coupleId, month, 0, emptyMap(), now) }
+                        publishMonth(month, emptyMap())
+                        return@launch
+                    }
+                }
+                val photos = repo.fetchRange(coupleId, from, to)
+                val days = PhotoDays.covers(photos).mapValues { (_, c) -> DayPhoto(c.photo.id, c.photo.thumb, c.count) }
+                withContext(Dispatchers.IO) { PhotoMonthCache.write(f.app, coupleId, month, photos.size, days, now) }
+                publishMonth(month, days)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // 못 물었으면(인터넷 없음 등) 저장해 둔 것만 보여주고, 다음에 다시 묻는다
+                monthCheckedAt.remove(month)
+            }
+        }
+    }
+
+    private fun publishMonth(month: java.time.YearMonth, days: Map<LocalDate, DayPhoto>) {
+        _dayPhotos.update { all -> all.filterKeys { java.time.YearMonth.from(it) != month } + days }
     }
 
     private val _memoryPhotos = MutableStateFlow<Map<String, ByteArray>>(emptyMap())
