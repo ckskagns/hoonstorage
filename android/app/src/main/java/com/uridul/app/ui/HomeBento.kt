@@ -52,14 +52,15 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
     // 다음 일정: 위젯과 같은 계산 (반복 일정은 두 달 앞까지 펼쳐서)
     // 탭을 오갈 때마다 서버를 다시 읽지 않게 5분 동안 기억 (일정이 바뀌면 키가 달라져 바로 다시 읽는다)
     val nextKey = listOf("next", couple.id, today, eventsKey?.hashCode())
-    val next by produceState(BentoCache.peek<CalendarEvent>(nextKey), nextKey) {
+    val upcoming by produceState(BentoCache.peek<List<CalendarEvent>>(nextKey), nextKey) {
         val repo = container?.events ?: return@produceState
         value = BentoCache.load(nextKey) {
             runCatching {
                 val merged = com.uridul.app.domain.Recurrence.merge(
                     repo.fetchUpcoming(couple.id, today), repo.fetchRecurring(couple.id), today, today.plusDays(60),
                 )
-                CalendarMath.upcoming(merged, today, 1).firstOrNull()
+                // 오늘 이미 끝난 시간 일정은 고를 때 건너뛰므로 몇 개 더 받아 둔다
+                CalendarMath.upcoming(merged, today, 6)
             }.getOrNull()
         }
     }
@@ -76,6 +77,8 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
             }.getOrNull()
         }
     }
+    val now = java.time.LocalDateTime.now()
+    val next = upcoming?.let { HomeTiles.nextEvent(it, now) }
     val wish = HomeTiles.wishOfDay(wishes, today)
     val openWishes = wishes.count { !it.visited }
     val weekUsed = LocalPhotos.current.weekUsed
@@ -85,7 +88,7 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
             BentoTile(
                 "📅 다음 일정",
                 next?.title ?: "다가오는 일정이 없어요",
-                next?.let { HomeTiles.whenText(it, today) } ?: "눌러서 일정 추가",
+                next?.let { HomeTiles.whenText(it, today, now) } ?: "눌러서 일정 추가",
                 MaterialTheme.colorScheme.secondaryContainer,
                 Modifier.weight(1f),
             ) { onOpenTab(HomeTabs.CALENDAR) }

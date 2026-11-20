@@ -169,6 +169,8 @@ fun FeedViewerDialog(
                     }
                 }
             }
+            // 이 창 안에서 후기·사진을 마쳐도 하트가 보이게 (진동은 메인 화면이 한 번만)
+            HeartBurstOverlay(haptic = false)
         }
     }
 

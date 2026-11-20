@@ -26,6 +26,26 @@ class HomeTilesTest {
     }
 
     @Test
+    fun nextSkipsEndedAndShowsOngoing() {
+        fun timed(id: String, start: Int, end: Int) = CalendarEvent(
+            id, id, today, today, LocalTime.of(start, 30), "", "u",
+            timeline = listOf(com.uridul.app.data.TimeSlot(LocalTime.of(start, 30), LocalTime.of(end, 30))),
+        )
+        // 실제 11/20: 집 재계약 15:30~16:30, 금요일 19:00~20:00 (+ 시험 18:30~19:30)
+        val list = listOf(timed("집 재계약", 15, 16), timed("test0", 18, 19), timed("금요일", 19, 20))
+        val at1550 = today.atTime(15, 50)
+        assertEquals("집 재계약", HomeTiles.nextEvent(list, at1550)!!.id)
+        assertEquals("지금 · 오후 4:30까지", HomeTiles.whenText(list[0], today, at1550))
+        // 끝난 뒤에는 다음 것
+        val at1700 = today.atTime(17, 0)
+        assertEquals("test0", HomeTiles.nextEvent(list, at1700)!!.id)
+        assertEquals("오늘 오후 6:30", HomeTiles.whenText(list[1], today, at1700))
+        // 다 끝났으면 없음, 하루 종일 일정은 하루 동안 그대로
+        assertNull(HomeTiles.nextEvent(list, today.atTime(21, 0)))
+        assertEquals("allday", HomeTiles.nextEvent(list + ev("2026-11-20").copy(id = "allday"), today.atTime(21, 0))!!.id)
+    }
+
+    @Test
     fun wishOfDayRotatesOverUnvisited() {
         fun w(id: String, visited: Boolean = false) = WishPlace(id, Place("곳$id"), "", "u", visited)
         val wishes = listOf(w("a"), w("b", visited = true), w("c"), w("d"))

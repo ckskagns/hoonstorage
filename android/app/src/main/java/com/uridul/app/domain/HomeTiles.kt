@@ -12,8 +12,33 @@ import java.util.Locale
  */
 object HomeTiles {
 
+    /** 하루짜리 시간 일정이 끝나는 시각 (시간대 끝 중 가장 늦은 것, 없으면 시작 시각). 하루 종일·여러 날이면 null */
+    private fun endTimeToday(e: CalendarEvent): java.time.LocalTime? {
+        if (e.time == null || e.date != e.endDate) return null
+        return e.timeline.filter { it.dayIndex == 0 }.maxOfOrNull { it.end ?: it.start } ?: e.time
+    }
+
+    /**
+     * 홈 "다음 일정": 다가오는 일정 중 오늘 이미 끝난 시간 일정은 건너뛴다.
+     * @param upcoming [CalendarMath.upcoming] 순서의 일정들
+     */
+    fun nextEvent(upcoming: List<CalendarEvent>, now: java.time.LocalDateTime): CalendarEvent? =
+        upcoming.firstOrNull { e ->
+            val end = endTimeToday(e)
+            !(e.date == now.toLocalDate() && end != null && end < now.toLocalTime())
+        }
+
+    /** 지금 진행 중인 하루짜리 시간 일정이면 "지금 · 오후 4:30까지" */
+    fun nowText(event: CalendarEvent, now: java.time.LocalDateTime): String? {
+        val end = endTimeToday(event) ?: return null
+        val start = event.time ?: return null
+        if (event.date != now.toLocalDate() || now.toLocalTime() < start || end <= start) return null
+        return "지금 · " + end.format(java.time.format.DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)) + "까지"
+    }
+
     /** 다음 일정이 언제인지: "지금 진행 중", "오늘", "내일", "모레", "D-5 · 11월 25일 (수)" */
-    fun whenText(event: CalendarEvent, today: LocalDate): String {
+    fun whenText(event: CalendarEvent, today: LocalDate, now: java.time.LocalDateTime? = null): String {
+        now?.let { n -> nowText(event, n)?.let { return it } }
         if (event.date.isBefore(today) && !event.endDate.isBefore(today)) return "진행 중 · ${event.endDate.monthValue}월 ${event.endDate.dayOfMonth}일까지"
         val days = ChronoUnit.DAYS.between(today, event.date)
         val day = "${event.date.monthValue}월 ${event.date.dayOfMonth}일 (${event.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})"

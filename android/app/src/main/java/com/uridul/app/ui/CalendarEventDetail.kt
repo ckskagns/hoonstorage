@@ -71,7 +71,7 @@ fun EventDetailSheet(
     val strong = CoupleColors.strongOf(event, myUid)
     val who = if (mine) couple.myName(myUid) else (couple.names[event.createdBy] ?: "상대")
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) { androidx.compose.foundation.layout.Box {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -169,7 +169,9 @@ fun EventDetailSheet(
                 }
             }
         }
-    }
+        // 시트 안에서 후기를 마쳐도 하트가 보이게 (메인 화면의 하트는 시트에 가려진다)
+        HeartBurstOverlay(haptic = false)
+    } }
 
     if (confirmDelete) {
         DeleteEventDialog(

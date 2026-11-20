@@ -41,15 +41,18 @@ object Celebrate {
     }
 }
 
-/** 화면 맨 위에 깔아 두는 하트 터짐 (누르기는 막지 않는다) */
+/**
+ * 화면 맨 위에 깔아 두는 하트 터짐 (누르기는 막지 않는다).
+ * 메인 화면 말고 따로 뜨는 창(일정 상세 시트·크게 보기)에도 깔아야 그 창 위에서 보인다 → 그쪽은 [haptic] = false (진동은 한 번만).
+ */
 @Composable
-fun HeartBurstOverlay() {
+fun HeartBurstOverlay(haptic: Boolean = true) {
     val view = LocalView.current
     var shots by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         Celebrate.events.collect {
             shots++
-            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+            if (haptic) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         }
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
