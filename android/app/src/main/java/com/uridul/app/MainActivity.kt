@@ -109,6 +109,8 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val dayPhotos by viewModel.photos.dayPhotos.collectAsStateWithLifecycle()
     val heroPhoto by viewModel.photos.hero.collectAsStateWithLifecycle()
     val partnerLatest by viewModel.photos.partnerLatest.collectAsStateWithLifecycle()
+    // 상대가 일정 날짜를 옮겼으면 사진 달력도 새 날짜로
+    androidx.compose.runtime.LaunchedEffect(monthEvents, dayPhotos) { viewModel.photos.recheckMoved(monthEvents) }
     // 디데이 사진이 바뀌면 그 사진의 씨앗 색 (메뉴 "디데이 사진 색 따라가기"를 켰을 때 앱 강조색)
     androidx.compose.runtime.LaunchedEffect(heroPhoto.photo?.id) {
         com.uridul.app.ui.theme.PhotoTint.setSeed(heroPhoto.photo?.let { com.uridul.app.ui.theme.PhotoSeed.of(it.bytes) })

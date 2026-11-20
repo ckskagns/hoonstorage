@@ -19,6 +19,7 @@ import com.uridul.app.data.DateReview
 import com.uridul.app.data.ReviewEntry
 import com.uridul.app.data.normalized
 import com.uridul.app.domain.Memories
+import com.uridul.app.domain.MemoryMove
 import com.uridul.app.data.toSeriesDates
 import com.uridul.app.domain.Recurrence
 import com.uridul.app.data.EventDraft
@@ -199,8 +200,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val ready = state.value as? AppState.Ready ?: return false
         val repo = container.events ?: return false
+        // 고치기 전 원본 (날짜가 바뀌면 그 일정의 사진·후기를 함께 옮긴다). 저장하면 화면 목록이 바로 바뀌므로 먼저 찾아 둔다
+        val old = draft.id?.let { id -> (monthEvents.value.firstOrNull { it.id == id } ?: searchCache.firstOrNull { it.id == id })?.asSeries() }
         repo.save(ready.couple.id, ready.myUid, draft) { e -> _message.value = e.toUserMessage() ?: "저장하지 못했어요." }
+        if (old != null && MemoryMove.needed(old, draft.date)) moveMemories(ready.couple.id, ready.myUid, old, draft.date, draft.repeat)
         return true
+    }
+
+    /** 일정 날짜를 고쳤을 때 그 일정의 사진·후기도 새 날짜로 */
+    private fun moveMemories(coupleId: String, uid: String, old: CalendarEvent, newStart: LocalDate, newRepeat: com.uridul.app.data.Repeat?) {
+        val target = { d: LocalDate -> MemoryMove.target(old, newStart, newRepeat, d) }
+        viewModelScope.launch {
+            try {
+                val photoMoves = container.photos?.moveDates(coupleId, old.id, target).orEmpty()
+                val reviewCount = container.reviews?.moveDates(coupleId, uid, old.id, target) ?: 0
+                if (photoMoves.isNotEmpty()) {
+                    photoMoves.flatMap { (from, to) -> listOf(YearMonth.from(from), YearMonth.from(to)) }.toSet()
+                        .forEach { photos.loadMonthPhotos(it, force = true) }
+                    photos.refreshMemoryPhotos()
+                }
+                val what = listOfNotNull("사진".takeIf { photoMoves.isNotEmpty() }, "후기".takeIf { reviewCount > 0 }).joinToString("·")
+                if (what.isNotEmpty()) _message.value = "📷 $what 도 ${newStart.monthValue}월 ${newStart.dayOfMonth}일로 함께 옮겼어요"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = e.toUserMessage() ?: "일정은 고쳤지만 사진·후기를 옮기지 못했어요. 다시 저장해 보세요."
+            }
+        }
     }
 
     /** 일정 색 등 화면 설정이 바뀌면 위젯을 다시 그린다 */

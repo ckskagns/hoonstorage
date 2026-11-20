@@ -198,6 +198,23 @@ class PhotoController internal constructor(private val f: FeatureScope) {
         }
     }
 
+    /** 옮겨진 일정 때문에 다시 받은 달과 시각 (계속 어긋나도 5분에 한 번까지만) */
+    private val movedCheckedAt = java.util.concurrent.ConcurrentHashMap<java.time.YearMonth, Long>()
+
+    /**
+     * 상대가 일정 날짜를 옮겨 그 사진이 다른 날로 간 달은 다시 받는다.
+     * (같은 달 안에서 옮기면 사진 수가 같아 저장해 둔 달력을 그대로 쓰게 되므로)
+     */
+    fun recheckMoved(events: List<CalendarEvent>) {
+        val now = System.currentTimeMillis()
+        com.uridul.app.domain.MemoryMove.staleMonths(_dayPhotos.value, events).forEach { m ->
+            val last = movedCheckedAt[m]
+            if (last != null && now - last < PhotoDays.RECHECK_MS) return@forEach
+            movedCheckedAt[m] = now
+            loadMonthPhotos(m, force = true)
+        }
+    }
+
     private fun publishMonth(month: java.time.YearMonth, days: Map<LocalDate, DayPhoto>) {
         _dayPhotos.update { all -> all.filterKeys { java.time.YearMonth.from(it) != month } + days }
         heroToday?.let { recomputeHero(it) }

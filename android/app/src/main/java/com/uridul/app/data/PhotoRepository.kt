@@ -106,7 +106,7 @@ object PhotoProcessor {
 /**
  * couples/{coupleId}/photos/{id}     { eventId, date, week, thumb(작은 사진), width, height, uploadedBy, uploadedAt }
  * couples/{coupleId}/photoData/{id}  { data(큰 사진), uploadedBy }
- * 두 사람만 읽고 쓴다 (firestore.rules). 사진은 바꾸지 않고 올리기·지우기만 한다.
+ * 두 사람만 읽고 쓴다 (firestore.rules). 사진은 바꾸지 않고 올리기·지우기만 한다 (일정 날짜를 옮길 때 date 만 고친다).
  */
 class PhotoRepository(private val db: FirebaseFirestore) {
 
@@ -168,6 +168,26 @@ class PhotoRepository(private val db: FirebaseFirestore) {
             )
             .set(data(coupleId).document(ref.id), mapOf("data" to Blob.fromBytes(photo.photo), "uploadedBy" to uid))
             .commit().await()
+    }
+
+    /**
+     * 일정 날짜를 고쳤을 때 그 일정 사진의 날짜만 함께 옮긴다 (사진·올린 사람·주는 그대로).
+     * @param target 원래 날짜 → 새 날짜 (옮기지 않으면 null)
+     * @return 옮긴 사진들의 (원래 날짜, 새 날짜)
+     */
+    suspend fun moveDates(coupleId: String, eventId: String, target: (LocalDate) -> LocalDate?): List<Pair<LocalDate, LocalDate>> {
+        val moves = photos(coupleId).whereEqualTo("eventId", eventId).get().await().documents.mapNotNull { d ->
+            val from = d.getString("date")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@mapNotNull null
+            val to = target(from)?.takeIf { it != from } ?: return@mapNotNull null
+            Triple(d.reference, from, to)
+        }
+        // 한 번에 500개까지라 나눠서 (일정 하나에 사진은 많아야 수십 장)
+        moves.chunked(400).forEach { part ->
+            val batch = db.batch()
+            part.forEach { (ref, _, to) -> batch.update(ref, "date", to.toString()) }
+            batch.commit().await()
+        }
+        return moves.map { it.second to it.third }
     }
 
     /** 지우기: 두 문서를 함께 */

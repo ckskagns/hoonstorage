@@ -96,6 +96,36 @@ class ReviewRepository(private val db: FirebaseFirestore) {
         task.addOnFailureListener(onError)
     }
 
+    /**
+     * 일정 날짜를 고쳤을 때 그 일정의 후기를 새 날짜로 옮긴다.
+     * 문서 ID 에 날짜가 들어 있어서 새 ID 로 만들고(두 사람 후기·고친 시각 그대로) 예전 것을 지운다.
+     * 새 날짜에 이미 후기가 있으면 섞지 않고 그대로 둔다.
+     * @param target 원래 날짜 → 새 날짜 (옮기지 않으면 null)
+     * @return 옮긴 후기 수
+     */
+    suspend fun moveDates(coupleId: String, uid: String, eventId: String, target: (LocalDate) -> LocalDate?): Int {
+        val moves = reviews(coupleId).whereEqualTo("eventId", eventId).get().await().documents.mapNotNull { d ->
+            val from = d.getString("date")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@mapNotNull null
+            val to = target(from)?.takeIf { it != from } ?: return@mapNotNull null
+            Triple(d, from, to)
+        }
+        if (moves.isEmpty()) return 0
+        // 반복 일정을 앞으로 옮기면 새 날짜가 다음 반복의 원래 날짜일 수 있다: 먼 날부터 옮겨서 자리를 비운다
+        val forward = moves.first().let { it.third.isAfter(it.second) }
+        var moved = 0
+        for ((doc, _, to) in if (forward) moves.sortedByDescending { it.second } else moves.sortedBy { it.second }) {
+            val dest = reviews(coupleId).document(DateReview.idOf(eventId, to))
+            if (dest.get().await().exists()) continue
+            val data = doc.data.orEmpty().toMutableMap()
+            data["date"] = to.toString()
+            // 규칙상 마지막으로 고친 사람은 나. 고친 시각은 그대로 두어 상대에게 "새 후기" 점이 뜨지 않게 한다
+            data["updatedBy"] = uid
+            db.batch().set(dest, data).delete(doc.reference).commit().await()
+            moved++
+        }
+        return moved
+    }
+
     /** 백업 불러오기: 같은 ID 로 다시 만든다 */
     fun restore(coupleId: String, uid: String, review: DateReview, onError: (Exception) -> Unit) {
         val data = mapOf(
