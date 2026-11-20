@@ -78,6 +78,21 @@ fun HomeContent(
         recapMonth in com.uridul.app.domain.MonthRecap.months(reviews.values, photos.dayPhotos.keys, today)
     var recapOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     if (recapOpen && recapMonth != null) MonthRecapDialog(recapMonth, couple, myUid) { recapOpen = false }
+    // 기념일·생일 당일: 그날 처음 열 때 한 번 축하 창 (이 폰에만 기억)
+    val celebrateDay = remember(couple, today) {
+        com.uridul.app.domain.CelebrateDay.today(couple.startDate, couple.countFromOne, couple.birthdays(), today)
+    }
+    var celebrateOpen by remember(celebrateDay, today) {
+        androidx.compose.runtime.mutableStateOf(celebrateDay != null && !CelebrateFlags.shown(context, today))
+    }
+    if (celebrateOpen && celebrateDay != null) {
+        val close = { CelebrateFlags.markShown(context, today); celebrateOpen = false }
+        CelebrateDayDialog(
+            celebrateDay, couple, myUid,
+            onOpenDiary = { close(); onOpenTab(HomeTabs.DIARY) },
+            onDismiss = close,
+        )
+    }
     val recapBanner: @Composable (Modifier) -> Unit = { m ->
         if (showRecap && recapMonth != null) RecapHomeBanner(
             recapMonth,
@@ -181,6 +196,11 @@ private fun HeroCard(
         return
     }
     val partner = couple.partnerName(myUid)
+    // 기념일·생일 당일은 "축하해" 그림, 그 밖에는 시간대 그림
+    val celebrate = remember(couple, today) {
+        com.uridul.app.domain.CelebrateDay.today(couple.startDate, couple.countFromOne, couple.birthdays(), today)
+    }
+    val heroEmotion = if (celebrate != null) Emotion.CELEBRATE else Emotion.forHour(java.time.LocalTime.now().hour)
     // 큰 숫자는 글꼴 크기 설정을 따라 무한히 커지지 않도록 dp 기준으로 고정한다
     val heroSize = with(LocalDensity.current) { 64.dp.toSp() }
 
@@ -205,7 +225,7 @@ private fun HeroCard(
         ) {
             // 두 캐릭터가 살랑살랑 움직이고, 누르면 콩 뛴다
             // 캐릭터 그림이 있으면 시간대 장면(밤 잘 자·아침 굿모닝·낮 기본), 없으면 두 캐릭터와 이름
-            EmotionArt(Emotion.forHour(java.time.LocalTime.now().hour), couple, myUid, 160.dp) {
+            EmotionArt(heroEmotion, couple, myUid, 160.dp) {
                 CoupleHeader(
                     myCharacter = couple.myCharacter(myUid),
                     partnerCharacter = couple.partnerCharacter(myUid),

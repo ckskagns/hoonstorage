@@ -179,7 +179,13 @@ private fun DailyQuestionDialog(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    EmotionArt(com.uridul.app.ui.Emotion.THINK, couple, myUid, 110.dp)
+                    // 답 전 고민 → 상대만 답해 잠김이면 보고 싶어(창가) → 둘 다 답하면 사랑해 하트
+                    val art = when {
+                        mine != null && partner is PartnerAnswer.Open -> Emotion.LOVE
+                        mine == null && partner is PartnerAnswer.Locked -> Emotion.MISS
+                        else -> Emotion.THINK
+                    }
+                    EmotionArt(art, couple, myUid, 130.dp)
                     Text("💬 오늘의 질문", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(question, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
 
