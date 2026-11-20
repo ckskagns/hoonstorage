@@ -120,7 +120,7 @@ internal fun PhotoHeroCard(
             Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 Box(
                     Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.30f))
                         .clickable(role = Role.Button, onClickLabel = "사진 바꾸기") { menu = true }
@@ -184,7 +184,7 @@ internal fun PhotoHeroCard(
 internal fun HeroPhotoOnButton(onClick: () -> Unit, modifier: Modifier) {
     Box(
         modifier
-            .size(40.dp)
+            .size(48.dp)
             .clip(RoundedCornerShape(50))
             .clickable(role = Role.Button, onClickLabel = "디데이 사진 켜기", onClick = onClick),
         contentAlignment = Alignment.Center,

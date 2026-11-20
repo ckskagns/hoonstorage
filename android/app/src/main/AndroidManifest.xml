@@ -56,6 +56,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 앱 아이콘을 길게 누르면 나오는 바로가기 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
 
             <!-- 초대 링크: https://<프로젝트>.web.app/invite/<토큰> (Android App Links) -->
             <intent-filter android:autoVerify="true">

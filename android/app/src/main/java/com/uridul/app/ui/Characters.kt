@@ -61,6 +61,8 @@ val Character.drawable: Int
     get() = when (this) {
         Character.DRAGON -> R.drawable.char_dragon
         Character.BUNNY -> R.drawable.char_bunny
+        Character.COUPLE_HE -> R.drawable.char_couple_he
+        Character.COUPLE_SHE -> R.drawable.char_couple_she
     }
 
 /**
@@ -179,8 +181,11 @@ private fun NameLabel(name: String) {
 /** 캐릭터 고르기 카드 두 장 */
 @Composable
 private fun CharacterPicker(selected: Character, onSelect: (Character) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Character.entries.forEach { c ->
+    // 캐릭터가 4개라 두 줄로 (동물 한 쌍 / 연인 한 쌍)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+      Character.entries.chunked(2).forEach { pair ->
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        pair.forEach { c ->
             val isSelected = c == selected
             Card(
                 onClick = { onSelect(c) },
@@ -204,6 +209,8 @@ private fun CharacterPicker(selected: Character, onSelect: (Character) -> Unit) 
                 }
             }
         }
+      }
+      }
     }
 }
 

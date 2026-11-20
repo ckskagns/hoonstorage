@@ -73,6 +73,10 @@ data class OpenRequest(
     val addEvent: Boolean = false,
     /** 이 일정을 연 채로 그 날 하루 페이지 (알림을 눌러 열었을 때) */
     val focusEventId: String? = null,
+    /** 가계부 직접 기록 창 바로 열기 (앱 아이콘 바로가기) */
+    val ledgerAdd: Boolean = false,
+    /** 오늘의 질문 바로 열기 (앱 아이콘 바로가기) */
+    val question: Boolean = false,
 )
 
 sealed interface AppState {

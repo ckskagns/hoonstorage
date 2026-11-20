@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  연인 캐릭터 (남): 2등신 SD. 일기 사진에서 뽑은 특징 — 짧은 검은 머리·옆으로 넘긴 앞머리, 크게 웃는 얼굴,
+  갈색·크림 줄무늬 니트. 아기 용 캐릭터와 이어지게 민트색 용 뿔 머리핀.
+  귀여움 기준(아기 얼굴 특징): 큰 머리·둥근 얼굴·작은 코와 입, 분홍 볼.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- 줄무늬 니트 -->
+    <path android:fillColor="#FFF3E3C8" android:strokeColor="#FFD9C2A3" android:strokeWidth="1.2"
+        android:pathData="M25,100 C25,85 35,77.5 50,77.5 C65,77.5 75,85 75,100 Z" />
+    <path android:fillColor="#FF8A5A3B" android:pathData="M28.6,86.5 L71.4,86.5 L72.9,90.5 L27.1,90.5 Z" />
+    <path android:fillColor="#FF8A5A3B" android:pathData="M26.2,94.5 L73.8,94.5 L74.6,98.5 L25.4,98.5 Z" />
+    <path android:fillColor="#FF8A5A3B" android:pathData="M39,78.5 Q50,86 61,78.5 L62,81.5 Q50,90 38,81.5 Z" />
+
+    <!-- 귀 -->
+    <path android:fillColor="#FFFFE1D2" android:strokeColor="#FFF0C4B0" android:strokeWidth="1.2"
+        android:pathData="M19.5,52 a4.5,5 0 1,0 9,0 a4.5,5 0 1,0 -9,0 Z" />
+    <path android:fillColor="#FFFFE1D2" android:strokeColor="#FFF0C4B0" android:strokeWidth="1.2"
+        android:pathData="M71.5,52 a4.5,5 0 1,0 9,0 a4.5,5 0 1,0 -9,0 Z" />
+
+    <!-- 얼굴 (큰 머리) -->
+    <path android:fillColor="#FFFFE7DA" android:strokeColor="#FFF0C4B0" android:strokeWidth="1.2"
+        android:pathData="M23,50 a27,27.5 0 1,0 54,0 a27,27.5 0 1,0 -54,0 Z" />
+
+    <!-- 머리카락: 짧은 머리 + 옆으로 넘긴 앞머리 -->
+    <path android:fillColor="#FF2F2724"
+        android:pathData="M22.5,51 C20,29 33,19.5 50,19.5 C67,19.5 80,29 77.5,51 C76,44 73.5,39.5 69,37 C62,42 50,43.5 37,40 C31,42 25.5,45.5 22.5,51 Z" />
+    <path android:fillColor="#FF2F2724"
+        android:pathData="M37,40 C42,31 55,28.5 66,33.5 C69,35 71,36.5 69,37 C58,34 47,35.5 37,40 Z" />
+    <!-- 머리 윤기 -->
+    <path android:fillColor="#00000000" android:strokeColor="#FF5A4C46" android:strokeWidth="1.4" android:strokeLineCap="round"
+        android:pathData="M44,24.5 Q52,23 60,26" />
+
+    <!-- 용 뿔 머리핀 (민트) -->
+    <path android:fillColor="#FF9EE0D2" android:strokeColor="#FF6CC2B0" android:strokeWidth="1"
+        android:pathData="M31,27 L27.5,15.5 L37.5,23.5 Z" />
+    <path android:fillColor="#FF9EE0D2" android:strokeColor="#FF6CC2B0" android:strokeWidth="1"
+        android:pathData="M69,27 L72.5,15.5 L62.5,23.5 Z" />
+
+    <!-- 웃는 눈 (반달) -->
+    <path android:fillColor="#00000000" android:strokeColor="#FF3B2A20" android:strokeWidth="2.4" android:strokeLineCap="round"
+        android:pathData="M36.5,56 Q41,50.5 45.5,56" />
+    <path android:fillColor="#00000000" android:strokeColor="#FF3B2A20" android:strokeWidth="2.4" android:strokeLineCap="round"
+        android:pathData="M54.5,56 Q59,50.5 63.5,56" />
+
+    <!-- 볼 -->
+    <path android:fillColor="#B3FFB3C1" android:pathData="M29,62.5 a5,3.2 0 1,0 10,0 a5,3.2 0 1,0 -10,0 Z" />
+    <path android:fillColor="#B3FFB3C1" android:pathData="M61,62.5 a5,3.2 0 1,0 10,0 a5,3.2 0 1,0 -10,0 Z" />
+
+    <!-- 웃는 입 -->
+    <path android:fillColor="#FFE07A8C"
+        android:pathData="M44.5,63.5 Q50,70.5 55.5,63.5 Q50,66 44.5,63.5 Z" />
+</vector>

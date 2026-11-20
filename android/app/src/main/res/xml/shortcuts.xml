@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘을 길게 누르면 나오는 바로가기 (한 번에 그 화면으로) -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="add_event" android:enabled="true" android:icon="@drawable/ic_shortcut_add_event"
+        android:shortcutShortLabel="@string/shortcut_add_event" android:shortcutLongLabel="@string/shortcut_add_event_long">
+        <intent android:action="com.uridul.app.SHORTCUT" android:data="uridul-shortcut://open/add_event"
+            android:targetPackage="com.uridul.app" android:targetClass="com.uridul.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="question" android:enabled="true" android:icon="@drawable/ic_shortcut_question"
+        android:shortcutShortLabel="@string/shortcut_question" android:shortcutLongLabel="@string/shortcut_question">
+        <intent android:action="com.uridul.app.SHORTCUT" android:data="uridul-shortcut://open/question"
+            android:targetPackage="com.uridul.app" android:targetClass="com.uridul.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="ledger_add" android:enabled="true" android:icon="@drawable/ic_shortcut_ledger"
+        android:shortcutShortLabel="@string/shortcut_ledger_add" android:shortcutLongLabel="@string/shortcut_ledger_add_long">
+        <intent android:action="com.uridul.app.SHORTCUT" android:data="uridul-shortcut://open/ledger_add"
+            android:targetPackage="com.uridul.app" android:targetClass="com.uridul.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="diary" android:enabled="true" android:icon="@drawable/ic_shortcut_diary"
+        android:shortcutShortLabel="@string/shortcut_diary" android:shortcutLongLabel="@string/shortcut_diary">
+        <intent android:action="com.uridul.app.SHORTCUT" android:data="uridul-shortcut://open/diary"
+            android:targetPackage="com.uridul.app" android:targetClass="com.uridul.app.MainActivity" />
+    </shortcut>
+</shortcuts>

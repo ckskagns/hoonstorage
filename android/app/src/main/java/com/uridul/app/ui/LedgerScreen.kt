@@ -71,6 +71,9 @@ fun LedgerContent(
     modifier: Modifier = Modifier,
     /** 날짜 머리글의 사진을 누르면 그날 일기 (크게 보기) */
     onOpenDay: (com.uridul.app.data.CalendarEvent) -> Unit = {},
+    /** 앱 아이콘 바로가기 "가계부 기록": 0 보다 크면 직접 기록 창을 열고 [onCreateRequestHandled] */
+    createRequest: Int = 0,
+    onCreateRequestHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember { appContainer(context)?.ledger }
@@ -102,6 +105,12 @@ fun LedgerContent(
     var editing by remember { mutableStateOf<LedgerEntry?>(null) }
     /** 직접 기록 창 */
     var creating by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(createRequest) {
+        if (createRequest > 0) {
+            creating = true
+            onCreateRequestHandled()
+        }
+    }
     var showLocals by rememberSaveable { mutableStateOf(false) }
 
     // 설정에서 돌아오면 허용 상태를 다시 본다

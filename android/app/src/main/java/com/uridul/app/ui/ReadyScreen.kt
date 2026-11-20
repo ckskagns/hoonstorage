@@ -152,6 +152,9 @@ fun ReadyScreen(
     val appContext = androidx.compose.ui.platform.LocalContext.current
     var tabKey by rememberSaveable { mutableStateOf(Tab.Home.key) }
     val tab = Tab.entries.firstOrNull { it.key == tabKey } ?: Tab.Home
+    /** 바로가기로 받은 "가계부 직접 기록" / "오늘의 질문" 요청 (0 = 없음, 쓰면 0 으로) */
+    var ledgerCreateRequest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var questionRequest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // 일기장 새 소식 점: 마지막으로 일기장을 본 뒤 상대가 후기·사진을 올렸으면
     val photoHooksTop = LocalPhotos.current
     val reviewsTop = LocalReviews.current.reviews
@@ -222,6 +225,9 @@ fun ReadyScreen(
         if (request.addEvent) openDay(request.date ?: selected, new = true)
         // 알림을 눌러 열었으면 그 일정을 연 채로 그 날 하루 페이지
         request.focusEventId?.let { id -> openDay(request.date ?: selected, focus = id) }
+        // 앱 아이콘 바로가기: 가계부 직접 기록 창 / 오늘의 질문
+        if (request.ledgerAdd) ledgerCreateRequest++
+        if (request.question) questionRequest++
         onOpenRequestHandled()
     }
 
@@ -429,6 +435,8 @@ fun ReadyScreen(
                     )
                     Tab.Ledger -> LedgerContent(
                         couple = couple, myUid = myUid, modifier = content,
+                        createRequest = ledgerCreateRequest,
+                        onCreateRequestHandled = { ledgerCreateRequest = 0 },
                         // 날짜 머리글의 사진을 누르면 일기장 탭에서 그날 사진·후기를 크게 보기
                         onOpenDay = { e ->
                             diaryViewText = FeedPost.of(e).encode()

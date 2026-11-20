@@ -105,6 +105,8 @@ private fun CharacterNames(snapshot: WidgetSnapshot, avatarDp: Int) {
 internal fun widgetDrawable(c: Character): Int = when (c) {
     Character.DRAGON -> R.drawable.char_dragon
     Character.BUNNY -> R.drawable.char_bunny
+    Character.COUPLE_HE -> R.drawable.char_couple_he
+    Character.COUPLE_SHE -> R.drawable.char_couple_she
 }
 
 @Composable

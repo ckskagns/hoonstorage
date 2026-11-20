@@ -66,6 +66,11 @@ class MainActivity : ComponentActivity() {
      */
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        // 앱 아이콘을 길게 눌러 고른 바로가기
+        if (intent.action == SHORTCUT_ACTION) {
+            shortcutRequest(intent.data?.lastPathSegment)?.let(viewModel::onOpenRequest)
+            return
+        }
         intent.dataString?.let { data ->
             InviteToken.parse(data)?.let(viewModel::onInviteReceived)
         }
@@ -233,4 +238,16 @@ private fun UridulRoot(viewModel: AppViewModel) {
             com.uridul.app.ui.HeartBurstOverlay()
         } }
     }
+}
+
+/** 앱 아이콘 바로가기 (res/xml/shortcuts.xml) 의 intent action */
+internal const val SHORTCUT_ACTION = "com.uridul.app.SHORTCUT"
+
+/** 바로가기 이름 → 열 화면 */
+internal fun shortcutRequest(name: String?): OpenRequest? = when (name) {
+    "add_event" -> OpenRequest(tab = "calendar", date = LocalDate.now(), addEvent = true)
+    "ledger_add" -> OpenRequest(tab = "ledger", ledgerAdd = true)
+    "diary" -> OpenRequest(tab = "diary")
+    "question" -> OpenRequest(tab = "home", question = true)
+    else -> null
 }

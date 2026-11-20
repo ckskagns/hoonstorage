@@ -16,4 +16,11 @@
     <string name="partner_photo_widget_description">상대가 일기에 올린 가장 최근 사진을 보여줘요. 앱을 열거나 한 시간마다 새로 고쳐요</string>
     <string name="photo_widget_description">각자 고른 사진 위에 함께한 날을 보여줘요. 사진은 이 폰에만 저장돼요</string>
     <string name="share_place_label">우리둘 일정 장소</string>
+    <!-- 앱 아이콘 바로가기 -->
+    <string name="shortcut_add_event">일정 추가</string>
+    <string name="shortcut_add_event_long">오늘 날짜로 일정 추가</string>
+    <string name="shortcut_question">오늘의 질문</string>
+    <string name="shortcut_ledger_add">가계부 기록</string>
+    <string name="shortcut_ledger_add_long">가계부 직접 기록</string>
+    <string name="shortcut_diary">일기장</string>
 </resources>

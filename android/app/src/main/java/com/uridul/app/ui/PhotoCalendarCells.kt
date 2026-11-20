@@ -35,7 +35,7 @@ import java.time.LocalDate
 // 사진 달력: 머리글의 📷 단추, 사진이 있는 날의 달력 칸. CalendarMonthGrid 에서 쓴다.
 
 /** 머리글 사진 단추 크기 (왼쪽에도 같은 만큼 비워 제목을 가운데에 둔다) */
-internal val PhotoToggleSize = 40.dp
+internal val PhotoToggleSize = 48.dp
 
 /** 📷 사진 달력 켜기/끄기 (켜면 동그란 바탕이 깔린다) */
 @Composable

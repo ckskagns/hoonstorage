@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +62,8 @@ fun EventColorPicker(
 private fun ColorDot(color: EventColor, isSelected: Boolean, label: String?, description: String, onClick: () -> Unit) {
     Box(
         Modifier
+            // 보이는 동그라미는 36dp, 누르는 영역은 48dp (안드로이드 접근성 기준)
+            .minimumInteractiveComponentSize()
             .size(36.dp)
             .clip(CircleShape)
             .background(Color(color.fill))

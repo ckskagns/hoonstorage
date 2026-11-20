@@ -4,12 +4,24 @@ import com.uridul.app.domain.Birthday
 import java.time.LocalDate
 import java.time.MonthDay
 
-/** 커플 캐릭터. 오리지널 디자인(통통한 주황 아기 용 / 하얀 토끼). */
+/**
+ * 커플 캐릭터. 오리지널 디자인(통통한 주황 아기 용 / 하얀 토끼) + 연인 캐릭터
+ * (일기 사진에서 뽑은 특징으로 그린 2등신: 용 뿔 머리핀 남자친구 / 토끼 귀 머리띠 여자친구).
+ * 예전 앱은 모르는 키를 기본 캐릭터로 보여준다 (서버 규칙은 키 값을 제한하지 않음).
+ */
 enum class Character(val key: String, val label: String) {
     DRAGON("dragon", "아기 용"),
-    BUNNY("bunny", "토끼");
+    BUNNY("bunny", "토끼"),
+    COUPLE_HE("couple_he", "연인 (남)"),
+    COUPLE_SHE("couple_she", "연인 (여)");
 
-    val other: Character get() = if (this == DRAGON) BUNNY else DRAGON
+    /** 짝 캐릭터 (용↔토끼, 연인 남↔여) */
+    val other: Character get() = when (this) {
+        DRAGON -> BUNNY
+        BUNNY -> DRAGON
+        COUPLE_HE -> COUPLE_SHE
+        COUPLE_SHE -> COUPLE_HE
+    }
 
     companion object {
         fun from(key: String?): Character? = entries.firstOrNull { it.key == key }
