@@ -25,87 +25,12 @@ import java.time.LocalDate
 
 // 메인 화면(ReadyScreen)의 오른쪽 위 메뉴와 작은 확인 창들
 
-/** 메뉴에서 고른 것 */
+/** 설정 페이지에서 고른 것 (ui/SettingsPage.kt) */
 internal enum class MenuAction {
     Profile, StartDate, ToggleCountFromOne, Invite,
-    ToggleNotify, TogglePartnerAlerts, Theme, TogglePhotoTint, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
+    ToggleNotify, TogglePartnerAlerts, Theme, TogglePhotoTint, TogglePhotoCalendar, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
 }
 
-/** 오른쪽 위 ⋮ 메뉴 */
-@Composable
-internal fun MainMenu(
-    expanded: Boolean,
-    onDismiss: () -> Unit,
-    couple: Couple,
-    myUid: String,
-    notifyEnabled: Boolean,
-    partnerAlertsEnabled: Boolean,
-    themeLabel: String,
-    deletedCount: Int,
-    onAction: (MenuAction) -> Unit,
-) {
-    fun pick(action: MenuAction) {
-        onDismiss()
-        onAction(action)
-    }
-    // 설정이 바뀌면 체크 표시도 바로 (StateFlow.value 를 그냥 읽으면 다시 그려지지 않는다)
-    val photoTint = com.uridul.app.data.AppSettings.state.collectAsState().value.photoTint
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text("내 프로필 (이름·캐릭터)") },
-            leadingIcon = { CharacterAvatar(couple.myCharacter(myUid), 24.dp) },
-            onClick = { pick(MenuAction.Profile) },
-        )
-        DropdownMenuItem(text = { Text("시작일 변경") }, onClick = { pick(MenuAction.StartDate) })
-        DropdownMenuItem(
-            text = { Text("사귄 날을 1일로 계산") },
-            trailingIcon = { Checkbox(checked = couple.countFromOne, onCheckedChange = null) },
-            onClick = { pick(MenuAction.ToggleCountFromOne) },
-        )
-        if (!couple.isPaired) {
-            DropdownMenuItem(text = { Text("초대 링크 보내기") }, onClick = { pick(MenuAction.Invite) })
-        }
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text("일정 알림 (일정 있는 날 아침 9시)") },
-            trailingIcon = { Checkbox(checked = notifyEnabled, onCheckedChange = null) },
-            onClick = { pick(MenuAction.ToggleNotify) },
-        )
-        DropdownMenuItem(
-            text = { Text("상대 소식 알림 (일정·가고 싶은 곳·후기)") },
-            trailingIcon = { Checkbox(checked = partnerAlertsEnabled, onCheckedChange = null) },
-            onClick = { pick(MenuAction.TogglePartnerAlerts) },
-        )
-        DropdownMenuItem(text = { Text("화면 모드 ($themeLabel)") }, onClick = { pick(MenuAction.Theme) })
-        DropdownMenuItem(
-            text = { Text("디데이 사진 색 따라가기") },
-            trailingIcon = { Checkbox(checked = photoTint, onCheckedChange = null) },
-            onClick = { pick(MenuAction.TogglePhotoTint) },
-        )
-        DropdownMenuItem(
-            text = { Text("일정 색") },
-            trailingIcon = {
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Box(Modifier.size(14.dp).background(CoupleColors.mineFill, CircleShape))
-                    Box(Modifier.size(14.dp).background(CoupleColors.partnerFill, CircleShape))
-                }
-            },
-            onClick = { pick(MenuAction.Colors) },
-        )
-        DropdownMenuItem(text = { Text("하트 위젯 디자인") }, onClick = { pick(MenuAction.HeartDesign) })
-        DropdownMenuItem(
-            text = { Text(if (deletedCount == 0) "최근 지운 일정" else "최근 지운 일정 ($deletedCount)") },
-            onClick = { pick(MenuAction.Deleted) },
-        )
-        DropdownMenuItem(text = { Text("백업 파일 저장") }, onClick = { pick(MenuAction.BackupSave) })
-        DropdownMenuItem(text = { Text("백업 불러오기") }, onClick = { pick(MenuAction.BackupLoad) })
-        DropdownMenuItem(
-            text = { Text("업데이트 확인 (현재 ${com.uridul.app.BuildConfig.VERSION_NAME})") },
-            onClick = { pick(MenuAction.CheckUpdate) },
-        )
-        DropdownMenuItem(text = { Text("로그아웃") }, onClick = { pick(MenuAction.SignOut) })
-    }
-}
 
 /** 지도 앱에서 그냥 공유한 장소: 가고 싶은 곳 / 고른 날 일정 중 어디에 담을지 */
 @Composable

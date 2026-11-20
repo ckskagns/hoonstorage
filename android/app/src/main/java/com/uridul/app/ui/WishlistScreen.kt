@@ -105,6 +105,7 @@ fun WishlistContent(
                     title = "아직 담은 곳이 없어요 🌷",
                     body = "[+ 장소 담기] 를 눌러 지도 앱에서 장소를 고른 뒤\n공유 → 우리둘 을 누르면 여기에 담겨요.\n지도 앱에서 그냥 공유해도 \"가고 싶은 곳에 담기\" 를 고를 수 있어요.",
                     modifier = Modifier.padding(top = 8.dp),
+                    emotion = Emotion.DATE,
                 )
             }
         }

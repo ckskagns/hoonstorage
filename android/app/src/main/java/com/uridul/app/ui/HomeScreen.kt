@@ -196,13 +196,16 @@ private fun HeroCard(
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
             // 두 캐릭터가 살랑살랑 움직이고, 누르면 콩 뛴다
-            CoupleHeader(
-                myCharacter = couple.myCharacter(myUid),
-                partnerCharacter = couple.partnerCharacter(myUid),
-                myName = couple.myName(myUid),
-                partnerName = partner,
-                avatarSize = 72.dp,
-            )
+            // 캐릭터 그림이 있으면 시간대 장면(밤 잘 자·아침 굿모닝·낮 기본), 없으면 두 캐릭터와 이름
+            EmotionArt(Emotion.forHour(java.time.LocalTime.now().hour), couple, myUid, 160.dp) {
+                CoupleHeader(
+                    myCharacter = couple.myCharacter(myUid),
+                    partnerCharacter = couple.partnerCharacter(myUid),
+                    myName = couple.myName(myUid),
+                    partnerName = partner,
+                    avatarSize = 72.dp,
+                )
+            }
             Text(
                 "함께한 지",
                 style = MaterialTheme.typography.bodyMedium,

@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Edit
@@ -271,11 +271,11 @@ fun ReadyScreen(
                             },
                             onMarkAllRead = onInboxAllRead,
                         )
+                        // ⚙ 설정: 기능별 대메뉴 → 상세 페이지 (ui/SettingsPage.kt)
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "메뉴")
+                            Icon(Icons.Filled.Settings, contentDescription = "설정")
                         }
-                        MainMenu(
-                            expanded = menuOpen,
+                        if (menuOpen) SettingsPage(
                             onDismiss = { menuOpen = false },
                             couple = couple,
                             myUid = myUid,
@@ -293,6 +293,7 @@ fun ReadyScreen(
                                     MenuAction.TogglePartnerAlerts -> onSetPartnerAlerts(!partnerAlertsEnabled)
                                     MenuAction.Theme -> pickingTheme = true
                                     MenuAction.TogglePhotoTint -> AppSettings.update(appContext) { it.copy(photoTint = !it.photoTint) }
+                                    MenuAction.TogglePhotoCalendar -> AppSettings.update(appContext) { it.copy(photoCalendar = !it.photoCalendar) }
                                     MenuAction.Colors -> pickingColors = true
                                     MenuAction.HeartDesign -> runCatching {
                                         appContext.startActivity(android.content.Intent(appContext, com.uridul.app.HeartWidgetConfigActivity::class.java))
@@ -301,7 +302,7 @@ fun ReadyScreen(
                                     MenuAction.BackupSave -> exportLauncher.launch(com.uridul.app.data.Backup.fileName(LocalDate.now()))
                                     MenuAction.BackupLoad -> importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
                                     MenuAction.CheckUpdate -> onCheckUpdate()
-                                    MenuAction.SignOut -> onSignOut()
+                                    MenuAction.SignOut -> { menuOpen = false; onSignOut() }
                                 }
                             },
                         )

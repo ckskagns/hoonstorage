@@ -29,15 +29,19 @@ fun CharacterEmpty(
     modifier: Modifier = Modifier,
     action: String? = null,
     onAction: () -> Unit = {},
+    /** 감정 그림 (그림 파일이 생기면 캐릭터 둘 대신 이 장면) */
+    emotion: Emotion = Emotion.SAD,
 ) {
     Column(
         modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-            CharacterAvatar(couple.myCharacter(myUid), 64.dp, bob = true, phase = 0)
-            CharacterAvatar(couple.partnerCharacter(myUid), 64.dp, bob = true, phase = 1)
+        EmotionArt(emotion, couple, myUid, 150.dp) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+                CharacterAvatar(couple.myCharacter(myUid), 64.dp, bob = true, phase = 0)
+                CharacterAvatar(couple.partnerCharacter(myUid), 64.dp, bob = true, phase = 1)
+            }
         }
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)

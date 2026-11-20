@@ -210,6 +210,7 @@ fun LedgerContent(
                 body = "같이 쓰는 카드로 결제하면 알림을 읽어 자동으로 적혀요.\n현금처럼 알림이 없는 건 직접 적어 주세요.",
                 action = "✏️ 직접 기록",
                 onAction = { creating = true },
+                emotion = Emotion.SAVE,
             )
         }
         byDay.forEach { (day, list) ->

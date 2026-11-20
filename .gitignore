@@ -19,3 +19,6 @@ Thumbs.db
 firebase/.firebase/
 **/firebase-debug*.log
 firebase/node_modules/
+
+# 캐릭터 원본 그림 받는 곳 (앱에는 scripts/import_characters.ps1 로 줄여서 넣음)
+assets_in/

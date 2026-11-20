@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 감정 그림(char_NN_key)은 이름으로 찾아 쓰므로, 나중에 리소스 줄이기를 켜도 지우지 않게 -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/char_*" />

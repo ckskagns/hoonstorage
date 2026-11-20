@@ -99,7 +99,7 @@ fun DiaryContent(
     }
 
     val gridEmpty: @Composable () -> Unit = {
-        CharacterEmpty(couple, myUid, title = "아직 올린 사진이 없어요 📷", body = "일기 게시물의 📷 를 눌러 그날 사진을 올려 보세요.", action = "📰 피드로 가기", onAction = { gridMode = false })
+        CharacterEmpty(couple, myUid, title = "아직 올린 사진이 없어요 📷", body = "일기 게시물의 📷 를 눌러 그날 사진을 올려 보세요.", action = "📰 피드로 가기", onAction = { gridMode = false }, emotion = Emotion.PHOTO)
     }
 
     // 게시물마다 "이날 데이트 비용" (그 달 가계부를 한 번만 읽는다)
@@ -155,6 +155,7 @@ fun DiaryContent(
                             body = "캘린더에서 지난 일정을 누르고 💗 한 줄 후기 남기기 를 눌러 보세요.\n홈의 추억 슬라이드에서도 바로 쓸 수 있어요.",
                             action = "📅 캘린더로 가기",
                             onAction = onGoCalendar,
+                            emotion = Emotion.LETTER,
                         )
                     }
                 }

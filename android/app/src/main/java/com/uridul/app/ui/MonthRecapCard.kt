@@ -145,8 +145,11 @@ private fun RecapCard(recap: MonthRecap.Recap, couple: Couple, myUid: String, ph
                 Text("${recap.month.monthValue}월의 우리", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = scheme.primary)
                 Text("${couple.myName(myUid)} ♥ ${couple.partnerName(myUid) ?: "?"}", style = MaterialTheme.typography.titleSmall, color = scheme.onPrimaryContainer)
             }
-            CharacterAvatar(couple.myCharacter(myUid), 44.dp, bob = true, phase = 0)
-            CharacterAvatar(couple.partnerCharacter(myUid), 44.dp, bob = true, phase = 1)
+            // 캐릭터 그림이 있으면 "꼬옥" 장면
+            EmotionArt(Emotion.HUG, couple, myUid, 92.dp) {
+                CharacterAvatar(couple.myCharacter(myUid), 44.dp, bob = true, phase = 0)
+                CharacterAvatar(couple.partnerCharacter(myUid), 44.dp, bob = true, phase = 1)
+            }
         }
 
         // 사진 콜라주 (하트·사진 많은 날 최대 4장)
