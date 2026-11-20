@@ -1,9 +1,9 @@
 {
-    "versionCode":  21,
-    "versionName":  "0.19.0",
-    "notes":  "우리 캐릭터가 왔어요: 새 앱 아이콘, 상황별 캐릭터 그림(시간대·기념일 축하·빈 화면·알림), 설정 페이지(⚙), 오늘의 질문, 연결 끊김 안내, 다음 일정 바로 추가",
-    "size":  52663404,
-    "sha256":  "2ee7197f2adb2d8684d5cdfee0c9a0f02164039be17c31050dbc59c2f6a4c618",
-    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.19.0/uridul.apk",
-    "releasedAt":  "2026-11-20T20:44:53+09:00"
+    "versionCode":  22,
+    "versionName":  "0.20.0",
+    "notes":  "일정 날짜를 바꾸면 그 날의 사진·후기도 함께 옮겨져요. 반복 일정은 이 날만 옮길지 반복 전체를 옮길지 골라요.",
+    "size":  52106660,
+    "sha256":  "4b39abd24478504c7ebb83e23060fda4282cb25ad2f27236bc82a1f6d6eac63d",
+    "apkUrl":  "https://github.com/ckskagns/hoonstorage/releases/download/v0.20.0/uridul.apk",
+    "releasedAt":  "2026-11-21T08:26:54+09:00"
 }
