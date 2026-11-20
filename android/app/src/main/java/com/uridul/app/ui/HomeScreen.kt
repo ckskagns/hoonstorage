@@ -20,6 +20,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -53,6 +55,25 @@ fun HomeContent(
         onLoadMemories(today)
         // 디데이 카드에 깔 오늘의 사진 (일기 사진 중에서, 하루에 하나)
         photos.refreshHero(today)
+    }
+    // 매달 1~7일: "지난달의 우리" 카드 (지난달에 후기·사진이 있고, 닫지 않았으면)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val reviews = LocalReviews.current.reviews
+    val recapMonth = com.uridul.app.domain.MonthRecap.homeMonth(today)
+    var recapClosed by androidx.compose.runtime.remember(recapMonth) {
+        androidx.compose.runtime.mutableStateOf(recapMonth == null || RecapFlags.closed(context, recapMonth))
+    }
+    val showRecap = recapMonth != null && !recapClosed &&
+        recapMonth in com.uridul.app.domain.MonthRecap.months(reviews.values, photos.dayPhotos.keys, today)
+    var recapOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (recapOpen && recapMonth != null) MonthRecapDialog(recapMonth, couple, myUid) { recapOpen = false }
+    val recapBanner: @Composable (Modifier) -> Unit = { m ->
+        if (showRecap && recapMonth != null) RecapHomeBanner(
+            recapMonth,
+            onOpen = { recapOpen = true },
+            onClose = { RecapFlags.close(context, recapMonth); recapClosed = true },
+            modifier = m,
+        )
     }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -90,6 +111,7 @@ fun HomeContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (!couple.isPaired) InviteBanner(busy, onInvite)
+                        recapBanner(Modifier.fillMaxWidth())
                         MemorySlides(memories, couple, myUid, onOpenMemory)
                         MilestoneCard(milestones, today, Modifier.fillMaxWidth())
                     }
@@ -109,6 +131,7 @@ fun HomeContent(
                         .widthIn(max = 560.dp)
                     HeroCard(couple, myUid, today, m, onOpenMemory, photoHeight = HeroPhotoHeight)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
+                    recapBanner(m)
                     MemorySlides(memories, couple, myUid, onOpenMemory, m)
                     MilestoneCard(milestones, today, m)
                 }

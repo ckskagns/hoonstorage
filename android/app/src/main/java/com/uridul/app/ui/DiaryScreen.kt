@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +47,14 @@ fun DiaryContent(
             .map(FeedPost::of)
     }
 
+    // 위쪽 "11월의 우리" 단추들 (후기·사진이 있는 달) → 한 달 돌아보기
+    val dayPhotos = LocalPhotos.current.dayPhotos
+    val recapMonths = remember(reviews, dayPhotos.keys) { com.uridul.app.domain.MonthRecap.months(reviews.values, dayPhotos.keys, java.time.LocalDate.now()) }
+    var recapText by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    recapText.takeIf { it.isNotEmpty() }?.let { m ->
+        MonthRecapDialog(java.time.YearMonth.parse(m), couple, myUid) { recapText = "" }
+    }
+
     // 게시물마다 "이날 데이트 비용" (그 달 가계부를 한 번만 읽는다)
     val dayCosts = rememberDayCosts(couple.id)
     androidx.compose.runtime.CompositionLocalProvider(LocalDayCosts provides dayCosts) {
@@ -55,6 +65,7 @@ fun DiaryContent(
     ) {
         item(key = "head") {
             Column(Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(horizontal = 16.dp, vertical = 4.dp)) {
+                RecapMonthChips(recapMonths, onOpen = { recapText = it.toString() }, modifier = Modifier.padding(bottom = 4.dp))
                 Text(
                     if (posts.isEmpty()) "지난 일정에 한 줄 후기를 남기면 여기에 차곡차곡 모여요" else "하루 ${posts.size}개 · 최근 날짜부터 · 사진을 누르면 크게 보여요",
                     style = MaterialTheme.typography.bodySmall,
