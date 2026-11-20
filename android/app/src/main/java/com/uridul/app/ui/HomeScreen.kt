@@ -211,7 +211,8 @@ private fun HeroCard(
             Text(
                 DDay.heroText(couple.startDate, today, couple.countFromOne),
                 fontSize = heroSize,
-                fontWeight = FontWeight.Bold,
+                // 디데이 숫자는 둥근 주아 글꼴
+                fontFamily = com.uridul.app.ui.theme.JuaFamily,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 textAlign = TextAlign.Center,

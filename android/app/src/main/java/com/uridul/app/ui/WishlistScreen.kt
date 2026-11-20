@@ -100,12 +100,11 @@ fun WishlistContent(
         }
         if (wishes.isEmpty()) {
             item {
-                Text(
-                    "아직 담은 곳이 없어요 🌷\n[+ 장소 담기] 를 눌러 지도 앱에서 장소를 고른 뒤\n공유 → 우리둘 을 누르면 여기에 담겨요.\n\n지도 앱에서 그냥 공유해도 \"가고 싶은 곳에 담기\" 를 고를 수 있어요.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 32.dp, start = 16.dp, end = 16.dp),
+                CharacterEmpty(
+                    couple, myUid,
+                    title = "아직 담은 곳이 없어요 🌷",
+                    body = "[+ 장소 담기] 를 눌러 지도 앱에서 장소를 고른 뒤\n공유 → 우리둘 을 누르면 여기에 담겨요.\n지도 앱에서 그냥 공유해도 \"가고 싶은 곳에 담기\" 를 고를 수 있어요.",
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }

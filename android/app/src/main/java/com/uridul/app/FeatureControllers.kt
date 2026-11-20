@@ -228,6 +228,29 @@ class PhotoController internal constructor(private val f: FeatureScope) {
         heroToday?.let { recomputeHero(it) }
     }
 
+    private val _partnerLatest = MutableStateFlow<PhotoMeta?>(null)
+    /** 상대가 가장 최근에 올린 사진 (일기장 새 소식 점, "상대 최근 사진" 위젯) */
+    val partnerLatest: StateFlow<PhotoMeta?> = _partnerLatest.asStateFlow()
+    private var partnerCheckedAt = 0L
+
+    /** 상대 최근 사진 다시 확인 (5분에 한 번까지, 사진은 최근 5장의 작은 사진만) */
+    fun refreshPartnerLatest(force: Boolean = false) {
+        val ready = f.ready() ?: return
+        val repo = f.container.photos ?: return
+        val now = System.currentTimeMillis()
+        if (!force && now - partnerCheckedAt < PhotoDays.RECHECK_MS) return
+        partnerCheckedAt = now
+        f.scope.launch {
+            runCatching { repo.fetchLatest(ready.couple.id, 5) }
+                .onSuccess { list ->
+                    val latest = list.firstOrNull { it.uploadedBy != ready.myUid }
+                    _partnerLatest.value = latest
+                    com.uridul.app.widget.PartnerPhotoStore.update(f.app, latest, ready.couple.partnerName(ready.myUid))
+                }
+                .onFailure { partnerCheckedAt = 0L }
+        }
+    }
+
     private val _hero = MutableStateFlow(HeroState())
     /** 디데이 카드에 깔 오늘의 사진 */
     val hero: StateFlow<HeroState> = _hero.asStateFlow()
@@ -244,6 +267,8 @@ class PhotoController internal constructor(private val f: FeatureScope) {
     fun refreshHero(today: LocalDate) {
         val ready = f.ready() ?: return
         heroToday = today
+        // 홈을 열 때 상대 최근 사진도 (일기장 새 소식 점, 상대 사진 위젯)
+        refreshPartnerLatest()
         val coupleId = ready.couple.id
         f.scope.launch {
             if (!heroSavedLoaded) {

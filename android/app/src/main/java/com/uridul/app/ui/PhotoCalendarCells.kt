@@ -82,6 +82,7 @@ internal fun PhotoDayCell(
     val shape = RoundedCornerShape(10.dp)
     val bitmap = rememberPhotoBitmap("cal:${photo.id}", photo.thumb)
     val fade = if (inMonth) 1f else 0.4f
+    val dark = com.uridul.app.ui.theme.LocalDarkTheme.current
     Box(
         modifier
             .padding(1.dp)
@@ -106,7 +107,7 @@ internal fun PhotoDayCell(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.45f * fade), 0.5f to Color.Transparent)),
+                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = (if (dark) 0.6f else 0.45f) * fade), 0.5f to Color.Transparent)),
         )
         if (inRange) Box(Modifier.fillMaxSize().background(scheme.primary.copy(alpha = 0.35f)))
         Box(

@@ -192,6 +192,15 @@ fun LedgerContent(
             }
         }
         item(key = "listHead") { SectionTitle("📒 ${month.monthValue}월 내역", if (confirmed.isEmpty()) "아직 기록이 없어요" else "${confirmed.size}건") }
+        if (confirmed.isEmpty()) item(key = "emptyMonth") {
+            CharacterEmpty(
+                couple, myUid,
+                title = "${month.monthValue}월 데이트 기록이 아직 없어요",
+                body = "같이 쓰는 카드로 결제하면 알림을 읽어 자동으로 적혀요.\n현금처럼 알림이 없는 건 직접 적어 주세요.",
+                action = "✏️ 직접 기록",
+                onAction = { creating = true },
+            )
+        }
         byDay.forEach { (day, list) ->
             item(key = "d$day") {
                 Row(Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {

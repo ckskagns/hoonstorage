@@ -64,7 +64,7 @@ import java.time.YearMonth
 private enum class Tab(val key: String, val label: String, val icon: ImageVector) {
     Home("home", "디데이", Icons.Filled.Favorite),
     Calendar("calendar", "캘린더", Icons.Filled.DateRange),
-    Diary("diary", "일기장", Icons.Filled.Edit),
+    Diary("diary", "일기장", PhotoAlbumIcon),
     Wish("wish", "가고 싶은 곳", Icons.Filled.Place),
     Ledger("ledger", "가계부", Icons.Filled.ShoppingCart),
 }
@@ -152,6 +152,19 @@ fun ReadyScreen(
     val appContext = androidx.compose.ui.platform.LocalContext.current
     var tabKey by rememberSaveable { mutableStateOf(Tab.Home.key) }
     val tab = Tab.entries.firstOrNull { it.key == tabKey } ?: Tab.Home
+    // 일기장 새 소식 점: 마지막으로 일기장을 본 뒤 상대가 후기·사진을 올렸으면
+    val photoHooksTop = LocalPhotos.current
+    val reviewsTop = LocalReviews.current.reviews
+    val diarySeenAt by com.uridul.app.data.DiarySeen.seenAt.collectAsState()
+    LaunchedEffect(couple.id) {
+        com.uridul.app.data.DiarySeen.load(appContext, couple.id)
+        photoHooksTop.refreshPartner()
+    }
+    LaunchedEffect(tab) {
+        if (tab == Tab.Diary) com.uridul.app.data.DiarySeen.mark(appContext, couple.id)
+    }
+    val diaryNew = tab != Tab.Diary &&
+        com.uridul.app.domain.DiaryNews.hasNew(reviewsTop.values, myUid, diarySeenAt, photoHooksTop.partnerPhotoAt)
     var selectedText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     val selected = LocalDate.parse(selectedText)
     var editing by remember { mutableStateOf<EditorTarget?>(null) }
@@ -273,6 +286,7 @@ fun ReadyScreen(
                                     MenuAction.ToggleNotify -> onSetNotify(!notifyEnabled)
                                     MenuAction.TogglePartnerAlerts -> onSetPartnerAlerts(!partnerAlertsEnabled)
                                     MenuAction.Theme -> pickingTheme = true
+                                    MenuAction.TogglePhotoTint -> AppSettings.update(appContext) { it.copy(photoTint = !it.photoTint) }
                                     MenuAction.Colors -> pickingColors = true
                                     MenuAction.HeartDesign -> runCatching {
                                         appContext.startActivity(android.content.Intent(appContext, com.uridul.app.HeartWidgetConfigActivity::class.java))
@@ -295,7 +309,7 @@ fun ReadyScreen(
                             NavigationBarItem(
                                 selected = tab == t,
                                 onClick = { tabKey = t.key },
-                                icon = { Icon(t.icon, contentDescription = null) },
+                                icon = { TabIcon(t.icon, t == Tab.Diary && diaryNew) },
                                 label = { Text(t.label) },
                             )
                         }
@@ -327,7 +341,7 @@ fun ReadyScreen(
                             NavigationRailItem(
                                 selected = tab == t,
                                 onClick = { tabKey = t.key },
-                                icon = { Icon(t.icon, contentDescription = null) },
+                                icon = { TabIcon(t.icon, t == Tab.Diary && diaryNew) },
                                 label = { Text(t.label) },
                             )
                         }
@@ -395,6 +409,7 @@ fun ReadyScreen(
                             diaryViewText = p?.encode().orEmpty()
                             diaryViewPage = page
                         },
+                        onGoCalendar = { tabKey = Tab.Calendar.key },
                     )
                     Tab.Wish -> WishlistContent(
                         wishes = wishes,
@@ -616,4 +631,35 @@ private data class DayPageTarget(val date: LocalDate, val focus: String?, val ne
             return DayPageTarget(date, parts[1].ifEmpty { null }, parts[2] == "true")
         }
     }
+}
+
+/** 탭 아이콘 (+ 새 소식이 있으면 작은 점) */
+@Composable
+private fun TabIcon(icon: ImageVector, dot: Boolean) {
+    androidx.compose.material3.BadgedBox(badge = { if (dot) androidx.compose.material3.Badge() }) {
+        Icon(icon, contentDescription = if (dot) "새 소식" else null)
+    }
+}
+
+/** 일기장 탭 아이콘: 사진 액자 (산 + 해). 기본 아이콘 묶음에 사진 모양이 없어 직접 그린다 */
+private val PhotoAlbumIcon: ImageVector by lazy {
+    ImageVector.Builder("PhotoAlbum", 24.dp, 24.dp, 24f, 24f).apply {
+        // 액자 테두리 (안을 비운 둥근 사각형)
+        addPath(
+            pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+                "M19,3H5C3.9,3 3,3.9 3,5v14c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2V5C21,3.9 20.1,3 19,3zM19,19H5V5h14V19z",
+            ).toNodes(),
+            fill = androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Black),
+        )
+        // 산
+        addPath(
+            pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M13.96,12.29l-2.75,3.54l-1.96,-2.36L6.5,17h11L13.96,12.29z").toNodes(),
+            fill = androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Black),
+        )
+        // 해
+        addPath(
+            pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M8.5,9.5m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0").toNodes(),
+            fill = androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Black),
+        )
+    }.build()
 }

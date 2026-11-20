@@ -35,6 +35,7 @@ object Widgets {
         CalendarWidget().updateAll(context)
         MonthWidget.refreshAll(context)
         PhotoWidget().updateAll(context)
+        PartnerPhotoWidget().updateAll(context)
     }
 
     /**

@@ -115,6 +115,8 @@ object CoupleColors {
 }
 
 /** 둥글둥글한 모서리: 카드·창·버튼을 기본보다 더 동글게 해서 부드럽고 귀여운 느낌 */
+private val UridulTypography = uridulTypography()
+
 private val SoftShapes = Shapes(
     extraSmall = RoundedCornerShape(10.dp),
     small = RoundedCornerShape(14.dp),
@@ -138,10 +140,28 @@ fun isAppInDarkTheme(): Boolean {
 fun UridulTheme(content: @Composable () -> Unit) {
     val settings by AppSettings.state.collectAsState()
     val dark = isAppInDarkTheme()
+    // "디데이 사진 색 따라가기"를 켰고 사진 색이 있으면 강조색만 그 색으로
+    val seed by PhotoTint.seed.collectAsState()
+    val base = if (dark) DarkColors else LightColors
+    val scheme = seed?.takeIf { settings.photoTint }?.let { PhotoTint.tones(it, dark) }?.let { t ->
+        base.copy(
+            primary = Color(t.primary),
+            onPrimary = Color(t.onPrimary),
+            primaryContainer = Color(t.primaryContainer),
+            onPrimaryContainer = Color(t.onPrimaryContainer),
+            secondaryContainer = Color(t.secondaryContainer),
+            onSecondaryContainer = Color(t.onSecondaryContainer),
+            surfaceContainer = Color(t.surfaceContainer),
+            surfaceContainerHigh = Color(t.surfaceContainerHigh),
+            background = Color(t.background),
+            surface = Color(t.background),
+        )
+    } ?: base
     CompositionLocalProvider(LocalDarkTheme provides dark, LocalUiSettings provides settings) {
         MaterialTheme(
-            colorScheme = if (dark) DarkColors else LightColors,
+            colorScheme = scheme,
             shapes = SoftShapes,
+            typography = UridulTypography,
             content = content,
         )
     }

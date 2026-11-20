@@ -73,6 +73,8 @@ fun FeedViewerDialog(
     val photos by remember(post.reviewId) { hooks.album(post.asEvent()) }.collectAsState(initial = emptyList())
     val pager = rememberPagerState(initialPage = startPage) { photos.size.coerceAtLeast(1) }
     var deleting by remember { mutableStateOf<PhotoMeta?>(null) }
+    var framing by remember { mutableStateOf<PhotoMeta?>(null) }
+    framing?.let { p -> PhotoFrameDialog(p, post.title) { framing = null } }
     var writing by remember { mutableStateOf(false) }
     val addPhoto = rememberAddPhoto(post, photos)
     val mine = review?.entries?.get(myUid)
@@ -104,6 +106,8 @@ fun FeedViewerDialog(
                         Text(sub, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     if (photos.isNotEmpty()) {
+                        // 🖼 사진 꾸미기 (폴라로이드·필름 테두리 + 날짜 도장 → 폰 사진에 저장)
+                        TextButton(onClick = { framing = photos.getOrNull(pager.currentPage) }) { Text("🖼 꾸미기", color = Color.White) }
                         IconButton(onClick = { deleting = photos.getOrNull(pager.currentPage) }) {
                             Icon(Icons.Filled.Delete, contentDescription = "사진 지우기", tint = Color.White)
                         }

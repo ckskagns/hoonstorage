@@ -65,6 +65,8 @@ internal fun DiaryPhotoGrid(
     onPick: (LocalDate, DayPhoto) -> Unit,
     header: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    /** 사진 있는 날이 하나도 없을 때 */
+    empty: @Composable () -> Unit = {},
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 108.dp),
@@ -76,12 +78,7 @@ internal fun DiaryPhotoGrid(
         item(key = "head", span = { GridItemSpan(maxLineSpan) }) { header() }
         if (sections.isEmpty()) {
             item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    "아직 올린 사진이 없어요 📷\n일기 게시물의 📷 를 눌러 그날 사진을 올려 보세요.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 32.dp),
-                )
+                empty()
             }
         }
         sections.forEach { s ->

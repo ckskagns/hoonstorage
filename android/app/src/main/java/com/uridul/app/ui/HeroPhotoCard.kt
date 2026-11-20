@@ -70,6 +70,8 @@ internal fun PhotoHeroCard(
     val label = HeroPick.label(photo.date, today)
     val bitmap = rememberPhotoBitmap("hero:${photo.id}:${photo.sharp}", photo.bytes)
     val heroSize = with(LocalDensity.current) { 56.dp.toSp() }
+    // 다크 모드에서는 사진 위 글자 뒤를 조금 더 어둡게 (사진 자체는 그대로)
+    val dark = com.uridul.app.ui.theme.LocalDarkTheme.current
     val partner = couple.partnerName(myUid)
     var menu by remember { mutableStateOf(false) }
     Card(modifier) {
@@ -91,10 +93,10 @@ internal fun PhotoHeroCard(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.40f),
+                            0f to Color.Black.copy(alpha = if (dark) 0.50f else 0.40f),
                             0.22f to Color.Transparent,
                             0.45f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.70f),
+                            1f to Color.Black.copy(alpha = if (dark) 0.82f else 0.70f),
                         ),
                     ),
             )
@@ -162,7 +164,8 @@ internal fun PhotoHeroCard(
                 Text(
                     DDay.heroText(couple.startDate, today, couple.countFromOne),
                     fontSize = heroSize,
-                    fontWeight = FontWeight.Bold,
+                    // 디데이 숫자는 둥근 주아 글꼴
+                    fontFamily = com.uridul.app.ui.theme.JuaFamily,
                     color = Color.White,
                     maxLines = 1,
                 )

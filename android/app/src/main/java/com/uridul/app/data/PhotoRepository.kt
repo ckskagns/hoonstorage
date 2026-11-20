@@ -127,6 +127,11 @@ class PhotoRepository(private val db: FirebaseFirestore) {
         photos(coupleId).whereGreaterThanOrEqualTo("date", from.toString()).whereLessThanOrEqualTo("date", to.toString())
             .get().await().documents.mapNotNull { it.toMeta() }
 
+    /** 최근에 올린 사진 몇 장 (새 소식 점, 상대 최근 사진 위젯). 작은 사진 포함 */
+    suspend fun fetchLatest(coupleId: String, limit: Long): List<PhotoMeta> =
+        photos(coupleId).orderBy("uploadedAt", Query.Direction.DESCENDING).limit(limit)
+            .get().await().documents.mapNotNull { it.toMeta() }
+
     /** 기간 안 사진 수 (사진 달력이 저장해 둔 달이 그대로인지 볼 때). 사진을 받지 않고 개수만 센다 */
     suspend fun countRange(coupleId: String, from: LocalDate, to: LocalDate): Int =
         photos(coupleId).whereGreaterThanOrEqualTo("date", from.toString()).whereLessThanOrEqualTo("date", to.toString())

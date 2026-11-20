@@ -103,6 +103,11 @@ private fun UridulRoot(viewModel: AppViewModel) {
     val memoryPhotos by viewModel.photos.memoryPhotos.collectAsStateWithLifecycle()
     val dayPhotos by viewModel.photos.dayPhotos.collectAsStateWithLifecycle()
     val heroPhoto by viewModel.photos.hero.collectAsStateWithLifecycle()
+    val partnerLatest by viewModel.photos.partnerLatest.collectAsStateWithLifecycle()
+    // 디데이 사진이 바뀌면 그 사진의 씨앗 색 (메뉴 "디데이 사진 색 따라가기"를 켰을 때 앱 강조색)
+    androidx.compose.runtime.LaunchedEffect(heroPhoto.photo?.id) {
+        com.uridul.app.ui.theme.PhotoTint.setSeed(heroPhoto.photo?.let { com.uridul.app.ui.theme.PhotoSeed.of(it.bytes) })
+    }
 
     // 설치 허용 화면에서 돌아오면 업데이트를 이어서 진행
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -167,6 +172,8 @@ private fun UridulRoot(viewModel: AppViewModel) {
                 hero = heroPhoto,
                 refreshHero = viewModel.photos::refreshHero,
                 heroAction = viewModel.photos::heroAction,
+                partnerPhotoAt = partnerLatest?.uploadedAtMillis,
+                refreshPartner = { viewModel.photos.refreshPartnerLatest() },
                 refreshWeek = viewModel.photos::refreshWeekPhotoCount,
             ),
         ) { androidx.compose.foundation.layout.Box { ReadyScreen(

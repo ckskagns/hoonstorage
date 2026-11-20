@@ -31,6 +31,9 @@ data class DateReview(
     val place: Place?,
     /** 사람(uid)별 후기 */
     val entries: Map<String, ReviewEntry>,
+    /** 마지막으로 고친 사람·시각 (일기장 탭의 새 소식 점) */
+    val updatedBy: String = "",
+    val updatedAtMillis: Long = 0,
 ) {
     val averageHearts: Double get() = if (entries.isEmpty()) 0.0 else entries.values.map { it.hearts }.average()
 
@@ -126,6 +129,8 @@ class ReviewRepository(private val db: FirebaseFirestore) {
             title = getString("title").orEmpty(),
             place = placeName?.let { Place(it, getString("placeUrl"), MapApp.from(getString("placeApp"))) },
             entries = entries,
+            updatedBy = getString("updatedBy").orEmpty(),
+            updatedAtMillis = getTimestamp("updatedAt", com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.toDate()?.time ?: 0,
         )
     }
 }

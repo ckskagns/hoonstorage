@@ -67,6 +67,10 @@ class PhotoHooks(
     val refreshHero: (java.time.LocalDate) -> Unit = {},
     /** 디데이 카드 사진 메뉴 */
     val heroAction: (com.uridul.app.data.HeroAction) -> Unit = {},
+    /** 상대가 가장 최근 사진을 올린 시각 (일기장 새 소식 점) */
+    val partnerPhotoAt: Long? = null,
+    /** 상대 최근 사진 다시 확인 (5분에 한 번까지) */
+    val refreshPartner: () -> Unit = {},
 )
 
 val LocalPhotos = compositionLocalOf { PhotoHooks() }

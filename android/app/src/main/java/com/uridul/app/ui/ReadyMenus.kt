@@ -27,7 +27,7 @@ import java.time.LocalDate
 /** 메뉴에서 고른 것 */
 internal enum class MenuAction {
     Profile, StartDate, ToggleCountFromOne, Invite,
-    ToggleNotify, TogglePartnerAlerts, Theme, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
+    ToggleNotify, TogglePartnerAlerts, Theme, TogglePhotoTint, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
 }
 
 /** 오른쪽 위 ⋮ 메뉴 */
@@ -74,6 +74,11 @@ internal fun MainMenu(
             onClick = { pick(MenuAction.TogglePartnerAlerts) },
         )
         DropdownMenuItem(text = { Text("화면 모드 ($themeLabel)") }, onClick = { pick(MenuAction.Theme) })
+        DropdownMenuItem(
+            text = { Text("디데이 사진 색 따라가기") },
+            trailingIcon = { Checkbox(checked = com.uridul.app.data.AppSettings.state.value.photoTint, onCheckedChange = null) },
+            onClick = { pick(MenuAction.TogglePhotoTint) },
+        )
         DropdownMenuItem(
             text = { Text("일정 색") },
             trailingIcon = {

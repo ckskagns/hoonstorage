@@ -52,6 +52,8 @@ fun DiaryContent(
     viewing: FeedPost? = null,
     viewingPage: Int = 0,
     onView: (FeedPost?, Int) -> Unit = { _, _ -> },
+    /** 빈 일기장의 [캘린더로 가기] */
+    onGoCalendar: () -> Unit = {},
 ) {
     val reviews = LocalReviews.current.reviews
     // 최신 날짜부터 (같은 날은 제목순), 후기가 남아 있는 날만
@@ -96,6 +98,10 @@ fun DiaryContent(
         }
     }
 
+    val gridEmpty: @Composable () -> Unit = {
+        CharacterEmpty(couple, myUid, title = "아직 올린 사진이 없어요 📷", body = "일기 게시물의 📷 를 눌러 그날 사진을 올려 보세요.", action = "📰 피드로 가기", onAction = { gridMode = false })
+    }
+
     // 게시물마다 "이날 데이트 비용" (그 달 가계부를 한 번만 읽는다)
     val dayCosts = rememberDayCosts(couple.id)
     androidx.compose.runtime.CompositionLocalProvider(LocalDayCosts provides dayCosts) {
@@ -108,11 +114,11 @@ fun DiaryContent(
                     if (twoPane) selectedText = day.toString() else onView(postFor(day, p, reviews), 0)
                 }
                 if (!twoPane) {
-                    DiaryPhotoGrid(sections, dayPhotos, null, pick, header)
+                    DiaryPhotoGrid(sections, dayPhotos, null, pick, header, empty = gridEmpty)
                 } else {
                     // 폴드 펼침: 왼쪽 격자, 오른쪽 고른 날 게시물
                     Row(Modifier.fillMaxSize()) {
-                        DiaryPhotoGrid(sections, dayPhotos, selectedDay, pick, header, Modifier.weight(1f))
+                        DiaryPhotoGrid(sections, dayPhotos, selectedDay, pick, header, Modifier.weight(1f), empty = gridEmpty)
                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                             val p = selectedDay?.let { d -> dayPhotos[d]?.let { postFor(d, it, reviews) } }
@@ -143,12 +149,12 @@ fun DiaryContent(
                 }
                 if (posts.isEmpty()) {
                     item(key = "empty") {
-                        Text(
-                            "아직 쓴 후기가 없어요 🌷\n캘린더에서 지난 일정을 누르고\n💗 한 줄 후기 남기기 를 눌러 보세요.\n홈의 추억 슬라이드에서도 바로 쓸 수 있어요.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 32.dp),
+                        CharacterEmpty(
+                            couple, myUid,
+                            title = "아직 쓴 후기가 없어요 🌷",
+                            body = "캘린더에서 지난 일정을 누르고 💗 한 줄 후기 남기기 를 눌러 보세요.\n홈의 추억 슬라이드에서도 바로 쓸 수 있어요.",
+                            action = "📅 캘린더로 가기",
+                            onAction = onGoCalendar,
                         )
                     }
                 }

@@ -47,6 +47,8 @@ data class UiSettings(
     val partner: EventColor = EventColor.SKY,
     /** 달력 지난 날 칸에 그날 일기 사진을 깔기 (기본 켬) */
     val photoCalendar: Boolean = true,
+    /** 앱 강조색을 디데이 사진에서 뽑은 색으로 (기본 끔: 분홍) */
+    val photoTint: Boolean = false,
 )
 
 /**
@@ -68,6 +70,7 @@ object AppSettings {
                 mine = EventColor.from(p.getString("mine", null), EventColor.PINK),
                 partner = EventColor.from(p.getString("partner", null), EventColor.SKY),
                 photoCalendar = p.getBoolean("photoCalendar", true),
+                photoTint = p.getBoolean("photoTint", false),
             )
             loaded = true
         }
@@ -82,6 +85,7 @@ object AppSettings {
             .putString("mine", next.mine.key)
             .putString("partner", next.partner.key)
             .putBoolean("photoCalendar", next.photoCalendar)
+            .putBoolean("photoTint", next.photoTint)
             .apply()
     }
 }
