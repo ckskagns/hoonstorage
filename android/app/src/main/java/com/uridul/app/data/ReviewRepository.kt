@@ -102,21 +102,27 @@ class ReviewRepository(private val db: FirebaseFirestore) {
      * 새 날짜에 이미 후기가 있으면 섞지 않고 그대로 둔다.
      * @param target 원래 날짜 → 새 날짜 (옮기지 않으면 null)
      * @param toEventId 반복 일정의 하루만 따로 떼어 옮기면 새로 만든 일정 ID
-     * @return 옮긴 후기 수
+     * @return 옮긴 후기 수와 (새 날짜에 이미 후기가 있어) 그대로 둔 수
      */
-    suspend fun moveDates(coupleId: String, uid: String, eventId: String, target: (LocalDate) -> LocalDate?, toEventId: String = eventId): Int {
+    suspend fun moveDates(
+        coupleId: String, uid: String, eventId: String, target: (LocalDate) -> LocalDate?, toEventId: String = eventId,
+    ): ReviewMoves {
         val moves = reviews(coupleId).whereEqualTo("eventId", eventId).get().await().documents.mapNotNull { d ->
             val from = d.getString("date")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@mapNotNull null
             val to = target(from)?.takeIf { it != from } ?: return@mapNotNull null
             Triple(d, from, to)
         }
-        if (moves.isEmpty()) return 0
+        if (moves.isEmpty()) return ReviewMoves(0, 0)
         // 반복 일정을 앞으로 옮기면 새 날짜가 다음 반복의 원래 날짜일 수 있다: 먼 날부터 옮겨서 자리를 비운다
         val forward = moves.first().let { it.third.isAfter(it.second) }
         var moved = 0
+        var kept = 0
         for ((doc, _, to) in if (forward) moves.sortedByDescending { it.second } else moves.sortedBy { it.second }) {
             val dest = reviews(coupleId).document(DateReview.idOf(toEventId, to))
-            if (dest.get().await().exists()) continue
+            if (dest.get().await().exists()) {
+                kept++
+                continue
+            }
             val data = doc.data.orEmpty().toMutableMap()
             data["date"] = to.toString()
             data["eventId"] = toEventId
@@ -125,8 +131,11 @@ class ReviewRepository(private val db: FirebaseFirestore) {
             db.batch().set(dest, data).delete(doc.reference).commit().await()
             moved++
         }
-        return moved
+        return ReviewMoves(moved, kept)
     }
+
+    /** 후기 옮기기 결과: [moved] 옮긴 수, [kept] 새 날짜에 이미 후기가 있어 원래 날짜에 그대로 둔 수 */
+    data class ReviewMoves(val moved: Int, val kept: Int)
 
     /** 백업 불러오기: 같은 ID 로 다시 만든다 */
     fun restore(coupleId: String, uid: String, review: DateReview, onError: (Exception) -> Unit) {
