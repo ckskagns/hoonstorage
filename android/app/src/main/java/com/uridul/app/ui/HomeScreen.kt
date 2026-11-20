@@ -47,8 +47,13 @@ fun HomeContent(
     memories: List<com.uridul.app.domain.Memories.Slide> = emptyList(),
     onLoadMemories: (java.time.LocalDate) -> Unit = {},
     onOpenMemory: (com.uridul.app.data.CalendarEvent) -> Unit = {},
+    /** 벤토 칸: 가고 싶은 곳 목록, 일정이 바뀐 것을 알리는 값, 칸을 누르면 열 탭 */
+    wishes: List<com.uridul.app.data.WishPlace> = emptyList(),
+    eventsKey: Any? = null,
+    onOpenTab: (String) -> Unit = {},
 ) {
     val today = rememberToday()
+    val bento: @Composable (Modifier) -> Unit = { m -> HomeBento(couple, today, wishes, eventsKey, onOpenTab, m) }
     // 날이 바뀌면 추억을 다시 받아온다 (하루에 한 번)
     val photos = LocalPhotos.current
     androidx.compose.runtime.LaunchedEffect(today) {
@@ -111,6 +116,7 @@ fun HomeContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (!couple.isPaired) InviteBanner(busy, onInvite)
+                        bento(Modifier.fillMaxWidth())
                         recapBanner(Modifier.fillMaxWidth())
                         MemorySlides(memories, couple, myUid, onOpenMemory)
                         MilestoneCard(milestones, today, Modifier.fillMaxWidth())
@@ -131,6 +137,7 @@ fun HomeContent(
                         .widthIn(max = 560.dp)
                     HeroCard(couple, myUid, today, m, onOpenMemory, photoHeight = HeroPhotoHeight)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
+                    bento(m)
                     recapBanner(m)
                     MemorySlides(memories, couple, myUid, onOpenMemory, m)
                     MilestoneCard(milestones, today, m)

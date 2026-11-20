@@ -357,6 +357,13 @@ fun ReadyScreen(
                             diaryViewPage = 0
                             tabKey = Tab.Diary.key
                         },
+                        // 벤토 칸: 누르면 그 탭 (다음 일정 → 캘린더는 오늘로)
+                        wishes = wishes,
+                        eventsKey = monthEvents,
+                        onOpenTab = { key ->
+                            if (key == HomeTabs.CALENDAR) select(java.time.LocalDate.now())
+                            tabKey = Tab.entries.firstOrNull { it.key == key }?.key ?: tabKey
+                        },
                     )
                     Tab.Calendar -> CalendarContent(
                         couple = couple,
