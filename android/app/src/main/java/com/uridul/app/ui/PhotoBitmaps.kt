@@ -28,11 +28,15 @@ private val photoCache = object : android.util.LruCache<String, ImageBitmap>(16 
 fun rememberPhotoBitmap(key: String, bytes: ByteArray?): ImageBitmap? {
     val cacheKey = "$key:${bytes?.size}"
     val state = produceState(initialValue = bytes?.let { photoCache.get(cacheKey) }, cacheKey) {
-        if (value == null && bytes != null) {
-            value = withContext(Dispatchers.Default) {
-                runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
-            }?.also { photoCache.put(cacheKey, it) }
+        // 같은 자리에서 사진이 바뀌면(디데이 카드 "다른 사진" 등) 이전 그림이 value 에 남아 있으므로
+        // value 가 있는지가 아니라 이 사진을 풀어 뒀는지로 판단한다 (푸는 동안은 이전 그림을 그대로 보여준다)
+        if (bytes == null) {
+            value = null
+            return@produceState
         }
+        value = photoCache.get(cacheKey) ?: withContext(Dispatchers.Default) {
+            runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+        }?.also { photoCache.put(cacheKey, it) }
     }
     return state.value
 }

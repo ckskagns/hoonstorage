@@ -61,6 +61,12 @@ class PhotoHooks(
     val dayPhotos: Map<java.time.LocalDate, com.uridul.app.data.DayPhoto> = emptyMap(),
     /** 사진 달력에 보일 달의 사진 불러오기 */
     val loadMonthPhotos: (java.time.YearMonth) -> Unit = {},
+    /** 디데이 카드에 깔 오늘의 사진 */
+    val hero: com.uridul.app.data.HeroState = com.uridul.app.data.HeroState(),
+    /** 홈이 보일 때 오늘의 사진 고르기 */
+    val refreshHero: (java.time.LocalDate) -> Unit = {},
+    /** 디데이 카드 사진 메뉴 */
+    val heroAction: (com.uridul.app.data.HeroAction) -> Unit = {},
 )
 
 val LocalPhotos = compositionLocalOf { PhotoHooks() }

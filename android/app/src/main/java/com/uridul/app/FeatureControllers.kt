@@ -9,6 +9,11 @@ import com.uridul.app.data.PhotoMeta
 import com.uridul.app.data.PhotoProcessor
 import com.uridul.app.data.DayPhoto
 import com.uridul.app.data.PhotoMonthCache
+import com.uridul.app.data.HeroAction
+import com.uridul.app.data.HeroPhoto
+import com.uridul.app.data.HeroPhotoStore
+import com.uridul.app.data.HeroState
+import com.uridul.app.domain.HeroPick
 import com.uridul.app.domain.Memories
 import com.uridul.app.domain.PhotoDays
 import kotlinx.coroutines.Dispatchers
@@ -203,7 +208,7 @@ class PhotoController internal constructor(private val f: FeatureScope) {
                     }
                 }
                 val photos = repo.fetchRange(coupleId, from, to)
-                val days = PhotoDays.covers(photos).mapValues { (_, c) -> DayPhoto(c.photo.id, c.photo.thumb, c.count) }
+                val days = PhotoDays.covers(photos).mapValues { (_, c) -> DayPhoto(c.photo.id, c.photo.thumb, c.count, c.photo.eventId) }
                 withContext(Dispatchers.IO) { PhotoMonthCache.write(f.app, coupleId, month, photos.size, days, now) }
                 publishMonth(month, days)
             } catch (e: CancellationException) {
@@ -217,6 +222,107 @@ class PhotoController internal constructor(private val f: FeatureScope) {
 
     private fun publishMonth(month: java.time.YearMonth, days: Map<LocalDate, DayPhoto>) {
         _dayPhotos.update { all -> all.filterKeys { java.time.YearMonth.from(it) != month } + days }
+        heroToday?.let { recomputeHero(it) }
+    }
+
+    private val _hero = MutableStateFlow(HeroState())
+    /** 디데이 카드에 깔 오늘의 사진 */
+    val hero: StateFlow<HeroState> = _hero.asStateFlow()
+
+    /** 홈이 보인 날 (그 뒤로 사진 달력 달이 들어오면 카드 사진을 다시 고른다) */
+    private var heroToday: LocalDate? = null
+    private var heroJob: Job? = null
+    private var heroSavedLoaded = false
+
+    /**
+     * 홈을 열 때: 폰에 저장해 둔 달들을 먼저 후보로 올리고,
+     * 이번 달·지난달·몇 년 전 이번 달은 사진 달력처럼 서버에 사진 수를 물어 새 사진도 후보에 넣는다.
+     */
+    fun refreshHero(today: LocalDate) {
+        val ready = f.ready() ?: return
+        heroToday = today
+        val coupleId = ready.couple.id
+        f.scope.launch {
+            if (!heroSavedLoaded) {
+                heroSavedLoaded = true
+                val saved = withContext(Dispatchers.IO) {
+                    PhotoMonthCache.months(f.app, coupleId).mapNotNull { m -> PhotoMonthCache.read(f.app, coupleId, m)?.let { m to it.days } }
+                }
+                saved.forEach { (m, days) -> if (_dayPhotos.value.keys.none { java.time.YearMonth.from(it) == m }) _dayPhotos.update { it + days } }
+            }
+            recomputeHero(today)
+            val month = java.time.YearMonth.from(today)
+            val years = ready.couple.startDate.let { java.time.Period.between(it, today).years }.coerceIn(0, 10)
+            (listOf(month, month.minusMonths(1)) + (1..years).map { month.minusYears(it.toLong()) }).forEach { loadMonthPhotos(it) }
+        }
+    }
+
+    /** 카드 메뉴: 다른 사진 / 이 사진 고정 / 매일 바뀌게 / 끄기·켜기 */
+    fun heroAction(action: HeroAction) {
+        val today = heroToday ?: LocalDate.now()
+        when (action) {
+            HeroAction.NEXT -> {
+                HeroPhotoStore.nextSkip(f.app, today)
+                // 고정해 둔 상태에서 "다른 사진" 이면 고정을 풀고 매일 바뀌는 쪽으로
+                HeroPhotoStore.setMode(f.app, HeroPhotoStore.Mode.DAILY)
+            }
+            HeroAction.PIN -> _hero.value.photo?.let { p ->
+                HeroPhotoStore.setMode(f.app, HeroPhotoStore.Mode.FIXED, HeroPhotoStore.Fixed(p.id, p.date, p.eventId))
+            }
+            HeroAction.DAILY, HeroAction.ON -> HeroPhotoStore.setMode(f.app, HeroPhotoStore.Mode.DAILY)
+            HeroAction.OFF -> HeroPhotoStore.setMode(f.app, HeroPhotoStore.Mode.OFF)
+        }
+        recomputeHero(today, immediate = true)
+    }
+
+    private fun recomputeHero(today: LocalDate, immediate: Boolean = false) {
+        val ready = f.ready() ?: return
+        val repo = f.container.photos ?: return
+        heroJob?.cancel()
+        heroJob = f.scope.launch {
+            // 달이 연달아 들어올 때 잠깐 모았다가 한 번만 고른다 (중간 후보의 큰 사진을 받지 않게)
+            if (!immediate) kotlinx.coroutines.delay(300)
+            val settings = HeroPhotoStore.read(f.app, today)
+            val days = _dayPhotos.value
+            val candidates = days.map { (d, p) -> HeroPick.Candidate(d, p.id, p.eventId) }
+            val available = candidates.any { it.date <= today }
+            if (settings.mode == HeroPhotoStore.Mode.OFF) {
+                _hero.value = HeroState(null, settings.mode, available)
+                return@launch
+            }
+            val chosen = settings.fixed?.takeIf { settings.mode == HeroPhotoStore.Mode.FIXED }
+                // 일정 ID 를 모르고 고정했으면(예전 저장본) 사진 달력에서 채운다
+                ?.let { HeroPick.Candidate(it.date, it.id, it.eventId.ifEmpty { days[it.date]?.takeIf { p -> p.id == it.id }?.eventId.orEmpty() }) }
+                ?: HeroPick.pick(candidates, today, settings.skip)
+            if (chosen == null) {
+                _hero.value = HeroState(null, settings.mode, available)
+                return@launch
+            }
+            val current = _hero.value.photo
+            if (current?.id == chosen.id && current.sharp) {
+                _hero.value = HeroState(current, settings.mode, available)
+                return@launch
+            }
+            // 먼저 폰에 있는 사진(큰 사진 → 작은 사진)으로 보여주고, 큰 사진이 없으면 받아서 바꾼다
+            val local = withContext(Dispatchers.IO) { HeroPhotoStore.readPhoto(f.app, chosen.id) }
+            val thumb = days[chosen.date]?.takeIf { it.id == chosen.id }?.thumb
+            val first = local ?: thumb
+            if (first != null) _hero.value = HeroState(HeroPhoto(chosen.id, chosen.date, chosen.eventId, first, local != null), settings.mode, available)
+            if (local != null) return@launch
+            val big = runCatching { repo.fetchPhoto(ready.couple.id, chosen.id) }.getOrNull()
+            if (big != null) {
+                withContext(Dispatchers.IO) { HeroPhotoStore.savePhoto(f.app, chosen.id, big) }
+                _hero.value = HeroState(HeroPhoto(chosen.id, chosen.date, chosen.eventId, big, true), settings.mode, available)
+            } else if (first == null) {
+                // 고정한 사진이 지워졌으면 고정을 풀고 다시 고른다
+                if (settings.mode == HeroPhotoStore.Mode.FIXED) {
+                    HeroPhotoStore.setMode(f.app, HeroPhotoStore.Mode.DAILY)
+                    recomputeHero(today, immediate = true)
+                } else {
+                    _hero.value = HeroState(null, settings.mode, available)
+                }
+            }
+        }
     }
 
     private val _memoryPhotos = MutableStateFlow<Map<String, ByteArray>>(emptyMap())

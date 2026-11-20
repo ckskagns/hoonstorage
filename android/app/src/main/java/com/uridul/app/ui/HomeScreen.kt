@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +48,12 @@ fun HomeContent(
 ) {
     val today = rememberToday()
     // 날이 바뀌면 추억을 다시 받아온다 (하루에 한 번)
-    androidx.compose.runtime.LaunchedEffect(today) { onLoadMemories(today) }
+    val photos = LocalPhotos.current
+    androidx.compose.runtime.LaunchedEffect(today) {
+        onLoadMemories(today)
+        // 디데이 카드에 깔 오늘의 사진 (일기 사진 중에서, 하루에 하나)
+        photos.refreshHero(today)
+    }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         // 폭에 따라 1단/2단
@@ -74,6 +80,7 @@ fun HomeContent(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight(),
+                        onOpenMemory,
                     )
                     Column(
                         Modifier
@@ -100,7 +107,7 @@ fun HomeContent(
                     val m = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 560.dp)
-                    HeroCard(couple, myUid, today, m)
+                    HeroCard(couple, myUid, today, m, onOpenMemory, photoHeight = HeroPhotoHeight)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
                     MemorySlides(memories, couple, myUid, onOpenMemory, m)
                     MilestoneCard(milestones, today, m)
@@ -110,8 +117,31 @@ fun HomeContent(
     }
 }
 
+/** 1단 화면(폰·폴드 커버)에서 사진 디데이 카드 높이 (2단은 화면 높이를 다 쓴다) */
+private val HeroPhotoHeight = 360.dp
+
+/**
+ * 디데이 카드: 오늘의 사진이 있으면 사진을 깐 카드, 없으면(사진이 없거나 꺼 둠) 캐릭터 카드.
+ * @param photoHeight 사진 카드 높이 (null 이면 [modifier] 높이를 따른다)
+ */
 @Composable
-private fun HeroCard(couple: Couple, myUid: String, today: LocalDate, modifier: Modifier) {
+private fun HeroCard(
+    couple: Couple,
+    myUid: String,
+    today: LocalDate,
+    modifier: Modifier,
+    onOpenDay: (com.uridul.app.data.CalendarEvent) -> Unit,
+    photoHeight: androidx.compose.ui.unit.Dp? = null,
+) {
+    val photos = LocalPhotos.current
+    val hero = photos.hero
+    hero.photo?.let { p ->
+        PhotoHeroCard(
+            couple, myUid, today, p, hero.mode, photos.heroAction, onOpenDay,
+            if (photoHeight != null) modifier.height(photoHeight) else modifier,
+        )
+        return
+    }
     val partner = couple.partnerName(myUid)
     // 큰 숫자는 글꼴 크기 설정을 따라 무한히 커지지 않도록 dp 기준으로 고정한다
     val heroSize = with(LocalDensity.current) { 64.dp.toSp() }
@@ -120,6 +150,14 @@ private fun HeroCard(couple: Couple, myUid: String, today: LocalDate, modifier: 
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
+      androidx.compose.foundation.layout.Box {
+        // 사진을 꺼 뒀고 고를 사진이 있으면 다시 켜는 📷
+        if (hero.mode == com.uridul.app.data.HeroPhotoStore.Mode.OFF && hero.available) {
+            HeroPhotoOnButton(
+                onClick = { photos.heroAction(com.uridul.app.data.HeroAction.ON) },
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            )
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -154,6 +192,7 @@ private fun HeroCard(couple: Couple, myUid: String, today: LocalDate, modifier: 
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
             )
         }
+      }
     }
 }
 

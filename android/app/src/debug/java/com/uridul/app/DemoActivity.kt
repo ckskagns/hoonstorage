@@ -245,6 +245,10 @@ class DemoActivity : ComponentActivity() {
                         com.uridul.app.data.PhotoMeta("dc$i", "cal$i", today.minusDays(ago), "", p.thumb, p.width, p.height, me, i.toLong())
                     }
                 }
+                val demoHero = remember {
+                    com.uridul.app.data.HeroPhoto("dc4", today.minusDays(6), "cal4", demoPhoto(5).photo, sharp = true)
+                }
+                var demoHeroMode by remember { mutableStateOf(com.uridul.app.data.HeroPhotoStore.Mode.DAILY) }
                 val photoHooks = com.uridul.app.ui.PhotoHooks(
                     album = { e -> androidx.compose.runtime.snapshotFlow { demoPhotos.filter { it.eventId == e.id && it.date == e.date } } },
                     weekUsed = demoPhotos.count { it.week == thisWeek },
@@ -264,7 +268,20 @@ class DemoActivity : ComponentActivity() {
                     memoryThumbs = demoPhotos.groupBy { it.albumKey }.mapValues { (_, l) -> l.first().thumb },
                     // 사진 달력: 데모 사진 + 다른 날 몇 장 (칸 모양 확인용)
                     dayPhotos = com.uridul.app.domain.PhotoDays.covers(demoPhotos + demoCalendarPhotos)
-                        .mapValues { (_, c) -> com.uridul.app.data.DayPhoto(c.photo.id, c.photo.thumb, c.count) },
+                        .mapValues { (_, c) -> com.uridul.app.data.DayPhoto(c.photo.id, c.photo.thumb, c.count, c.photo.eventId) },
+                    // 디데이 카드 사진: 데모 사진 하나 (메뉴로 끄기·켜기만 해 볼 수 있다)
+                    hero = com.uridul.app.data.HeroState(
+                        photo = demoHero.takeIf { demoHeroMode != com.uridul.app.data.HeroPhotoStore.Mode.OFF },
+                        mode = demoHeroMode,
+                        available = true,
+                    ),
+                    heroAction = { a ->
+                        demoHeroMode = when (a) {
+                            com.uridul.app.data.HeroAction.OFF -> com.uridul.app.data.HeroPhotoStore.Mode.OFF
+                            com.uridul.app.data.HeroAction.PIN -> com.uridul.app.data.HeroPhotoStore.Mode.FIXED
+                            else -> com.uridul.app.data.HeroPhotoStore.Mode.DAILY
+                        }
+                    },
                 )
                 androidx.compose.runtime.CompositionLocalProvider(com.uridul.app.ui.LocalReviews provides hooks, com.uridul.app.ui.LocalPhotos provides photoHooks) {
                 ReadyScreen(
