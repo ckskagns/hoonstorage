@@ -79,13 +79,18 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         }
     }
 
-    /** 한 달 거래 (지운 것 빼고, 최신 먼저) */
-    fun observeMonth(coupleId: String, month: YearMonth): Flow<List<LedgerEntry>> =
-        listen(
+    /**
+     * 한 달 거래 + 앞뒤 [CancelPairs.WINDOW_DAYS]일 (지운 것 빼고, 최신 먼저).
+     * 앞뒤는 다른 달에 취소된 결제의 짝을 찾는 데만 쓰고, 화면에는 그 달 것만 보인다.
+     */
+    fun observeMonthWithMargin(coupleId: String, month: YearMonth): Flow<List<LedgerEntry>> {
+        val range = CancelPairs.readRange(month.atDay(1), month.atEndOfMonth())
+        return listen(
             entries(coupleId)
-                .whereGreaterThanOrEqualTo("date", month.atDay(1).toString())
-                .whereLessThanOrEqualTo("date", month.atEndOfMonth().toString()),
+                .whereGreaterThanOrEqualTo("date", range.start.toString())
+                .whereLessThanOrEqualTo("date", range.endInclusive.toString()),
         ) { list -> list.filter { !it.deleted }.sortedByDescending { it.at } }
+    }
 
     /** 확인 필요 거래 */
     fun observePending(coupleId: String): Flow<List<LedgerEntry>> =

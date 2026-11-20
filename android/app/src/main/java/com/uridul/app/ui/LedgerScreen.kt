@@ -40,8 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.uridul.app.data.Couple
+import com.uridul.app.ledger.CancelPairs
 import com.uridul.app.ledger.EntryStatus
-import com.uridul.app.ledger.EntryType
+import com.uridul.app.ledger.LedgerTotals
 import com.uridul.app.ledger.LedgerAsset
 import com.uridul.app.ledger.LedgerCategories
 import com.uridul.app.ledger.LedgerEntry
@@ -62,13 +63,29 @@ import java.util.Locale
 private val won = NumberFormat.getNumberInstance(Locale.KOREA)
 internal fun wonText(amount: Long): String = "${won.format(amount)}원"
 
+/** 부호 붙인 금액: 양수 "+1,000원", 음수 "-1,000원" (부호는 한 번만) */
+internal fun signedWonText(amount: Long): String = (if (amount < 0) "-" else "+") + wonText(kotlin.math.abs(amount))
+
+/** 취소 짝이 된 거래에 붙일 말: 결제엔 "M월 d일 취소됨", 취소엔 "M월 d일 결제 취소" (없으면 null) */
+internal fun pairNote(e: LedgerEntry, pairs: CancelPairs, byId: Map<String, LedgerEntry>): String? {
+    val other = (pairs.cancelOf(e.id) ?: pairs.paymentOf(e.id))?.let(byId::get) ?: return null
+    // 같은 달이면 날짜만 (줄이 잘리지 않게)
+    val day = if (YearMonth.from(other.date) == YearMonth.from(e.date)) "${other.date.dayOfMonth}일" else other.date.format(KoreanMonthDayShort)
+    return if (e.cancel) "$day 결제 취소" else "$day 취소됨"
+}
+
+private val KoreanMonthDayShort = java.time.format.DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
+
 @Composable
 fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val repo = remember { (context.applicationContext as? com.uridul.app.UridulApp)?.container?.ledger }
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthText)
-    val entries by remember(month, repo) { repo?.observeMonth(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
+    // 그 달 앞뒤까지 읽어 취소 짝을 찾고, 목록·합계는 그 달 것만
+    val window by remember(month, repo) { repo?.observeMonthWithMargin(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
+    val pairs = remember(window) { CancelPairs.of(window) }
+    val entries = remember(window, month) { window.filter { YearMonth.from(it.date) == month } }
     val pending by remember(repo) { repo?.observePending(couple.id) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     val assets by remember(repo) { repo?.observeAssets(couple.id) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     val learned by remember(repo) { repo?.observeLearned(couple.id) ?: flowOf(emptyMap()) }.collectAsState(initial = emptyMap())
@@ -119,7 +136,8 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
         }
     }
 
-    val summary = remember(entries) { MonthSummary.of(entries) }
+    val summary = remember(entries, pairs) { MonthSummary.of(entries, pairs) }
+    val byId = remember(window) { window.associateBy { it.id } }
     val confirmed = remember(entries) { entries.filter { it.status == EntryStatus.CONFIRMED } }
     val byDay = remember(confirmed) { confirmed.groupBy { it.date }.toSortedMap(compareByDescending { it }) }
 
@@ -173,11 +191,16 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
             item(key = "d$day") {
                 Row(Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(day.format(KoreanMonthDay), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    val dayExpense = list.filter { it.type == EntryType.EXPENSE }.sumOf { it.signedAmount }
-                    if (dayExpense != 0L) Text("-${wonText(dayExpense)}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // 그날 쓴 돈 (취소된 결제는 빼고). 짝 없는 환불이 더 많으면 +로
+                    val dayExpense = LedgerTotals.expense(list, pairs)
+                    if (dayExpense != 0L) Text(
+                        signedWonText(-dayExpense),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (dayExpense < 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            items(list, key = { it.id }) { e -> EntryRow(e, assets, onClick = { editing = e }) }
+            items(list, key = { it.id }) { e -> EntryRow(e, assets, pairNote(e, pairs, byId), onClick = { editing = e }) }
         }
         item(key = "next") {
             Text(

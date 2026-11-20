@@ -171,13 +171,11 @@ object PayerNames {
 /** 한 달 합계 */
 data class MonthSummary(val expense: Long, val income: Long, val count: Int) {
     companion object {
-        fun of(entries: List<LedgerEntry>): MonthSummary {
-            val live = entries.filter { !it.deleted && it.status == EntryStatus.CONFIRMED }
-            return MonthSummary(
-                expense = live.filter { it.type == EntryType.EXPENSE }.sumOf { it.signedAmount },
-                income = live.filter { it.type == EntryType.INCOME }.sumOf { it.signedAmount },
-                count = live.size,
-            )
-        }
+        /** @param pairs 취소 짝 (그 달 앞뒤까지 읽은 거래로 찾은 것: 다른 달에 취소된 결제도 빠진다) */
+        fun of(entries: List<LedgerEntry>, pairs: CancelPairs = CancelPairs.of(entries)): MonthSummary = MonthSummary(
+            expense = LedgerTotals.expense(entries, pairs),
+            income = LedgerTotals.income(entries),
+            count = entries.count { !it.deleted && it.status == EntryStatus.CONFIRMED },
+        )
     }
 }

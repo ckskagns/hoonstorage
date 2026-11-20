@@ -1,0 +1,99 @@
+package com.uridul.app.ledger
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.LocalDateTime
+
+/** 결제 취소를 원래 결제와 짝지어 합계에서 빼기 */
+class CancelPairsTest {
+    private fun at(s: String) = LocalDateTime.parse(s).atZone(LedgerEntry.ZONE).toInstant().toEpochMilli()
+
+    private fun pay(id: String, time: String, amount: Long, merchant: String, cancel: Boolean = false, asset: String = "date_card") =
+        LedgerEntry(id = id, type = EntryType.EXPENSE, amount = amount, cancel = cancel, at = at(time), merchant = merchant, assetId = asset)
+
+    /** 실제 11월 17~19일 모임카드 기록 */
+    private val november = listOf(
+        LedgerEntry(id = "in", type = EntryType.INCOME, amount = 600_000, at = at("2026-11-17T22:06:00"), assetId = "date_account"),
+        pay("a17", "2026-11-17T22:16:19", 398_147, "Agoda"),
+        pay("b17", "2026-11-17T22:21:59", 65_400, "Agoda"),
+        pay("c19", "2026-11-19T22:40:27", 398_147, "Agoda", cancel = true),
+        pay("d19", "2026-11-19T22:41:32", 342_420, "Agoda"),
+        pay("e19", "2026-11-19T22:49:15", 342_420, "Agoda", cancel = true),
+        pay("f19", "2026-11-19T23:00:15", 346_712, "트립닷컴"),
+    )
+
+    @Test
+    fun cancelPairsWithEarlierPayment() {
+        val p = CancelPairs.of(november)
+        assertEquals("a17", p.paymentOf("c19"))
+        assertEquals("d19", p.paymentOf("e19"))
+        assertEquals("c19", p.cancelOf("a17"))
+        assertFalse(p.isPaired("b17"))
+        assertFalse(p.isPaired("f19"))
+    }
+
+    @Test
+    fun dayTotalsNoLongerNegative() {
+        val p = CancelPairs.of(november)
+        val day19 = november.filter { it.date.dayOfMonth == 19 }
+        val day17 = november.filter { it.date.dayOfMonth == 17 }
+        // 전에는 19일 -51,435원(마이너스 두 번)으로 보였다
+        assertEquals(346_712L, LedgerTotals.expense(day19, p))
+        assertEquals(65_400L, LedgerTotals.expense(day17, p))
+        // 달 합계는 짝을 지어도 같다
+        val s = MonthSummary.of(november, p)
+        assertEquals(65_400L + 346_712L, s.expense)
+        assertEquals(600_000L, s.income)
+        assertEquals(7, s.count)
+    }
+
+    @Test
+    fun unmatchedRefundStaysOnItsDay() {
+        // 원래 결제가 기록에 없으면 취소한 날 합계에서 뺀다 (환불이 더 많으면 음수)
+        val list = listOf(pay("x", "2026-11-19T10:00:00", 10_000, "가게", cancel = true), pay("y", "2026-11-19T11:00:00", 3_000, "카페"))
+        assertEquals(-7_000L, LedgerTotals.expense(list, CancelPairs.of(list)))
+    }
+
+    @Test
+    fun pairNeedsSameAssetAmountMerchantAndOrder() {
+        val cancel = pay("c", "2026-11-19T10:00:00", 10_000, "Agoda", cancel = true)
+        assertNull(CancelPairs.of(listOf(pay("p", "2026-11-18T10:00:00", 10_000, "Agoda", asset = "cash"), cancel)).paymentOf("c"))
+        assertNull(CancelPairs.of(listOf(pay("p", "2026-11-18T10:00:00", 9_000, "Agoda"), cancel)).paymentOf("c"))
+        assertNull(CancelPairs.of(listOf(pay("p", "2026-11-18T10:00:00", 10_000, "Klook"), cancel)).paymentOf("c"))
+        // 취소보다 늦은 결제와는 짝짓지 않는다
+        assertNull(CancelPairs.of(listOf(pay("p", "2026-11-19T11:00:00", 10_000, "Agoda"), cancel)).paymentOf("c"))
+        // 기간을 넘으면 짝짓지 않는다
+        assertNull(CancelPairs.of(listOf(pay("p", "2026-09-01T10:00:00", 10_000, "Agoda"), cancel)).paymentOf("c"))
+        // 띄어쓰기·대소문자는 무시
+        assertEquals("p", CancelPairs.of(listOf(pay("p", "2026-11-18T10:00:00", 10_000, " AGO DA"), cancel)).paymentOf("c"))
+    }
+
+    @Test
+    fun oneCancelPerPaymentClosestFirst() {
+        val list = listOf(
+            pay("p1", "2026-11-10T10:00:00", 5_000, "카페"),
+            pay("p2", "2026-11-12T10:00:00", 5_000, "카페"),
+            pay("c1", "2026-11-13T10:00:00", 5_000, "카페", cancel = true),
+            pay("c2", "2026-11-14T10:00:00", 5_000, "카페", cancel = true),
+            pay("c3", "2026-11-15T10:00:00", 5_000, "카페", cancel = true),
+        )
+        val p = CancelPairs.of(list)
+        assertEquals("p2", p.paymentOf("c1"))
+        assertEquals("p1", p.paymentOf("c2"))
+        assertNull(p.paymentOf("c3"))
+        assertTrue(p.isPaired("p1"))
+        assertEquals(-5_000L, LedgerTotals.expense(list, p))
+    }
+
+    @Test
+    fun crossMonthCancelLeavesBothMonths() {
+        // 10월 결제를 11월에 취소: 두 달 모두 합계에서 빠진다 (화면은 앞뒤 45일을 함께 읽는다)
+        val all = listOf(pay("oct", "2026-10-28T10:00:00", 20_000, "Agoda"), pay("nov", "2026-11-03T10:00:00", 20_000, "Agoda", cancel = true))
+        val p = CancelPairs.of(all)
+        assertEquals(0L, MonthSummary.of(all.filter { it.date.monthValue == 10 }, p).expense)
+        assertEquals(0L, MonthSummary.of(all.filter { it.date.monthValue == 11 }, p).expense)
+    }
+}

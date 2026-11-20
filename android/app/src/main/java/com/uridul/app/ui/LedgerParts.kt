@@ -106,7 +106,13 @@ internal fun SummaryCard(month: YearMonth, s: MonthSummary, assets: List<LedgerA
                 IconButton(onClick = { onMonth(month.plusMonths(1)) }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "다음 달") }
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                SummaryCell("지출", wonText(s.expense), MaterialTheme.colorScheme.error, Modifier.weight(1f))
+                // 짝 없는 환불이 쓴 돈보다 많은 달은 "환불 N원"으로 (마이너스 지출로 적지 않는다)
+                SummaryCell(
+                    if (s.expense < 0) "환불" else "지출",
+                    wonText(kotlin.math.abs(s.expense)),
+                    if (s.expense < 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    Modifier.weight(1f),
+                )
                 SummaryCell("수입", wonText(s.income), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
                 SummaryCell("건수", "${s.count}건", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
             }
@@ -141,7 +147,7 @@ internal fun SummaryCell(label: String, value: String, color: androidx.compose.u
 }
 
 @Composable
-internal fun EntryRow(e: LedgerEntry, assets: List<LedgerAsset>, onClick: () -> Unit) {
+internal fun EntryRow(e: LedgerEntry, assets: List<LedgerAsset>, pairNote: String? = null, onClick: () -> Unit) {
     val cat = LedgerCategories.of(e.category)
     val asset = assets.firstOrNull { it.id == e.assetId }
     Row(
@@ -163,7 +169,8 @@ internal fun EntryRow(e: LedgerEntry, assets: List<LedgerAsset>, onClick: () -> 
                 add(cat.label)
                 asset?.let { add(it.name) }
                 if (e.installment > 0) add("${e.installment}개월 할부")
-                if (e.cancel) add("취소")
+                // 취소 짝이면 상대 날짜를 적고 합계에서 빠진 것을 줄 그어 보인다
+                if (pairNote != null) add(pairNote) else if (e.cancel) add("취소")
             }.joinToString(" · ")
             Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -176,7 +183,12 @@ internal fun EntryRow(e: LedgerEntry, assets: List<LedgerAsset>, onClick: () -> 
             "$sign${wonText(e.amount)}",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = if (sign == "+") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            color = when {
+                pairNote != null -> MaterialTheme.colorScheme.onSurfaceVariant
+                sign == "+" -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+            textDecoration = if (pairNote != null) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
         )
     }
 }
