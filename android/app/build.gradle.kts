@@ -38,8 +38,8 @@ android {
         applicationId = "com.uridul.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 21
-        versionName = "0.19.0"
+        versionCode = 22
+        versionName = "0.20.0"
 
         manifestPlaceholders["inviteHost"] = inviteHost
         buildConfigField("String", "INVITE_HOST", "\"$inviteHost\"")

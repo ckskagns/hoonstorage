@@ -207,6 +207,32 @@ class DemoActivity : ComponentActivity() {
                     val i = events.indexOfFirst { it.id == id }
                     if (i >= 0) events[i] = events[i].copy(skip = if (skipped) events[i].skip + day else events[i].skip - day)
                 }
+                var occurrenceMove by remember { mutableStateOf<com.uridul.app.data.EventDraft?>(null) }
+                occurrenceMove?.let { input ->
+                    com.uridul.app.ui.OccurrenceMoveDialog(input) { only ->
+                        occurrenceMove = null
+                        val series = events.firstOrNull { it.id == input.id } ?: return@OccurrenceMoveDialog
+                        val from = input.occurrence ?: return@OccurrenceMoveDialog
+                        when (only) {
+                            null -> {}
+                            false -> {
+                                val d = input.toSeriesDates().normalized()
+                                events.removeAll { it.id == series.id }
+                                events += series.copy(date = d.date, endDate = d.endDate, title = d.title, time = d.time, timeline = d.timeline)
+                            }
+                            true -> {
+                                setSkip(series.id, from, true)
+                                val toId = if (com.uridul.app.domain.MemoryMove.mergesIntoSeries(series, input.date)) series.id else {
+                                    val d = com.uridul.app.domain.MemoryMove.detached(input).normalized()
+                                    "new${events.size + 1}".also { nid ->
+                                        events += CalendarEvent(nid, d.title, d.date, d.endDate, d.time, d.memo, series.createdBy, timeline = d.timeline)
+                                    }
+                                }
+                                lifecycleScope.launch { snackbar.showSnackbar("${from.monthValue}월 ${from.dayOfMonth}일 일정을 ${input.date.monthValue}월 ${input.date.dayOfMonth}일로 옮겼어요 → $toId") }
+                            }
+                        }
+                    }
+                }
                 val range = CalendarMath.queryRange(month)
                 // 알림 보관함 점검용 예시 (데모에서만)
                 androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -317,6 +343,10 @@ class DemoActivity : ComponentActivity() {
                         val draft = input.toSeriesDates().normalized()
                         if (CalendarMath.validate(draft) != null) {
                             false
+                        } else if (com.uridul.app.domain.MemoryMove.asksOccurrenceChoice(input, events.firstOrNull { it.id == input.id })) {
+                            // 반복 일정의 하루 날짜를 바꿨으면 앱처럼 "이 날만 / 반복 전체" 를 묻는다
+                            occurrenceMove = input
+                            true
                         } else {
                             val id = draft.id ?: "new${events.size + 1}"
                             val old = events.firstOrNull { it.id == id }

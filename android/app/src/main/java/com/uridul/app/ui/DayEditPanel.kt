@@ -197,7 +197,7 @@ internal fun EditPanel(
             )
             if (edit.original?.repeat != null) {
                 Text(
-                    "🔁 반복 일정이에요. 여기서 고치면 모든 날에 함께 바뀌어요 (이 날만 없애려면 [일정 삭제] → 이 날만 빼기).",
+                    "🔁 반복 일정이에요. 여기서 고치면 모든 날에 함께 바뀌어요. 날짜를 옮기면 이 날만 옮길지 물어봐요 (이 날만 없애려면 [일정 삭제] → 이 날만 빼기).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

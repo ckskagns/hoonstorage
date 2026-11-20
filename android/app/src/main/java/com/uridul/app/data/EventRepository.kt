@@ -61,20 +61,26 @@ class EventRepository(private val db: FirebaseFirestore) {
     /**
      * 저장. 서버 응답을 기다리지 않는다(오프라인이어도 화면에는 바로 보이고, 연결되면 올라간다).
      * 실패하면 onError 로 알린다.
+     * @return 일정 ID (새 일정이면 새로 만든 ID)
      */
-    fun save(coupleId: String, uid: String, draft: EventDraft, onError: (Exception) -> Unit) {
+    fun save(coupleId: String, uid: String, draft: EventDraft, onError: (Exception) -> Unit): String {
         val data = dataOf(draft, uid)
+        val id: String
         val task = if (draft.id == null) {
             data["createdBy"] = uid
             data["createdAt"] = FieldValue.serverTimestamp()
-            events(coupleId).document().set(data)
+            val ref = events(coupleId).document()
+            id = ref.id
+            ref.set(data)
         } else {
+            id = draft.id
             // 색을 기본(등록한 사람 색)으로 되돌렸으면 저장된 색을 지운다
             if (draft.color == null) data["color"] = FieldValue.delete()
             if (draft.category == EventCategory.US) data["category"] = FieldValue.delete()
             events(coupleId).document(draft.id).update(data)
         }
         task.addOnFailureListener(onError)
+        return id
     }
 
     /** 반복 일정 원본 목록 (달력·위젯에서 날짜별로 펼친다) */

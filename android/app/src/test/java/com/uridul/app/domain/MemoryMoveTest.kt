@@ -3,6 +3,7 @@ package com.uridul.app.domain
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.DayPhoto
 import com.uridul.app.data.Repeat
+import com.uridul.app.data.toDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -56,6 +57,34 @@ class MemoryMoveTest {
         val old = event("2026-11-02", Repeat.WEEKLY)
         assertEquals(d("2026-11-05"), MemoryMove.target(old, d("2026-11-05"), null, d("2026-11-02")))
         assertNull(MemoryMove.target(old, d("2026-11-05"), null, d("2026-11-09")))
+    }
+
+    @Test
+    fun weeklyDayMovedOntoAnotherWeekMerges() {
+        // 매주 수요일(10/28 시작) 중 12/2 를 11/25 로: 11/25 도 그 반복의 날이라 새 일정 없이 합친다
+        val series = event("2026-10-28", Repeat.WEEKLY)
+        val occ = Recurrence.occurrence(series, d("2026-12-02")).toDraft()
+        val input = occ.copy(date = d("2026-11-25"), endDate = d("2026-11-25"))
+        assertTrue(MemoryMove.asksOccurrenceChoice(input, series))
+        assertTrue(MemoryMove.mergesIntoSeries(series, d("2026-11-25")))
+        assertFalse(MemoryMove.editsBesidesDate(input, series))
+        assertTrue(MemoryMove.editsBesidesDate(input.copy(title = "다른 제목"), series))
+        // 뺀 날이거나 요일이 다르면 합치지 않고 새 일정
+        assertFalse(MemoryMove.mergesIntoSeries(series.copy(skip = setOf(d("2026-11-25"))), d("2026-11-25")))
+        assertFalse(MemoryMove.mergesIntoSeries(series, d("2026-11-26")))
+        val single = MemoryMove.detached(input)
+        assertNull(single.id); assertNull(single.repeat); assertNull(single.occurrence)
+    }
+
+    @Test
+    fun choiceOnlyForDateChangeOfRepeatingDay() {
+        val series = event("2026-10-28", Repeat.WEEKLY)
+        val occ = Recurrence.occurrence(series, d("2026-12-02")).toDraft()
+        // 날짜 그대로면, 반복 방식도 바꿨으면, 반복 아닌 일정이면 묻지 않는다
+        assertFalse(MemoryMove.asksOccurrenceChoice(occ.copy(title = "새 제목"), series))
+        assertFalse(MemoryMove.asksOccurrenceChoice(occ.copy(date = d("2026-11-25"), endDate = d("2026-11-25"), repeat = null), series))
+        val plain = event("2026-12-02")
+        assertFalse(MemoryMove.asksOccurrenceChoice(plain.toDraft().copy(date = d("2026-11-25"), endDate = d("2026-11-25")), plain))
     }
 
     @Test

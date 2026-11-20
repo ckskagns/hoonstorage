@@ -171,11 +171,14 @@ class PhotoRepository(private val db: FirebaseFirestore) {
     }
 
     /**
-     * 일정 날짜를 고쳤을 때 그 일정 사진의 날짜만 함께 옮긴다 (사진·올린 사람·주는 그대로).
+     * 일정 날짜를 고쳤을 때 그 일정 사진의 날짜(와 일정)만 함께 옮긴다 (사진·올린 사람·주는 그대로).
      * @param target 원래 날짜 → 새 날짜 (옮기지 않으면 null)
+     * @param toEventId 반복 일정의 하루만 따로 떼어 옮기면 새로 만든 일정 ID
      * @return 옮긴 사진들의 (원래 날짜, 새 날짜)
      */
-    suspend fun moveDates(coupleId: String, eventId: String, target: (LocalDate) -> LocalDate?): List<Pair<LocalDate, LocalDate>> {
+    suspend fun moveDates(
+        coupleId: String, eventId: String, target: (LocalDate) -> LocalDate?, toEventId: String = eventId,
+    ): List<Pair<LocalDate, LocalDate>> {
         val moves = photos(coupleId).whereEqualTo("eventId", eventId).get().await().documents.mapNotNull { d ->
             val from = d.getString("date")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return@mapNotNull null
             val to = target(from)?.takeIf { it != from } ?: return@mapNotNull null
@@ -184,7 +187,7 @@ class PhotoRepository(private val db: FirebaseFirestore) {
         // 한 번에 500개까지라 나눠서 (일정 하나에 사진은 많아야 수십 장)
         moves.chunked(400).forEach { part ->
             val batch = db.batch()
-            part.forEach { (ref, _, to) -> batch.update(ref, "date", to.toString()) }
+            part.forEach { (ref, _, to) -> batch.update(ref, mapOf("date" to to.toString(), "eventId" to toEventId)) }
             batch.commit().await()
         }
         return moves.map { it.second to it.third }

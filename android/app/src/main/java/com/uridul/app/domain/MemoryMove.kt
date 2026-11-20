@@ -2,7 +2,10 @@ package com.uridul.app.domain
 
 import com.uridul.app.data.CalendarEvent
 import com.uridul.app.data.DayPhoto
+import com.uridul.app.data.EventDraft
 import com.uridul.app.data.Repeat
+import com.uridul.app.data.normalized
+import com.uridul.app.data.toDraft
 import java.time.LocalDate
 import java.time.MonthDay
 import java.time.YearMonth
@@ -43,6 +46,31 @@ object MemoryMove {
             .takeIf { it >= 0 && day.dayOfMonth == start.dayOfMonth }
         Repeat.YEARLY -> (day.year - start.year).toLong()
             .takeIf { it >= 0 && MonthDay.from(start).atYear(day.year) == day }
+    }
+
+    /**
+     * 반복 일정의 어느 날에서 날짜만 바꿨는지 ("이 날만 / 반복 전체" 를 물을 때).
+     * 반복 방식까지 바꿨으면 반복 전체를 고친 것으로 본다.
+     */
+    fun asksOccurrenceChoice(input: EventDraft, series: CalendarEvent?): Boolean =
+        input.seriesStart != null && input.occurrence != null && input.date != input.occurrence &&
+            series?.repeat != null && input.repeat == series.repeat
+
+    /** 하루만 옮길 날이 이미 그 반복의 날(뺀 날 아님)이면 새 일정을 만들지 않고 그 날에 합친다 */
+    fun mergesIntoSeries(series: CalendarEvent, to: LocalDate): Boolean =
+        to in Recurrence.occurrenceStarts(series, to, to)
+
+    /** 하루만 떼어 낸 새 일정 (반복 없음, 고친 내용 그대로) */
+    fun detached(input: EventDraft): EventDraft =
+        input.copy(id = null, repeat = null, seriesStart = null, occurrence = null)
+
+    /** 그 날에서 날짜 말고 다른 것(제목·시간·메모·장소 등)도 고쳤는지 */
+    fun editsBesidesDate(input: EventDraft, series: CalendarEvent): Boolean {
+        val from = input.occurrence ?: return false
+        val before = Recurrence.occurrence(series, from).toDraft()
+        val span = ChronoUnit.DAYS.between(before.date, before.endDate)
+        val same = detached(before).copy(date = input.date, endDate = input.date.plusDays(span)).normalized()
+        return detached(input).normalized() != same
     }
 
     /**

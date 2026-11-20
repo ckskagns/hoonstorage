@@ -190,6 +190,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _visibleMonth.value = month
     }
 
+    /** 고치기 전 원본 (첫 날 기준). 저장하면 화면 목록이 바로 바뀌므로 저장 전에 찾는다 */
+    private fun seriesOf(id: String?): CalendarEvent? =
+        id?.let { (monthEvents.value.firstOrNull { e -> e.id == it } ?: searchCache.firstOrNull { e -> e.id == it })?.asSeries() }
+
+    private val _occurrenceMove = MutableStateFlow<EventDraft?>(null)
+    /** 반복 일정의 어느 날 날짜를 바꿔 "이 날만 / 반복 전체" 를 묻는 중인 입력값 */
+    val occurrenceMove: StateFlow<EventDraft?> = _occurrenceMove.asStateFlow()
+    /** 물을 때의 원본 (고르기 전에 달을 넘겨도 그대로 쓰도록) */
+    private var occurrenceSeries: CalendarEvent? = null
+
     fun saveEvent(input: EventDraft): Boolean {
         // 반복 일정의 어느 날을 고쳤으면 원래 첫 날 기준으로 저장 (반복 전체가 함께 바뀐다)
         // 타임라인 정리: 하루 일정은 시간 순, 여러 날 일정은 날짜별로
@@ -198,35 +208,72 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = it
             return false
         }
+        if (state.value !is AppState.Ready || container.events == null) return false
+        // 반복 일정의 어느 날 날짜를 바꿨으면 그 날만 옮길지, 반복 전체를 옮길지 묻는다 (창은 닫고 물음 창을 띄운다)
+        val series = seriesOf(input.id)
+        if (MemoryMove.asksOccurrenceChoice(input, series)) {
+            occurrenceSeries = series
+            _occurrenceMove.value = input
+            return true
+        }
+        return saveSeries(draft, series)
+    }
+
+    /** "이 날만" / "반복 전체" 를 고른 뒤 (null = 취소, 저장하지 않음) */
+    fun resolveOccurrenceMove(onlyThisDay: Boolean?) {
+        val input = _occurrenceMove.value ?: return
+        val series = occurrenceSeries
+        _occurrenceMove.value = null
+        occurrenceSeries = null
+        when (onlyThisDay) {
+            null -> _message.value = "일정을 고치지 않았어요"
+            true -> moveOneOccurrence(input, series)
+            false -> saveSeries(input.toSeriesDates().normalized(), series)
+        }
+    }
+
+    /** [old] 고치기 전 원본 (날짜가 바뀌면 그 일정의 사진·후기를 함께 옮긴다) */
+    private fun saveSeries(draft: EventDraft, old: CalendarEvent?): Boolean {
         val ready = state.value as? AppState.Ready ?: return false
         val repo = container.events ?: return false
-        // 고치기 전 원본 (날짜가 바뀌면 그 일정의 사진·후기를 함께 옮긴다). 저장하면 화면 목록이 바로 바뀌므로 먼저 찾아 둔다
-        val old = draft.id?.let { id -> (monthEvents.value.firstOrNull { it.id == id } ?: searchCache.firstOrNull { it.id == id })?.asSeries() }
         repo.save(ready.couple.id, ready.myUid, draft) { e -> _message.value = e.toUserMessage() ?: "저장하지 못했어요." }
-        if (old != null && MemoryMove.needed(old, draft.date)) moveMemories(ready.couple.id, ready.myUid, old, draft.date, draft.repeat)
+        if (old != null && MemoryMove.needed(old, draft.date)) {
+            memoryMover.move(old.id, old.id, { d -> MemoryMove.target(old, draft.date, draft.repeat, d) }) { what ->
+                if (old.repeat != null && draft.repeat != null) "📷 날마다 남긴 ${what}도 반복과 함께 옮겼어요"
+                else "📷 ${what}도 ${draft.date.monthValue}월 ${draft.date.dayOfMonth}일로 함께 옮겼어요"
+            }
+        }
         return true
     }
 
-    /** 일정 날짜를 고쳤을 때 그 일정의 사진·후기도 새 날짜로 */
-    private fun moveMemories(coupleId: String, uid: String, old: CalendarEvent, newStart: LocalDate, newRepeat: com.uridul.app.data.Repeat?) {
-        val target = { d: LocalDate -> MemoryMove.target(old, newStart, newRepeat, d) }
-        viewModelScope.launch {
-            try {
-                val photoMoves = container.photos?.moveDates(coupleId, old.id, target).orEmpty()
-                val reviewCount = container.reviews?.moveDates(coupleId, uid, old.id, target) ?: 0
-                if (photoMoves.isNotEmpty()) {
-                    photoMoves.flatMap { (from, to) -> listOf(YearMonth.from(from), YearMonth.from(to)) }.toSet()
-                        .forEach { photos.loadMonthPhotos(it, force = true) }
-                    photos.refreshMemoryPhotos()
-                }
-                val what = listOfNotNull("사진".takeIf { photoMoves.isNotEmpty() }, "후기".takeIf { reviewCount > 0 }).joinToString("·")
-                if (what.isNotEmpty()) _message.value = "📷 $what 도 ${newStart.monthValue}월 ${newStart.dayOfMonth}일로 함께 옮겼어요"
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _message.value = e.toUserMessage() ?: "일정은 고쳤지만 사진·후기를 옮기지 못했어요. 다시 저장해 보세요."
+    /**
+     * 반복 일정의 하루만 다른 날로: 그 날은 반복에서 빼고,
+     *  - 옮길 날이 이미 그 반복의 날이면 그 날에 합치고 (새 일정 없음)
+     *  - 아니면 고친 내용으로 반복 없는 일정을 새로 만든다.
+     * 그 날의 사진·후기도 함께 옮긴다.
+     */
+    private fun moveOneOccurrence(input: EventDraft, found: CalendarEvent?) {
+        val ready = state.value as? AppState.Ready ?: return
+        val repo = container.events ?: return
+        val series = found ?: seriesOf(input.id) ?: run { _message.value = "일정을 찾지 못했어요. 다시 시도해 주세요."; return }
+        val from = input.occurrence ?: return
+        val to = input.date
+        val merge = MemoryMove.mergesIntoSeries(series, to)
+        val toId = if (merge) {
+            series.id
+        } else {
+            repo.save(ready.couple.id, ready.myUid, MemoryMove.detached(input).normalized()) { e ->
+                _message.value = e.toUserMessage() ?: "저장하지 못했어요."
             }
         }
+        repo.setSkipped(ready.couple.id, ready.myUid, series.id, from, skipped = true) { e ->
+            _message.value = e.toUserMessage() ?: "반복에서 이 날을 빼지 못했어요."
+        }
+        // 반복의 날에 합치면 그 날만 따로 고친 내용(시간·메모 등)은 남길 곳이 없다: 알려 준다
+        val note = if (merge && MemoryMove.editsBesidesDate(input, series)) " · 바꾼 내용은 반복 전체에서 고쳐 주세요" else ""
+        val day = "${from.monthValue}월 ${from.dayOfMonth}일 일정을 ${to.monthValue}월 ${to.dayOfMonth}일로 옮겼어요$note"
+        _message.value = day
+        memoryMover.move(series.id, toId, { d -> to.takeIf { d == from } }) { what -> "$day ($what 함께)" }
     }
 
     /** 일정 색 등 화면 설정이 바뀌면 위젯을 다시 그린다 */
@@ -332,6 +379,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val updates = UpdateController(features)
     val wishList = WishController(features)
     val colors = ColorController(features)
+    private val memoryMover = MemoryMover(features, photos)
 
     // ── 앱 안 알림 (종 아이콘) ────────────────────────────
 
