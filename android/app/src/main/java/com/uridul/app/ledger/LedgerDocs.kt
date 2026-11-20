@@ -36,7 +36,10 @@ internal fun entryData(e: LedgerEntry, uid: String): MutableMap<String, Any?> = 
     "deleted" to e.deleted,
     "updatedBy" to uid,
     "updatedAt" to FieldValue.serverTimestamp(),
-)
+).apply {
+    // 잔액으로 계산한 입금만 (취소 짝은 올린 뒤 따로 잇는다: linkCancels)
+    if (e.gapFrom != null) put("gapFrom", e.gapFrom)
+}
 
 internal fun assetData(a: LedgerAsset, uid: String): Map<String, Any?> = mapOf(
     "v" to LedgerAsset.SCHEMA,
@@ -82,6 +85,9 @@ internal fun DocumentSnapshot.toEntry(): LedgerEntry? {
         tags = (get("tags") as? List<*>).orEmpty().filterIsInstance<String>(),
         deleted = getBoolean("deleted") == true,
         createdBy = getString("createdBy").orEmpty(),
+        cancelPair = getString("cancelPair"),
+        cancelPairAt = getLong("cancelPairAt"),
+        gapFrom = getLong("gapFrom"),
     )
 }
 

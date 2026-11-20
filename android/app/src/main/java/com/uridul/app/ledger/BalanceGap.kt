@@ -38,11 +38,42 @@ object BalanceGap {
         return gap.takeIf { it in 1..LedgerEntry.AMOUNT_MAX }
     }
 
+    /**
+     * 직접 기록한 입금이 이 잔액 차이를 만든 돈인지: 같은 통장, 직접 기록, 지난 잔액 알림([from]) 뒤 ~ 이번 결제([paymentAt]) 사이.
+     * 직접 기록은 시각을 대충 넣기 쉬워 결제한 날과 같은 날이면 결제보다 늦어도 같은 돈으로 본다.
+     */
+    fun explains(e: LedgerEntry, account: String, from: Long, paymentAt: Long): Boolean =
+        !e.deleted && e.type == EntryType.INCOME && e.source == EntrySource.MANUAL && e.parser != PARSER &&
+            e.assetId == account && e.at > from &&
+            (e.at <= paymentAt || e.date == LedgerEntry.dateOf(paymentAt))
+
+    /**
+     * 잔액 차이에서 이미 직접 기록한 입금을 뺀 나머지 (없으면 null).
+     *   예) 차이 600,000원, 그 사이 직접 기록한 입금 600,000원 → 적지 않는다 (두 번 세지 않게)
+     */
+    fun remaining(gap: Long, account: String, from: Long, paymentAt: Long, recorded: List<LedgerEntry>): Long? {
+        val known = recorded.filter { explains(it, account, from, paymentAt) }.sumOf { it.amount }
+        return (gap - known).takeIf { it > 0 }
+    }
+
+    /**
+     * 잔액으로 계산한 입금이 이미 적힌 뒤에 같은 돈을 직접 기록했을 때: 그 계산 입금을 줄이거나(0이면 휴지통) 한다.
+     * @return 고칠 계산 입금과 새 금액 (0 = 휴지통으로), 해당 없으면 null
+     */
+    fun absorb(manual: LedgerEntry, gaps: List<LedgerEntry>): Pair<LedgerEntry, Long>? {
+        val g = gaps
+            .filter { it.parser == PARSER && !it.deleted && it.gapFrom != null && it.assetId != null }
+            .sortedBy { it.at }
+            .firstOrNull { explains(manual, it.assetId!!, it.gapFrom!!, it.at + BEFORE_MS) }
+            ?: return null
+        return g to (g.amount - manual.amount).coerceAtLeast(0)
+    }
+
     /** 두 폰이 같은 결제를 올려도 한 번만 적히도록: 통장 + 이번 결제 거래 ID 로 정한다 */
     fun entryId(paymentEntryId: String): String = "g_" + paymentEntryId.removePrefix("n_")
 
     /** 적을 수입 거래 */
-    fun entry(gap: Long, payment: LedgerEntry, accountId: String, uid: String): LedgerEntry = LedgerEntry(
+    fun entry(gap: Long, payment: LedgerEntry, accountId: String, uid: String, from: Long? = null): LedgerEntry = LedgerEntry(
         id = "",
         type = EntryType.INCOME,
         amount = gap,
@@ -58,5 +89,6 @@ object BalanceGap {
         balanceAfter = null,
         tags = listOf(TAG),
         createdBy = uid,
+        gapFrom = from,
     )
 }

@@ -79,18 +79,13 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         }
     }
 
-    /**
-     * 한 달 거래 + 앞뒤 [CancelPairs.WINDOW_DAYS]일 (지운 것 빼고, 최신 먼저).
-     * 앞뒤는 다른 달에 취소된 결제의 짝을 찾는 데만 쓰고, 화면에는 그 달 것만 보인다.
-     */
-    fun observeMonthWithMargin(coupleId: String, month: YearMonth): Flow<List<LedgerEntry>> {
-        val range = CancelPairs.readRange(month.atDay(1), month.atEndOfMonth())
-        return listen(
+    /** 한 달 거래 (지운 것 빼고, 최신 먼저). 다른 달에 취소된 결제는 거래에 적어 둔 짝(cancelPair)으로 안다 */
+    fun observeMonth(coupleId: String, month: YearMonth): Flow<List<LedgerEntry>> =
+        listen(
             entries(coupleId)
-                .whereGreaterThanOrEqualTo("date", range.start.toString())
-                .whereLessThanOrEqualTo("date", range.endInclusive.toString()),
+                .whereGreaterThanOrEqualTo("date", month.atDay(1).toString())
+                .whereLessThanOrEqualTo("date", month.atEndOfMonth().toString()),
         ) { list -> list.filter { !it.deleted }.sortedByDescending { it.at } }
-    }
 
     /** 확인 필요 거래 */
     fun observePending(coupleId: String): Flow<List<LedgerEntry>> =
@@ -155,6 +150,8 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         val balance = p.balance
         val account = if (balance != null) capture.assetId?.let { balanceAccount(coupleId, it) } else null
         val gapId = BalanceGap.entryId(id)
+        // 지난 잔액 알림 뒤 직접 기록한 입금 (잔액 차이에서 빼서 같은 돈을 두 번 적지 않게)
+        val recorded = if (account != null) manualIncomesSince(coupleId, account, capture.postedAt) else emptyList()
         val withBalance = runCatching { db.runTransaction { tx ->
             val here = tx.get(entries(coupleId).document(id))
             val before = tx.get(entries(coupleId).document(prevId))
@@ -173,8 +170,9 @@ class LedgerRepository(private val db: FirebaseFirestore) {
             } else {
                 null
             }
-            if (gap != null && gapDoc?.exists() != true) {
-                val income = BalanceGap.entry(gap, entry, account, uid)
+            val rest = if (gap != null && lastAt != null) BalanceGap.remaining(gap, account, lastAt, capture.postedAt, recorded) else null
+            if (rest != null && gapDoc?.exists() != true) {
+                val income = BalanceGap.entry(rest, entry, account, uid, from = lastAt)
                 tx.set(
                     entries(coupleId).document(gapId),
                     entryData(income, uid).apply {
@@ -209,6 +207,18 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         LedgerAsset.defaults.firstOrNull { it.id == assetId }?.let { return it.linkedAssetId ?: it.id }
         return runCatching { assets(coupleId).document(assetId).get().await().getString("linkedAssetId") }.getOrNull() ?: assetId
     }
+
+    /** 그 통장의 지난 잔액 알림 날부터 이번 결제 날까지 직접 기록한 입금 (최대 62일, 못 읽으면 빈 목록) */
+    private suspend fun manualIncomesSince(coupleId: String, account: String, paymentAt: Long): List<LedgerEntry> = runCatching {
+        val lastAt = assets(coupleId).document(account).get().await().getLong("lastBalanceAt") ?: return@runCatching emptyList()
+        val to = LedgerEntry.dateOf(paymentAt)
+        val from = maxOf(LedgerEntry.dateOf(lastAt), to.minusDays(62))
+        entries(coupleId)
+            .whereGreaterThanOrEqualTo("date", from.toString())
+            .whereLessThanOrEqualTo("date", to.toString())
+            .get().await().documents.mapNotNull { it.toEntry() }
+            .filter { !it.deleted && it.type == EntryType.INCOME && it.source == EntrySource.MANUAL }
+    }.getOrDefault(emptyList())
 
     private suspend fun hasNearbyExpense(coupleId: String, capture: PaymentCapture): Boolean {
         val amount = capture.parsed.amount ?: return false
@@ -252,11 +262,74 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         }
     }
 
-    /** 휴지통으로 (바로 지우지 않는다: 나중에 되살리기) */
-    fun moveToTrash(coupleId: String, uid: String, id: String, onError: (Exception) -> Unit = {}) {
-        entries(coupleId).document(id).update(
-            mapOf("deleted" to true, "deletedAt" to FieldValue.serverTimestamp(), "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()),
+    /**
+     * 휴지통으로 (바로 지우지 않는다: 나중에 되살리기).
+     * 취소 짝이 있던 거래면 상대 거래의 짝도 푼다 (남은 쪽이 다시 합계에 들어가고, 되살리면 [linkCancels]가 다시 잇는다).
+     */
+    fun moveToTrash(coupleId: String, uid: String, entry: LedgerEntry, onError: (Exception) -> Unit = {}) {
+        val stamp = mapOf("updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp())
+        val unpair = mapOf("cancelPair" to FieldValue.delete(), "cancelPairAt" to FieldValue.delete())
+        entries(coupleId).document(entry.id).update(
+            mapOf("deleted" to true, "deletedAt" to FieldValue.serverTimestamp()) + unpair + stamp,
         ).addOnFailureListener(onError)
+        // 상대 거래가 없어졌어도 휴지통 옮기기는 그대로 (따로 적는다)
+        entry.cancelPair?.let { entries(coupleId).document(it).update(unpair + stamp) }
+    }
+
+    /**
+     * 아직 짝이 적히지 않은 취소를 원래 결제와 잇는다 (두 거래에 서로의 id·시각을 적는다).
+     * 결제를 올린 뒤와 가계부 화면을 열 때 부른다: 예전 기록도 이렇게 채워진다. 두 폰이 같이 해도 한 번만 이어진다.
+     * @return 이번에 이은 수
+     */
+    suspend fun linkCancels(coupleId: String, uid: String): Int {
+        val cancels = entries(coupleId).whereEqualTo("cancel", true).get().await().documents
+            .mapNotNull { it.toEntry() }
+            .filter { !it.deleted && it.cancelPair == null && it.status == EntryStatus.CONFIRMED && it.type == EntryType.EXPENSE }
+            .sortedBy { it.at }
+        var linked = 0
+        for (c in cancels) {
+            // 같은 금액만 읽는다 (앞 취소가 이어졌으면 그 결제는 짝이 생겨 후보에서 빠진다)
+            val candidates = entries(coupleId).whereEqualTo("amount", c.amount).get().await().documents.mapNotNull { it.toEntry() }
+            val p = CancelPairs.pick(c, candidates) ?: continue
+            val ok = runCatching {
+                db.runTransaction { tx ->
+                    val cs = tx.get(entries(coupleId).document(c.id))
+                    val ps = tx.get(entries(coupleId).document(p.id))
+                    val free = cs.exists() && ps.exists() && cs.getString("cancelPair") == null && ps.getString("cancelPair") == null &&
+                        cs.getBoolean("deleted") != true && ps.getBoolean("deleted") != true
+                    if (!free) return@runTransaction false
+                    val stamp = mapOf("updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp())
+                    tx.update(cs.reference, mapOf("cancelPair" to p.id, "cancelPairAt" to p.at) + stamp)
+                    tx.update(ps.reference, mapOf("cancelPair" to c.id, "cancelPairAt" to c.at) + stamp)
+                    true
+                }.await()
+            }.getOrDefault(false)
+            if (ok) linked++
+        }
+        return linked
+    }
+
+    /**
+     * 직접 기록한 입금이 이미 잔액으로 계산해 적힌 입금과 같은 돈이면, 계산 입금에서 그만큼 뺀다 (0이 되면 휴지통).
+     * 직접 기록을 새로 저장한 뒤에 부른다.
+     */
+    suspend fun absorbManualIncome(coupleId: String, uid: String, manual: LedgerEntry): Boolean {
+        if (manual.type != EntryType.INCOME || manual.source != EntrySource.MANUAL) return false
+        val gaps = entries(coupleId).whereEqualTo("parser", BalanceGap.PARSER).get().await().documents.mapNotNull { it.toEntry() }
+        val (gap, amount) = BalanceGap.absorb(manual, gaps) ?: return false
+        if (amount == 0L) {
+            moveToTrash(coupleId, uid, gap)
+        } else {
+            entries(coupleId).document(gap.id).update(
+                mapOf(
+                    "amount" to amount,
+                    "memo" to "${BalanceGap.MEMO} (직접 기록한 ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(manual.amount)}원 뺌)".take(LedgerEntry.MEMO_MAX),
+                    "updatedBy" to uid,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            ).await()
+        }
+        return true
     }
 
     private fun listen(query: Query, transform: (List<LedgerEntry>) -> List<LedgerEntry>): Flow<List<LedgerEntry>> = callbackFlow {

@@ -113,6 +113,8 @@ class LedgerUploadWorker(context: Context, params: WorkerParameters) : Coroutine
             if (ok) done += c.key
         }
         PaymentInbox.removeUploaded(ctx, done)
+        // 취소가 올라갔으면 원래 결제와 잇는다 (합계에서 둘 다 빠지게)
+        if (pending.any { it.key in done && it.parsed.kind == PaymentKind.CANCEL }) runCatching { repo.linkCancels(coupleId, myUid) }
         return if (done.size == pending.size) Result.success() else Result.retry()
     }
 

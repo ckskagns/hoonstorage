@@ -91,6 +91,12 @@ data class LedgerEntry(
     val tags: List<String> = emptyList(),
     val deleted: Boolean = false,
     val createdBy: String = "",
+    /** 취소 짝 (서버에 적어 둔 것): 취소면 원래 결제 id, 결제면 그 결제를 취소한 거래 id */
+    val cancelPair: String? = null,
+    /** 짝 거래의 시각 (다른 달이라 짝을 읽지 않아도 "17일 결제 취소"처럼 적으려고) */
+    val cancelPairAt: Long? = null,
+    /** 잔액으로 계산한 입금: 비교한 지난 잔액 알림 시각 (그 뒤에 직접 기록한 입금이면 이 입금과 같은 돈) */
+    val gapFrom: Long? = null,
 ) {
     val date: LocalDate get() = dateOf(at)
     val localDateTime: java.time.LocalDateTime get() = Instant.ofEpochMilli(at).atZone(ZONE).toLocalDateTime()

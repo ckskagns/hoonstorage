@@ -240,7 +240,8 @@ service cloud.firestore {
           return d.keys().hasOnly(['v', 'type', 'amount', 'cancel', 'date', 'at', 'merchant', 'memo', 'category',
                                    'assetId', 'toAssetId', 'paidBy', 'paidByName', 'status', 'source', 'sourceApp',
                                    'raw', 'parser', 'balanceAfter', 'installment', 'recurringId', 'eventId', 'tags',
-                                   'deleted', 'deletedAt', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt'])
+                                   'deleted', 'deletedAt', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt',
+                                   'cancelPair', 'cancelPairAt', 'gapFrom'])
             && d.type in ['expense', 'income', 'transfer']
             && d.amount is int && d.amount >= 0 && d.amount <= 10000000000
             && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -252,6 +253,9 @@ service cloud.firestore {
             && (!('source' in d) || d.source in ['notification', 'sms', 'manual', 'import', 'recurring'])
             && (!('raw' in d) || d.raw == null || (d.raw is map && d.raw.keys().hasOnly(['title', 'text'])))
             && (!('tags' in d) || (d.tags is list && d.tags.size() <= 10))
+            && (!('cancelPair' in d) || (d.cancelPair is string && d.cancelPair.size() <= 64))
+            && (!('cancelPairAt' in d) || d.cancelPairAt is int)
+            && (!('gapFrom' in d) || d.gapFrom is int)
             && d.updatedBy == request.auth.uid;
         }
 
