@@ -14,6 +14,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.uridul.app.data.Couple
@@ -47,6 +48,8 @@ internal fun MainMenu(
         onDismiss()
         onAction(action)
     }
+    // 설정이 바뀌면 체크 표시도 바로 (StateFlow.value 를 그냥 읽으면 다시 그려지지 않는다)
+    val photoTint = com.uridul.app.data.AppSettings.state.collectAsState().value.photoTint
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
             text = { Text("내 프로필 (이름·캐릭터)") },
@@ -76,7 +79,7 @@ internal fun MainMenu(
         DropdownMenuItem(text = { Text("화면 모드 ($themeLabel)") }, onClick = { pick(MenuAction.Theme) })
         DropdownMenuItem(
             text = { Text("디데이 사진 색 따라가기") },
-            trailingIcon = { Checkbox(checked = com.uridul.app.data.AppSettings.state.value.photoTint, onCheckedChange = null) },
+            trailingIcon = { Checkbox(checked = photoTint, onCheckedChange = null) },
             onClick = { pick(MenuAction.TogglePhotoTint) },
         )
         DropdownMenuItem(

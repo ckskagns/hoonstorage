@@ -131,19 +131,7 @@ internal fun PhotoDayCell(
             )
         }
         PhotoDays.moreText(photo.count)?.let { more ->
-            Text(
-                more,
-                style = smallStyle,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(3.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .padding(horizontal = 3.dp),
-            )
+            PhotoBadge(more, Modifier.align(Alignment.BottomEnd), smallStyle, outer = 3.dp, inner = 3.dp)
         }
         if (isSelected) Box(Modifier.fillMaxSize().border(2.5.dp, scheme.primary, shape))
     }

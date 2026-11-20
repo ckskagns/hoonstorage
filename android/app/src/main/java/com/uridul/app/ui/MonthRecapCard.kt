@@ -71,7 +71,7 @@ fun MonthRecapDialog(month: YearMonth, couple: Couple, myUid: String, onDismiss:
     // 그 달 데이트 가계부 (한 번만 읽는다, 못 읽으면 돈 칸만 뺀다)
     var ledger by remember(month) { mutableStateOf<List<LedgerEntry>?>(null) }
     LaunchedEffect(month) {
-        val repo = (context.applicationContext as? com.uridul.app.UridulApp)?.container?.ledger
+        val repo = appContainer(context)?.ledger
         ledger = runCatching { repo?.fetchMonth(couple.id, month) }.getOrNull().orEmpty()
     }
     val dayPhotos = photos.dayPhotos
@@ -209,17 +209,11 @@ private fun RecapCollage(items: List<Pair<LocalDate, DayPhoto>>) {
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                     ) {
                         bmp?.let { Image(it, contentDescription = "${date.monthValue}월 ${date.dayOfMonth}일 사진", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                        Text(
+                        PhotoBadge(
                             "${date.dayOfMonth}일",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = androidx.compose.ui.graphics.Color.White,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(6.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f))
-                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                            Modifier.align(Alignment.BottomStart),
+                            MaterialTheme.typography.labelMedium,
+                            outer = 6.dp, inner = 6.dp, corner = 8.dp,
                         )
                     }
                 }

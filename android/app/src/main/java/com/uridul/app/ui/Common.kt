@@ -122,3 +122,7 @@ fun shareInviteLink(context: Context, link: String) {
     }
     context.startActivity(Intent.createChooser(send, "초대 링크 보내기"))
 }
+
+/** 앱 저장소 묶음 (Firebase 가 준비 안 됐거나 미리보기면 null). 화면에서 저장소를 꺼낼 때 한곳에서 */
+internal fun appContainer(context: android.content.Context): com.uridul.app.AppContainer? =
+    (context.applicationContext as? com.uridul.app.UridulApp)?.container

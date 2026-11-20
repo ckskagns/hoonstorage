@@ -73,10 +73,12 @@ fun LedgerContent(
     onOpenDay: (com.uridul.app.data.CalendarEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val repo = remember { (context.applicationContext as? com.uridul.app.UridulApp)?.container?.ledger }
+    val repo = remember { appContainer(context)?.ledger }
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthText)
-    val entries by remember(month, repo) { repo?.observeMonth(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
+    // null = 아직 받는 중 (빈 달 캐릭터 화면이 열자마자 번쩍 보이지 않게)
+    val loadedEntries by remember(month, repo) { repo?.observeMonth(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = null)
+    val entries = loadedEntries.orEmpty()
     // 취소 짝: 서버에 적어 둔 짝 + 아직 안 이어진 것은 이 달 안에서 찾기
     val pairs = remember(entries) { CancelPairs.of(entries) }
     // 예전 기록(이 폰에서 처음 한 번)이나 다른 폰이 올린, 아직 짝이 안 적힌 취소를 원래 결제와 잇는다.
@@ -192,7 +194,7 @@ fun LedgerContent(
             }
         }
         item(key = "listHead") { SectionTitle("📒 ${month.monthValue}월 내역", if (confirmed.isEmpty()) "아직 기록이 없어요" else "${confirmed.size}건") }
-        if (confirmed.isEmpty()) item(key = "emptyMonth") {
+        if (loadedEntries != null && confirmed.isEmpty()) item(key = "emptyMonth") {
             CharacterEmpty(
                 couple, myUid,
                 title = "${month.monthValue}월 데이트 기록이 아직 없어요",

@@ -118,16 +118,31 @@ private fun GridTile(day: LocalDate, photo: DayPhoto, selected: Boolean, onClick
 }
 
 @Composable
-private fun GridBadge(text: String, modifier: Modifier) {
+private fun GridBadge(text: String, modifier: Modifier) = PhotoBadge(text, modifier, MaterialTheme.typography.labelSmall, outer = 4.dp, inner = 4.dp)
+
+/**
+ * 사진 위 작은 글자표 (반투명 검은 바탕 + 흰 굵은 글자): 날짜 "14일", 나머지 장수 "+4".
+ * 사진 달력 칸·모아보기 칸·이달의 우리 콜라주가 함께 쓴다.
+ */
+@Composable
+internal fun PhotoBadge(
+    text: String,
+    modifier: Modifier,
+    style: androidx.compose.ui.text.TextStyle,
+    outer: androidx.compose.ui.unit.Dp,
+    inner: androidx.compose.ui.unit.Dp,
+    corner: androidx.compose.ui.unit.Dp = 6.dp,
+) {
     Text(
         text,
-        style = MaterialTheme.typography.labelSmall,
+        style = style,
         color = Color.White,
         fontWeight = FontWeight.Bold,
+        maxLines = 1,
         modifier = modifier
-            .padding(4.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .padding(outer)
+            .clip(RoundedCornerShape(corner))
             .background(Color.Black.copy(alpha = 0.45f))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
+            .padding(horizontal = inner, vertical = 1.dp),
     )
 }

@@ -48,26 +48,33 @@ object HomeTabs {
 @Composable
 fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsKey: Any?, onOpenTab: (String) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val container = (context.applicationContext as? com.uridul.app.UridulApp)?.container
+    val container = appContainer(context)
     // 다음 일정: 위젯과 같은 계산 (반복 일정은 두 달 앞까지 펼쳐서)
-    val next by produceState<CalendarEvent?>(null, couple.id, today, eventsKey) {
+    // 탭을 오갈 때마다 서버를 다시 읽지 않게 5분 동안 기억 (일정이 바뀌면 키가 달라져 바로 다시 읽는다)
+    val nextKey = listOf("next", couple.id, today, eventsKey?.hashCode())
+    val next by produceState(BentoCache.peek<CalendarEvent>(nextKey), nextKey) {
         val repo = container?.events ?: return@produceState
-        value = runCatching {
-            val merged = com.uridul.app.domain.Recurrence.merge(
-                repo.fetchUpcoming(couple.id, today), repo.fetchRecurring(couple.id), today, today.plusDays(60),
-            )
-            CalendarMath.upcoming(merged, today, 1).firstOrNull()
-        }.getOrNull()
+        value = BentoCache.load(nextKey) {
+            runCatching {
+                val merged = com.uridul.app.domain.Recurrence.merge(
+                    repo.fetchUpcoming(couple.id, today), repo.fetchRecurring(couple.id), today, today.plusDays(60),
+                )
+                CalendarMath.upcoming(merged, today, 1).firstOrNull()
+            }.getOrNull()
+        }
     }
     // 이번 달 데이트 비용 (가계부와 같은 계산: 확정, 취소 짝 빼고)
     val month = YearMonth.from(today)
-    val spent by produceState<Pair<Long, Int>?>(null, couple.id, month) {
+    val spentKey = listOf("spent", couple.id, month)
+    val spent by produceState(BentoCache.peek<Pair<Long, Int>>(spentKey), spentKey) {
         val repo = container?.ledger ?: return@produceState
-        value = runCatching {
-            val entries = repo.fetchMonth(couple.id, month)
-            val confirmed = entries.filter { it.status == com.uridul.app.ledger.EntryStatus.CONFIRMED }
-            LedgerTotals.expense(entries, com.uridul.app.ledger.CancelPairs.of(entries)).coerceAtLeast(0) to confirmed.size
-        }.getOrNull()
+        value = BentoCache.load(spentKey) {
+            runCatching {
+                val entries = repo.fetchMonth(couple.id, month)
+                val confirmed = entries.filter { it.status == com.uridul.app.ledger.EntryStatus.CONFIRMED }
+                LedgerTotals.expense(entries, com.uridul.app.ledger.CancelPairs.of(entries)).coerceAtLeast(0) to confirmed.size
+            }.getOrNull()
+        }
     }
     val wish = HomeTiles.wishOfDay(wishes, today)
     val openWishes = wishes.count { !it.visited }
@@ -121,5 +128,21 @@ private fun BentoTile(label: String, value: String, sub: String, color: Color, m
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/** 홈 벤토 값 기억 (앱이 켜져 있는 동안, 키마다 5분) */
+private object BentoCache {
+    private const val TTL_MS = 5 * 60 * 1000L
+    private val map = HashMap<Any, Pair<Long, Any?>>()
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T> peek(key: Any): T? = map[key]?.second as T?
+
+    @Suppress("UNCHECKED_CAST")
+    suspend fun <T> load(key: Any, block: suspend () -> T?): T? {
+        val now = System.currentTimeMillis()
+        map[key]?.let { (at, v) -> if (now - at < TTL_MS) return v as T? }
+        return block().also { if (it != null) map[key] = now to it }
     }
 }

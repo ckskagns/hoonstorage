@@ -70,6 +70,7 @@ class PartnerPhotoWidgetReceiver : GlanceAppWidgetReceiver() {
 /** 상대 최근 사진 (폰에 저장해 둔 것) */
 object PartnerPhotoStore {
     private const val PREFS = "partner_photo"
+    private const val CHECK_EVERY_MS = 30 * 60 * 1000L
 
     class Saved(val bitmap: Bitmap, val uploadedAt: Long, val partnerName: String)
 
@@ -90,6 +91,11 @@ object PartnerPhotoStore {
     /** 위젯이 그려질 때: 로그인돼 있으면 서버에 최근 사진을 물어 새 것이면 저장 (6초 안에 못 받으면 저장해 둔 것) */
     suspend fun refreshFromServer(context: Context) {
         if (FirebaseApp.getApps(context).isEmpty() || FirebaseAuth.getInstance().currentUser == null) return
+        // 다른 위젯과 함께 자주 다시 그려지므로 서버에는 30분에 한 번만 묻는다 (앱을 열면 앱이 따로 알려 준다)
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong("checkedAt", 0L) in 0 until CHECK_EVERY_MS) return
+        prefs.edit().putLong("checkedAt", now).apply()
         val snap = WidgetStore.load(context) ?: return
         val coupleId = snap.coupleId ?: return
         val myUid = snap.myUid ?: return

@@ -50,4 +50,4 @@ fun rememberDayCosts(coupleId: String): DayCosts? {
     }
 }
 
-private fun ledgerRepo(context: Context) = (context.applicationContext as? com.uridul.app.UridulApp)?.container?.ledger
+private fun ledgerRepo(context: Context) = appContainer(context)?.ledger
