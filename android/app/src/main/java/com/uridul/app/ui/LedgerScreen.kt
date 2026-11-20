@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -63,7 +65,13 @@ import java.time.YearMonth
 internal fun wonText(amount: Long): String = Won.text(amount)
 
 @Composable
-fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) {
+fun LedgerContent(
+    couple: Couple,
+    myUid: String,
+    modifier: Modifier = Modifier,
+    /** 날짜 머리글의 사진을 누르면 그날 일기 (크게 보기) */
+    onOpenDay: (com.uridul.app.data.CalendarEvent) -> Unit = {},
+) {
     val context = LocalContext.current
     val repo = remember { (context.applicationContext as? com.uridul.app.UridulApp)?.container?.ledger }
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
@@ -133,6 +141,10 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     val summary = remember(entries, pairs) { MonthSummary.of(entries, pairs) }
     val confirmed = remember(entries) { entries.filter { it.status == EntryStatus.CONFIRMED } }
     val byDay = remember(confirmed) { confirmed.groupBy { it.date }.toSortedMap(compareByDescending { it }) }
+    // 날짜 머리글에 그날 일기 사진 (사진 달력이 저장해 둔 대표 사진, 이 달 것을 불러 둔다)
+    val photoHooks = LocalPhotos.current
+    val reviewHooks = LocalReviews.current
+    LaunchedEffect(month) { photoHooks.loadMonthPhotos(month) }
 
     Box(modifier.fillMaxSize()) {
     LazyColumn(
@@ -183,6 +195,11 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
         byDay.forEach { (day, list) ->
             item(key = "d$day") {
                 Row(Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    photoHooks.dayPhotos[day]?.let { p ->
+                        val title = reviewHooks.reviews[com.uridul.app.data.DateReview.idOf(p.eventId, day)]?.title.orEmpty()
+                        DayPhotoDot(p, title) { onOpenDay(FeedPost(p.eventId, day, title, null).asEvent()) }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Text(day.format(KoreanMonthDay), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     // 그날 쓴 돈 (취소된 결제는 빼고). 짝 없는 환불이 더 많으면 +로
                     val dayExpense = LedgerTotals.expense(list, pairs)

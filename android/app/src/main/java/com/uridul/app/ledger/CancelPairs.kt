@@ -100,4 +100,15 @@ object LedgerTotals {
 
     fun income(entries: List<LedgerEntry>): Long =
         entries.filter { it.counts() && it.type == EntryType.INCOME }.sumOf { it.signedAmount }
+
+    /**
+     * 날짜별 지출 (가계부 날짜 머리글과 같은 계산: 취소 짝은 빼고). 쓴 돈이 있는 날만.
+     * 일기 게시물의 "이날 데이트 비용" 에 쓴다. [entries] 는 한 달치 (짝을 그 안에서 찾는다)
+     */
+    fun expenseByDay(entries: List<LedgerEntry>): Map<java.time.LocalDate, Long> {
+        val pairs = CancelPairs.of(entries)
+        return entries.filter { it.counts() }.groupBy { it.date }
+            .mapValues { (_, list) -> expense(list, pairs) }
+            .filterValues { it > 0 }
+    }
 }

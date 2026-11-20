@@ -134,4 +134,20 @@ class CancelPairsTest {
     }
 
     private fun pickOf(list: List<LedgerEntry>): String? = CancelPairs.pick(list.last { it.cancel }, list)?.id
+
+    /** 일기장 "이날 데이트 비용": 가계부 날짜 머리글과 같은 계산 (취소 짝 빼고, 쓴 돈이 있는 날만) */
+    @Test
+    fun expenseByDayMatchesLedgerHeaders() {
+        val byDay = LedgerTotals.expenseByDay(november)
+        // 17일: 아고다 398,147 은 19일에 취소되어 빠지고 65,400 만
+        assertEquals(65_400L, byDay[java.time.LocalDate.parse("2026-11-17")])
+        // 19일: 같은 날 결제·취소(342,420)는 빠지고 트립닷컴 346,712 만
+        assertEquals(346_712L, byDay[java.time.LocalDate.parse("2026-11-19")])
+        // 입금만 있는 날·쓴 돈 없는 날은 없음
+        assertEquals(2, byDay.size)
+        // 확인 필요(PENDING)·지운 거래는 세지 않는다
+        val more = november + pay("g20", "2026-11-20T12:00:00", 9_000, "카페").copy(status = EntryStatus.PENDING) +
+            pay("h20", "2026-11-20T13:00:00", 5_000, "편의점").copy(deleted = true)
+        assertNull(LedgerTotals.expenseByDay(more)[java.time.LocalDate.parse("2026-11-20")])
+    }
 }

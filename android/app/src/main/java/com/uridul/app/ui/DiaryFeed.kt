@@ -40,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import com.uridul.app.ledger.Won
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -403,8 +404,12 @@ fun DiaryPost(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { writing = true }.padding(vertical = 4.dp),
             )
+            // 날짜 · 💳 이날 데이트 비용 (데이트 가계부에서 그날 쓴 돈, 취소된 결제는 빼고)
+            val costs = LocalDayCosts.current
+            LaunchedEffect(costs, post.date) { costs?.request(java.time.YearMonth.from(post.date)) }
+            val cost = costs?.of(post.date)
             Text(
-                post.date.format(KoreanMonthDay),
+                post.date.format(KoreanMonthDay) + (cost?.let { " · 💳 이날 데이트 비용 ${Won.text(it)}" } ?: ""),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),

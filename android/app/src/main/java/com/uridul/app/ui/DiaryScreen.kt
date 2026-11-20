@@ -45,6 +45,9 @@ fun DiaryContent(
             .map(FeedPost::of)
     }
 
+    // 게시물마다 "이날 데이트 비용" (그 달 가계부를 한 번만 읽는다)
+    val dayCosts = rememberDayCosts(couple.id)
+    androidx.compose.runtime.CompositionLocalProvider(LocalDayCosts provides dayCosts) {
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
@@ -83,6 +86,7 @@ fun DiaryContent(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
+    }
     }
 
     viewing?.let { post ->

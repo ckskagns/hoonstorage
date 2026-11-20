@@ -405,7 +405,15 @@ fun ReadyScreen(
                         onDelete = { w -> onDeleteWish(w.id) },
                         modifier = content,
                     )
-                    Tab.Ledger -> LedgerContent(couple = couple, myUid = myUid, modifier = content)
+                    Tab.Ledger -> LedgerContent(
+                        couple = couple, myUid = myUid, modifier = content,
+                        // 날짜 머리글의 사진을 누르면 일기장 탭에서 그날 사진·후기를 크게 보기
+                        onOpenDay = { e ->
+                            diaryViewText = FeedPost.of(e).encode()
+                            diaryViewPage = 0
+                            tabKey = Tab.Diary.key
+                        },
+                    )
                 }
                 }
             }

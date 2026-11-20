@@ -147,3 +147,22 @@ internal fun PhotoDayCell(
         if (isSelected) Box(Modifier.fillMaxSize().border(2.5.dp, scheme.primary, shape))
     }
 }
+
+/**
+ * 가계부 날짜 머리글 앞의 동그란 사진 (그날 일기 대표 사진). 누르면 그날 일기.
+ * 사진이 여러 장이면 오른쪽 아래에 작은 장수.
+ */
+@Composable
+internal fun DayPhotoDot(photo: DayPhoto, title: String, onClick: () -> Unit) {
+    val bitmap = rememberPhotoBitmap("cal:${photo.id}", photo.thumb)
+    Box(
+        Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(role = Role.Button, onClickLabel = "이날 일기 보기", onClick = onClick)
+            .semantics { contentDescription = "${title.ifBlank { "이날" }} 사진 ${photo.count}장" },
+    ) {
+        bitmap?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+    }
+}

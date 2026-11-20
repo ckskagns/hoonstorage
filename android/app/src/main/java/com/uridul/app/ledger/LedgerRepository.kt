@@ -87,6 +87,13 @@ class LedgerRepository(private val db: FirebaseFirestore) {
                 .whereLessThanOrEqualTo("date", month.atEndOfMonth().toString()),
         ) { list -> list.filter { !it.deleted }.sortedByDescending { it.at } }
 
+    /** 한 달 거래를 한 번만 읽기 (일기장의 "이날 데이트 비용", 지운 것 빼고) */
+    suspend fun fetchMonth(coupleId: String, month: YearMonth): List<LedgerEntry> =
+        entries(coupleId)
+            .whereGreaterThanOrEqualTo("date", month.atDay(1).toString())
+            .whereLessThanOrEqualTo("date", month.atEndOfMonth().toString())
+            .get().await().documents.mapNotNull { it.toEntry() }.filter { !it.deleted }
+
     /** 확인 필요 거래 */
     fun observePending(coupleId: String): Flow<List<LedgerEntry>> =
         listen(entries(coupleId).whereEqualTo("status", EntryStatus.PENDING.key)) { list ->
