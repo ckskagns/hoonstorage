@@ -145,6 +145,8 @@ private fun InboxRow(item: InboxItem, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // 상대가 후기를 남긴 소식이면 "고마워(꽃)" 작은 그림 (그림이 들어 있는 앱에서만)
+        if ("후기" in item.title) SmallArt(Emotion.THANKS, 48.dp, Modifier.padding(start = 8.dp))
     }
 }
 

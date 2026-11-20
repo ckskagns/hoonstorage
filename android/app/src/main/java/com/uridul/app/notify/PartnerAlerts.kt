@@ -258,6 +258,11 @@ object PartnerAlerts {
             .setContentIntent(open)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+            // 우리 캐릭터 그림이 있으면: 후기 소식은 "고마워", 그 밖에는 두 사람 기본 그림
+            .also { b ->
+                val art = if ("후기" in title) com.uridul.app.ui.Emotion.THANKS else com.uridul.app.ui.Emotion.BASE
+                com.uridul.app.ui.CharArt.bitmap(context, art.resName)?.let(b::setLargeIcon)
+            }
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification) }
     }

@@ -73,13 +73,16 @@ internal fun DayPanel(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CharacterPair(couple.myCharacter(myUid), couple.partnerCharacter(myUid), size = 48.dp)
+                    // 그림이 있으면 "가자" 장면, 없으면 두 캐릭터
+                    EmotionArt(Emotion.DATE, couple, myUid, 130.dp) {
+                        CharacterPair(couple.myCharacter(myUid), couple.partnerCharacter(myUid), size = 48.dp)
+                    }
                     Text(
                         "등록된 일정이 없어요",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedButton(onClick = { onAdd(day) }) { Text("이 날에 일정 추가") }
+                    OutlinedButton(onClick = { onAdd(day) }) { Text("💕 이 날 데이트 계획하기") }
                 }
             }
         } else {

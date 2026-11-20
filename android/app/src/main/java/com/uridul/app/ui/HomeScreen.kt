@@ -128,6 +128,7 @@ fun HomeContent(
                             .weight(1f)
                             .fillMaxHeight(),
                         onOpenMemory,
+                        celebrate = celebrateDay,
                     )
                     Column(
                         Modifier
@@ -157,7 +158,7 @@ fun HomeContent(
                     val m = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 560.dp)
-                    HeroCard(couple, myUid, today, m, onOpenMemory, photoHeight = HeroPhotoHeight)
+                    HeroCard(couple, myUid, today, m, onOpenMemory, photoHeight = HeroPhotoHeight, celebrate = celebrateDay)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
                     bento(m)
                     question(m)
@@ -185,6 +186,8 @@ private fun HeroCard(
     modifier: Modifier,
     onOpenDay: (com.uridul.app.data.CalendarEvent) -> Unit,
     photoHeight: androidx.compose.ui.unit.Dp? = null,
+    /** 오늘이 기념일·생일이면 그 날 (HomeContent 에서 한 번 계산) */
+    celebrate: com.uridul.app.domain.SpecialDay? = null,
 ) {
     val photos = LocalPhotos.current
     val hero = photos.hero
@@ -197,9 +200,6 @@ private fun HeroCard(
     }
     val partner = couple.partnerName(myUid)
     // 기념일·생일 당일은 "축하해" 그림, 그 밖에는 시간대 그림
-    val celebrate = remember(couple, today) {
-        com.uridul.app.domain.CelebrateDay.today(couple.startDate, couple.countFromOne, couple.birthdays(), today)
-    }
     val heroEmotion = if (celebrate != null) Emotion.CELEBRATE else Emotion.forHour(java.time.LocalTime.now().hour)
     // 큰 숫자는 글꼴 크기 설정을 따라 무한히 커지지 않도록 dp 기준으로 고정한다
     val heroSize = with(LocalDensity.current) { 64.dp.toSp() }

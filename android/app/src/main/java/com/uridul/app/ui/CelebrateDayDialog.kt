@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.edit
 import com.uridul.app.data.Couple
 import com.uridul.app.domain.CelebrateDay
 import com.uridul.app.domain.SpecialDay
@@ -67,6 +68,6 @@ object CelebrateFlags {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("last", null) == day.toString()
 
     fun markShown(context: Context, day: LocalDate) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("last", day.toString()).apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString("last", day.toString()) }
     }
 }

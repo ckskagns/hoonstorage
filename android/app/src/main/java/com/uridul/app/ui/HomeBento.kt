@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -95,6 +96,7 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
                 next?.let { HomeTiles.whenText(it, today, now) } ?: if (upcoming == null) "눌러서 캘린더 보기" else "눌러서 일정 추가",
                 MaterialTheme.colorScheme.secondaryContainer,
                 Modifier.weight(1f),
+                art = Emotion.DATE.takeIf { upcoming != null && next == null },
             ) {
                 // 다가오는 일정이 없다고 확인된 때만 바로 새 일정 (읽는 중이면 캘린더로)
                 onOpenTab(if (upcoming != null && next == null) HomeTabs.ADD_EVENT else HomeTabs.CALENDAR)
@@ -105,6 +107,7 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
                 spent?.let { "기록 ${it.second}건" } ?: "데이트 가계부",
                 MaterialTheme.colorScheme.tertiaryContainer,
                 Modifier.weight(1f),
+                art = Emotion.SAVE.takeIf { spent != null && spent?.second == 0 },
             ) { onOpenTab(HomeTabs.LEDGER) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -114,6 +117,7 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
                 if (wish != null) "아직 못 간 ${openWishes}곳 중 오늘의 한 곳" else "지도 앱에서 공유하면 담겨요",
                 MaterialTheme.colorScheme.surfaceContainerHigh,
                 Modifier.weight(1f),
+                art = Emotion.TRIP.takeIf { wish == null },
             ) { onOpenTab(HomeTabs.WISH) }
             BentoTile(
                 "📷 이번 주 사진",
@@ -121,23 +125,33 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
                 "일기장에서 사진 올리기",
                 MaterialTheme.colorScheme.primaryContainer,
                 Modifier.weight(1f),
+                art = Emotion.PHOTO.takeIf { weekUsed == 0 },
             ) { onOpenTab(HomeTabs.DIARY) }
         }
     }
 }
 
 @Composable
-private fun BentoTile(label: String, value: String, sub: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+private fun BentoTile(
+    label: String, value: String, sub: String, color: Color, modifier: Modifier,
+    /** 비어 있는 칸에만 오른쪽 아래 작은 캐릭터 (그림이 들어 있는 앱에서만) */
+    art: Emotion? = null,
+    onClick: () -> Unit,
+) {
     Card(
         onClick = onClick,
         modifier = modifier.heightIn(min = 104.dp),
         colors = CardDefaults.cardColors(containerColor = color),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+      androidx.compose.foundation.layout.Box {
+        val res = art?.let { rememberEmotionRes(it) } ?: 0
+        if (art != null) SmallArt(art, 64.dp, Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 2.dp, bottom = 2.dp))
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp).padding(end = if (res != 0) 40.dp else 0.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+      }
     }
 }
 

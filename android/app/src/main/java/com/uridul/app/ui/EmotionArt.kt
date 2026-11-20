@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.luminance
+import androidx.core.graphics.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -81,8 +82,27 @@ object CharArt {
     fun res(context: android.content.Context, name: String): Int =
         cache.getOrPut(name) { context.resources.getIdentifier(name, "drawable", context.packageName) }
 
+    /** 알림 큰 아이콘용 작은 비트맵 (그림이 없으면 null) */
+    fun bitmap(context: android.content.Context, name: String, sizePx: Int = 192): android.graphics.Bitmap? {
+        val id = res(context, name)
+        if (id == 0) return null
+        return runCatching {
+            val full = android.graphics.BitmapFactory.decodeResource(context.resources, id) ?: return null
+            full.scale(sizePx, sizePx).also { if (it !== full) full.recycle() }
+        }.getOrNull()
+    }
+
     /** 우리 캐릭터 그림이 들어 있는 앱인지 (고르기 목록에 "우리 캐릭터"를 보일지) */
     fun available(context: android.content.Context): Boolean = res(context, "char_bust_he") != 0
+}
+
+/** 작은 장식 그림 (벤토 빈 칸·알림 목록 등). 그림이 없는 앱이면 아무것도 그리지 않는다 */
+@Composable
+fun SmallArt(emotion: Emotion, size: Dp, modifier: Modifier = Modifier) {
+    val res = rememberEmotionRes(emotion)
+    if (res != 0) {
+        Image(painterResource(res), contentDescription = null, modifier = modifier.size(size).artBacking(isDarkSurface()))
+    }
 }
 
 /** 다크 모드 받침 색: 머리카락·외곽선이 어두운 배경에 묻히지 않게 (대비 1.3:1 → 받침 위 10:1 이상) */

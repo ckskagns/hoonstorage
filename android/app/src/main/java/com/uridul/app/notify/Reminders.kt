@@ -189,6 +189,8 @@ object Reminders {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            // 우리 캐릭터 그림이 있으면 "좋은 아침" 그림을 큰 아이콘으로
+            .also { b -> com.uridul.app.ui.CharArt.bitmap(context, com.uridul.app.ui.Emotion.MORNING.resName)?.let(b::setLargeIcon) }
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(DAILY_NOTIFICATION_ID, notification) }
     }
