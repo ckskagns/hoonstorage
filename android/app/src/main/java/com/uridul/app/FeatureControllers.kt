@@ -134,7 +134,10 @@ class PhotoController internal constructor(private val f: FeatureScope) {
                     if (uris.size > room) append(" (남은 ${room}장만, 나머지 ${uris.size - room}장은 빼고)")
                 }
                 refreshMemoryPhotos()
-                if (done > 0) loadMonthPhotos(java.time.YearMonth.from(event.date), force = true)
+                if (done > 0) {
+                    loadMonthPhotos(java.time.YearMonth.from(event.date), force = true)
+                    com.uridul.app.ui.Celebrate.fire()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

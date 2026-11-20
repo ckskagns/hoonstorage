@@ -169,7 +169,7 @@ private fun UridulRoot(viewModel: AppViewModel) {
                 heroAction = viewModel.photos::heroAction,
                 refreshWeek = viewModel.photos::refreshWeekPhotoCount,
             ),
-        ) { ReadyScreen(
+        ) { androidx.compose.foundation.layout.Box { ReadyScreen(
             couple = s.couple,
             myUid = s.myUid,
             busy = busy,
@@ -221,6 +221,9 @@ private fun UridulRoot(viewModel: AppViewModel) {
                 if (enabled && !Reminders.hasPermission(context)) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
             },
             onSignOut = { viewModel.signOut(context) },
-        ) }
+        )
+            // 후기 저장·사진 올리기를 마치면 화면 가운데서 하트가 터진다 (짧은 진동과 함께)
+            com.uridul.app.ui.HeartBurstOverlay()
+        } }
     }
 }

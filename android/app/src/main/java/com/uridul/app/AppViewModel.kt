@@ -336,6 +336,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = e.toUserMessage() ?: "후기를 저장하지 못했어요."
         }
         _message.value = "💗 후기를 남겼어요"
+        com.uridul.app.ui.Celebrate.fire()
     }
 
     fun deleteMyReview(review: DateReview) {

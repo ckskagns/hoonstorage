@@ -224,6 +224,7 @@ class DemoActivity : ComponentActivity() {
                         val id = com.uridul.app.data.DateReview.idOf(e.id, e.date)
                         val old = reviews[id]
                         reviews[id] = com.uridul.app.data.DateReview(id, e.id, e.date, e.title, e.place, (old?.entries.orEmpty() + (me to com.uridul.app.data.ReviewEntry(text, hearts))))
+                        com.uridul.app.ui.Celebrate.fire()
                     },
                     onDelete = { r -> reviews.remove(r.id) },
                 )
@@ -345,6 +346,7 @@ class DemoActivity : ComponentActivity() {
                     onInboxRead = { com.uridul.app.data.NotificationInbox.markRead(applicationContext, it) },
                     onInboxAllRead = { com.uridul.app.data.NotificationInbox.markAllRead(applicationContext) },
                 )
+                com.uridul.app.ui.HeartBurstOverlay()
                 }
             }
         }

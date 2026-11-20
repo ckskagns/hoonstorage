@@ -57,6 +57,10 @@ val LocalReviews = compositionLocalOf { ReviewHooks() }
 /** 하트 1~5개 (onPick 이 있으면 눌러서 고르기) */
 @Composable
 fun HeartsRow(hearts: Int, size: TextUnit = 16.sp, onPick: ((Int) -> Unit)? = null) {
+    // 고를 때: 누른 하트에서 작은 하트가 터지고 톡 진동 (하트 손맛)
+    val view = androidx.compose.ui.platform.LocalView.current
+    var popped by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var poppedAt by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     Row(
         horizontalArrangement = Arrangement.spacedBy(if (onPick != null) 6.dp else 1.dp),
         modifier = Modifier.semantics { contentDescription = "하트 ${hearts}개" },
@@ -64,23 +68,31 @@ fun HeartsRow(hearts: Int, size: TextUnit = 16.sp, onPick: ((Int) -> Unit)? = nu
         ReviewEntry.HEARTS.forEach { i ->
             val on = i <= hearts
             val scale = bounceScale(onPick != null && i == hearts, 1.25f)
-            Text(
-                if (on) "♥" else "♡",
-                fontSize = size,
-                color = if (on) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
-                modifier = Modifier
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .then(
-                        if (onPick != null) {
-                            Modifier
-                                .clip(RoundedCornerShape(50))
-                                .clickable { onPick(i) }
-                                .padding(4.dp)
-                        } else {
-                            Modifier
-                        },
-                    ),
-            )
+            androidx.compose.foundation.layout.Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Text(
+                    if (on) "♥" else "♡",
+                    fontSize = size,
+                    color = if (on) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                    modifier = Modifier
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
+                        .then(
+                            if (onPick != null) {
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable {
+                                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                        poppedAt = i
+                                        popped++
+                                        onPick(i)
+                                    }
+                                    .padding(4.dp)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
+                if (onPick != null && poppedAt == i) HeartBurst(popped, count = 6, radius = 28.dp, size = 12.sp, durationMs = 550)
+            }
         }
     }
 }
