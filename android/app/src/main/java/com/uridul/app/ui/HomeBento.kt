@@ -90,8 +90,9 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             BentoTile(
                 "📅 다음 일정",
-                next?.title ?: "다가오는 일정이 없어요",
-                next?.let { HomeTiles.whenText(it, today, now) } ?: "눌러서 일정 추가",
+                // 못 읽었거나 읽는 중이면(upcoming == null) "없어요"라고 단정하지 않는다
+                next?.title ?: if (upcoming == null) "우리 캘린더" else "다가오는 일정이 없어요",
+                next?.let { HomeTiles.whenText(it, today, now) } ?: if (upcoming == null) "눌러서 캘린더 보기" else "눌러서 일정 추가",
                 MaterialTheme.colorScheme.secondaryContainer,
                 Modifier.weight(1f),
             ) {

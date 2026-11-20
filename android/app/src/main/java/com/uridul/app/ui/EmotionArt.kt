@@ -64,7 +64,14 @@ enum class Emotion(val no: Int, val key: String, val label: String) {
 @Composable
 fun rememberEmotionRes(emotion: Emotion): Int {
     val context = LocalContext.current
-    return remember(emotion) { context.resources.getIdentifier(emotion.resName, "drawable", context.packageName) }
+    return remember(emotion) {
+        // 이름으로 찾는 건 느린 편이라 앱이 켜져 있는 동안 한 번만 (그림은 설치할 때 정해지므로 바뀌지 않음)
+        EmotionResCache.map.getOrPut(emotion) { context.resources.getIdentifier(emotion.resName, "drawable", context.packageName) }
+    }
+}
+
+private object EmotionResCache {
+    val map = java.util.concurrent.ConcurrentHashMap<Emotion, Int>()
 }
 
 /**

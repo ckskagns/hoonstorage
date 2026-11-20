@@ -1,36 +1,14 @@
 package com.uridul.app.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.uridul.app.data.Couple
 import com.uridul.app.data.ImportPreview
 import com.uridul.app.data.Place
-import com.uridul.app.ui.theme.CoupleColors
 import java.time.LocalDate
 
-// 메인 화면(ReadyScreen)의 오른쪽 위 메뉴와 작은 확인 창들
-
-/** 설정 페이지에서 고른 것 (ui/SettingsPage.kt) */
-internal enum class MenuAction {
-    Profile, StartDate, ToggleCountFromOne, Invite,
-    ToggleNotify, TogglePartnerAlerts, Theme, TogglePhotoTint, TogglePhotoCalendar, Colors, HeartDesign, Deleted, BackupSave, BackupLoad, CheckUpdate, SignOut,
-}
-
+// 메인 화면(ReadyScreen)의 작은 확인 창들 (설정 페이지는 SettingsPage.kt)
 
 /** 지도 앱에서 그냥 공유한 장소: 가고 싶은 곳 / 고른 날 일정 중 어디에 담을지 */
 @Composable

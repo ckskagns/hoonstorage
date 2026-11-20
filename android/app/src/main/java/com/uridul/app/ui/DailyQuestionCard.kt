@@ -42,6 +42,7 @@ import com.uridul.app.data.PartnerAnswer
 import com.uridul.app.data.QuestionDay
 import com.uridul.app.data.QuestionRepository
 import com.uridul.app.domain.DailyQuestion
+import com.uridul.app.domain.QuestionText
 import java.time.LocalDate
 
 // 오늘의 질문 (선호도 조사 4번): 홈 카드 + 답하기 창.
@@ -77,7 +78,8 @@ fun DailyQuestionCard(
 
     // 다시 읽기: 창을 열 때·답한 뒤·앱으로 돌아올 때
     var reload by remember { mutableIntStateOf(0) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { reload++ }
+    // 처음 그릴 때 이미 읽기 시작하므로, 곧바로 오는 ON_RESUME 로 또 읽지 않게 지금 시각으로 시작
+    var loadedAt by remember { androidx.compose.runtime.mutableLongStateOf(System.currentTimeMillis()) }
     // 방금 쓴 내 답 (서버에 닿기 전에도 바로 보이게)
     var localMine by remember(today) { mutableStateOf<String?>(null) }
     val load by produceState<QLoad>(QLoad.Loading, couple.id, today, partnerUid, reload) {
@@ -89,8 +91,14 @@ fun DailyQuestionCard(
         } catch (e: Exception) {
             QLoad.Failed
         }
+        loadedAt = System.currentTimeMillis()
     }
     val day = (load as? QLoad.Done)?.day
+    // 앱으로 돌아올 때 다시 읽기: 둘 다 답해 열린 날은 더 바뀔 게 없으니 안 읽고, 그 밖에는 1분에 한 번까지
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        val settled = day?.mine != null && day.partner is PartnerAnswer.Open
+        if (!settled && System.currentTimeMillis() - loadedAt > 60_000) reload++
+    }
     val mine = localMine ?: day?.mine
     val partner = day?.partner ?: PartnerAnswer.Unknown
 
@@ -99,15 +107,7 @@ fun DailyQuestionCard(
         if (openRequest != 0) { open = true; onOpenRequestHandled() }
     }
 
-    val status = when {
-        load is QLoad.NotReady -> "곧 열려요"
-        !couple.isPaired -> if (mine == null) "눌러서 먼저 답해 두기" else "답했어요 · $partnerName 연결을 기다려요"
-        mine == null && partner is PartnerAnswer.Locked -> "🔒 ${partnerName}님은 답했어요 · 내가 답하면 열려요"
-        mine == null -> "눌러서 답하기"
-        partner is PartnerAnswer.Open -> "💞 둘 다 답했어요 · 눌러서 보기"
-        partner is PartnerAnswer.None -> "답했어요 · ${partnerName}님 답을 기다려요"
-        else -> "답했어요"
-    }
+    val status = QuestionText.cardStatus(load !is QLoad.NotReady, couple.isPaired, mine, partner, partnerName)
     Card(
         onClick = { open = true; reload++ },
         modifier = modifier,
@@ -217,14 +217,7 @@ private fun DailyQuestionDialog(
                         }
                         // 상대 답
                         AnswerBox(partnerName) {
-                            val (text, dim) = when {
-                                !couple.isPaired -> "상대가 연결되면 함께 답할 수 있어요" to true
-                                partner is PartnerAnswer.Open -> partner.text to false
-                                partner is PartnerAnswer.Locked -> "🔒 답했어요 · 내가 답하면 열려요" to true
-                                partner is PartnerAnswer.None -> "💭 아직 답하지 않았어요" to true
-                                load is QLoad.Loading -> "불러오는 중…" to true
-                                else -> "연결되면 확인할 수 있어요" to true
-                            }
+                            val (text, dim) = QuestionText.partnerLine(couple.isPaired, partner, load is QLoad.Loading)
                             Text(
                                 text,
                                 style = MaterialTheme.typography.bodyLarge,

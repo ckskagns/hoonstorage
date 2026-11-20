@@ -37,11 +37,13 @@ fun rememberOnline(): Boolean {
     var online by remember { mutableStateOf(NetworkState.isOnline(context)) }
     DisposableEffect(context) {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        // 기본 연결 콜백: 바뀐 연결이 곧 기본 연결이므로 콜백이 준 값을 그대로 쓴다
+        // (onLost 직후 activeNetwork 가 아직 옛 연결을 돌려줄 수 있어 다시 묻지 않는다)
         val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { online = NetworkState.isOnline(context) }
-            override fun onLost(network: Network) { online = NetworkState.isOnline(context) }
+            override fun onAvailable(network: Network) { online = true }
+            override fun onLost(network: Network) { online = false }
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                online = NetworkState.isOnline(context)
+                online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             }
         }
         val registered = runCatching { cm?.registerDefaultNetworkCallback(callback) }.isSuccess && cm != null
