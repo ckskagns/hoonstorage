@@ -236,6 +236,7 @@ fun ReadyScreen(
 
         Scaffold(
             topBar = {
+                androidx.compose.foundation.layout.Column {
                 TopAppBar(
                     title = {
                         Text(
@@ -308,6 +309,9 @@ fun ReadyScreen(
                         )
                     },
                 )
+                // 인터넷이 끊기면 상단 바 아래에 안내 줄 (ui/OfflineBanner.kt)
+                OfflineBanner()
+                }
             },
             bottomBar = {
                 if (!wide) {
@@ -381,9 +385,19 @@ fun ReadyScreen(
                         // 벤토 칸: 누르면 그 탭 (다음 일정 → 캘린더는 오늘로)
                         wishes = wishes,
                         eventsKey = monthEvents,
+                        questionRequest = questionRequest,
+                        onQuestionRequestHandled = { questionRequest = 0 },
                         onOpenTab = { key ->
-                            if (key == HomeTabs.CALENDAR) select(java.time.LocalDate.now())
-                            tabKey = Tab.entries.firstOrNull { it.key == key }?.key ?: tabKey
+                            if (key == HomeTabs.ADD_EVENT) {
+                                // 다음 일정이 비었으면 오늘 하루 페이지에서 바로 새 일정
+                                val now = java.time.LocalDate.now()
+                                select(now)
+                                tabKey = Tab.Calendar.key
+                                openDay(now, new = true)
+                            } else {
+                                if (key == HomeTabs.CALENDAR) select(java.time.LocalDate.now())
+                                tabKey = Tab.entries.firstOrNull { it.key == key }?.key ?: tabKey
+                            }
                         },
                     )
                     Tab.Calendar -> CalendarContent(

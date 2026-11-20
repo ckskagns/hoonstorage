@@ -333,6 +333,33 @@ service cloud.firestore {
           && request.resource.data.createdBy == resource.data.createdBy;
         allow delete: if isWishMember();
       }
+
+      // 오늘의 질문 답: 문서 이름 = "날짜_uid". 하루 한 사람 한 답.
+      // 내 답은 언제나 읽고, 상대 답은 같은 날 내 답이 있을 때만 읽힌다 (둘 다 답하면 열림).
+      // 아직 없는 문서는 읽어도 아무 정보가 없으므로 허용 (상대가 아직 안 했는지 알 수 있게).
+      match /answers/{answerId} {
+        function isAnswerMember() {
+          return signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+        }
+
+        allow get: if isAnswerMember()
+          && (resource == null
+              || resource.data.uid == request.auth.uid
+              || exists(/databases/$(database)/documents/couples/$(coupleId)/answers/$(resource.data.date + '_' + request.auth.uid)));
+        allow list: if false;
+
+        allow create, update: if isAnswerMember()
+          && request.resource.data.keys().hasOnly(['date', 'uid', 'qid', 'text', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && answerId == request.resource.data.date + '_' + request.auth.uid
+          && request.resource.data.qid is int && request.resource.data.qid >= 0 && request.resource.data.qid < 1000
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
+          && request.resource.data.at == request.time;
+        allow delete: if isAnswerMember() && resource.data.uid == request.auth.uid;
+      }
     }
   }
 }

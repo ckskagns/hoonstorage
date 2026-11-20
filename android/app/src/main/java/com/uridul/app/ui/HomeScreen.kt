@@ -51,9 +51,15 @@ fun HomeContent(
     wishes: List<com.uridul.app.data.WishPlace> = emptyList(),
     eventsKey: Any? = null,
     onOpenTab: (String) -> Unit = {},
+    /** 앱 아이콘 바로가기 "오늘의 질문": 0 이 아니면 답하기 창을 연다 */
+    questionRequest: Int = 0,
+    onQuestionRequestHandled: () -> Unit = {},
 ) {
     val today = rememberToday()
     val bento: @Composable (Modifier) -> Unit = { m -> HomeBento(couple, today, wishes, eventsKey, onOpenTab, m) }
+    val question: @Composable (Modifier) -> Unit = { m ->
+        DailyQuestionCard(couple, myUid, today, m, questionRequest, onQuestionRequestHandled)
+    }
     // 날이 바뀌면 추억을 다시 받아온다 (하루에 한 번)
     val photos = LocalPhotos.current
     androidx.compose.runtime.LaunchedEffect(today) {
@@ -117,6 +123,7 @@ fun HomeContent(
                     ) {
                         if (!couple.isPaired) InviteBanner(busy, onInvite)
                         bento(Modifier.fillMaxWidth())
+                        question(Modifier.fillMaxWidth())
                         recapBanner(Modifier.fillMaxWidth())
                         MemorySlides(memories, couple, myUid, onOpenMemory)
                         MilestoneCard(milestones, today, Modifier.fillMaxWidth())
@@ -138,6 +145,7 @@ fun HomeContent(
                     HeroCard(couple, myUid, today, m, onOpenMemory, photoHeight = HeroPhotoHeight)
                     if (!couple.isPaired) Column(m) { InviteBanner(busy, onInvite) }
                     bento(m)
+                    question(m)
                     recapBanner(m)
                     MemorySlides(memories, couple, myUid, onOpenMemory, m)
                     MilestoneCard(milestones, today, m)

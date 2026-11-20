@@ -144,14 +144,17 @@ internal fun PhotoDayCell(
 @Composable
 internal fun DayPhotoDot(photo: DayPhoto, title: String, onClick: () -> Unit) {
     val bitmap = rememberPhotoBitmap("cal:${photo.id}", photo.thumb)
+    // 보이는 동그라미는 30dp, 누르는 영역은 48dp (손가락으로 누르기 쉽게)
     Box(
         Modifier
-            .size(30.dp)
+            .size(48.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(role = Role.Button, onClickLabel = "이날 일기 보기", onClick = onClick)
             .semantics { contentDescription = "${title.ifBlank { "이날" }} 사진 ${photo.count}장" },
+        contentAlignment = Alignment.Center,
     ) {
-        bitmap?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+        Box(Modifier.size(30.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+            bitmap?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+        }
     }
 }

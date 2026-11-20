@@ -39,6 +39,9 @@ object HomeTabs {
     const val LEDGER = "ledger"
     const val WISH = "wish"
     const val DIARY = "diary"
+
+    /** 탭 키가 아니라 "캘린더 탭에서 오늘 새 일정 바로 쓰기" 요청 */
+    const val ADD_EVENT = "add_event"
 }
 
 /**
@@ -91,7 +94,10 @@ fun HomeBento(couple: Couple, today: LocalDate, wishes: List<WishPlace>, eventsK
                 next?.let { HomeTiles.whenText(it, today, now) } ?: "눌러서 일정 추가",
                 MaterialTheme.colorScheme.secondaryContainer,
                 Modifier.weight(1f),
-            ) { onOpenTab(HomeTabs.CALENDAR) }
+            ) {
+                // 다가오는 일정이 없다고 확인된 때만 바로 새 일정 (읽는 중이면 캘린더로)
+                onOpenTab(if (upcoming != null && next == null) HomeTabs.ADD_EVENT else HomeTabs.CALENDAR)
+            }
             BentoTile(
                 "💳 ${month.monthValue}월 데이트 비용",
                 spent?.let { Won.text(it.first) } ?: "-",

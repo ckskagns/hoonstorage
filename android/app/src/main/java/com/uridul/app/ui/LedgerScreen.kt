@@ -219,7 +219,7 @@ fun LedgerContent(
                     photoHooks.dayPhotos[day]?.let { p ->
                         val title = reviewHooks.reviews[com.uridul.app.data.DateReview.idOf(p.eventId, day)]?.title.orEmpty()
                         DayPhotoDot(p, title) { onOpenDay(FeedPost(p.eventId, day, title, null).asEvent()) }
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(2.dp))
                     }
                     Text(day.format(KoreanMonthDay), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     // 그날 쓴 돈 (취소된 결제는 빼고). 짝 없는 환불이 더 많으면 +로

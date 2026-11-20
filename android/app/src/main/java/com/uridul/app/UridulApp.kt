@@ -78,6 +78,11 @@ class AppContainer(context: Context) {
         if (firebaseReady) com.uridul.app.data.ReviewRepository(FirebaseFirestore.getInstance()) else null
     }
 
+    /** 오늘의 질문 답 */
+    val questions: com.uridul.app.data.QuestionRepository? by lazy {
+        if (firebaseReady) com.uridul.app.data.QuestionRepository(FirebaseFirestore.getInstance()) else null
+    }
+
     /** 가계부 */
     val ledger: com.uridul.app.ledger.LedgerRepository? by lazy {
         if (firebaseReady) com.uridul.app.ledger.LedgerRepository(FirebaseFirestore.getInstance()) else null

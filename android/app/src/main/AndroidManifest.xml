@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 연결 끊김 안내 줄 (인터넷 연결 상태만 읽음) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 재부팅 후 자정 위젯 갱신 알람 재등록 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 자정 정시 위젯 갱신 (3단계 기념일 알림에도 사용). Android 13+ 는 USE_EXACT_ALARM 자동 허용 -->
