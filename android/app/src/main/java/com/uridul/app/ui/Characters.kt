@@ -12,6 +12,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -63,6 +65,9 @@ val Character.drawable: Int
         Character.BUNNY -> R.drawable.char_bunny
         Character.COUPLE_HE -> R.drawable.char_couple_he
         Character.COUPLE_SHE -> R.drawable.char_couple_she
+        // 우리 캐릭터 그림이 없는 앱에서는 연인 캐릭터로
+        Character.OUR_HE -> R.drawable.char_couple_he
+        Character.OUR_SHE -> R.drawable.char_couple_she
     }
 
 /**
@@ -77,6 +82,8 @@ fun CharacterAvatar(
     bob: Boolean = false,
     phase: Int = 0,
     contentDescription: String? = null,
+    /** false 면 눌러도 뛰지 않음 (카드 안에서 카드 누르기를 가로채지 않게) */
+    interactive: Boolean = true,
 ) {
     val density = LocalDensity.current
     val bobOffset = if (bob) {
@@ -94,11 +101,20 @@ fun CharacterAvatar(
     val jump = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
+    // 우리 캐릭터: 얼굴 그림이 들어 있으면 동그란 얼굴로 (연분홍 바탕이라 다크 모드에서도 또렷)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val art = remember(character) { character.artName?.let { CharArt.res(context, it) } ?: 0 }
     Image(
-        painter = painterResource(character.drawable),
+        painter = painterResource(if (art != 0) art else character.drawable),
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
+            .then(
+                if (art != 0) Modifier
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(androidx.compose.ui.graphics.Color(0xFFFFE6EC))
+                else Modifier,
+            )
             .graphicsLayer {
                 translationY = -bobOffset - jump.value * size.toPx() * 0.18f
                 val squash = 1f + jump.value * 0.06f
@@ -106,6 +122,7 @@ fun CharacterAvatar(
                 scaleY = 2f - squash
             }
             .clickable(
+                enabled = interactive,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 role = Role.Image,
@@ -181,9 +198,12 @@ private fun NameLabel(name: String) {
 /** 캐릭터 고르기 카드 두 장 */
 @Composable
 private fun CharacterPicker(selected: Character, onSelect: (Character) -> Unit) {
-    // 캐릭터가 4개라 두 줄로 (동물 한 쌍 / 연인 한 쌍)
+    // 한 줄에 한 쌍씩 (동물 / 연인 / 우리 캐릭터)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-      Character.entries.chunked(2).forEach { pair ->
+      // 우리 캐릭터 그림은 그림이 들어 있는 앱에서만
+      val context = androidx.compose.ui.platform.LocalContext.current
+      val choices = remember { Character.entries.filter { it.artName == null || CharArt.available(context) } }
+      choices.chunked(2).forEach { pair ->
       Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         pair.forEach { c ->
             val isSelected = c == selected
@@ -204,7 +224,7 @@ private fun CharacterPicker(selected: Character, onSelect: (Character) -> Unit) 
                         .padding(vertical = 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Image(painterResource(c.drawable), contentDescription = null, modifier = Modifier.size(56.dp))
+                    CharacterAvatar(c, 56.dp, interactive = false)
                     Text(c.label, style = MaterialTheme.typography.labelLarge)
                 }
             }

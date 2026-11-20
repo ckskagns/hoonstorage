@@ -81,11 +81,16 @@ private val SubText = WidgetColors.SubText
 private fun CharacterNames(snapshot: WidgetSnapshot, avatarDp: Int) {
     val mine = Character.from(snapshot.myCharacter) ?: Character.DRAGON
     val partner = Character.from(snapshot.partnerCharacter) ?: mine.other
+    val context = androidx.glance.LocalContext.current
+    // 우리 캐릭터 얼굴 그림은 네모 그림이라 동그랗게
+    fun avatarModifier(c: Character) = GlanceModifier.size(avatarDp.dp).let {
+        if (c.artName != null) it.cornerRadius((avatarDp / 2).dp) else it
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Image(
-            ImageProvider(widgetDrawable(mine)),
+            ImageProvider(widgetDrawable(mine, context)),
             contentDescription = null,
-            modifier = GlanceModifier.size(avatarDp.dp),
+            modifier = avatarModifier(mine),
         )
         Spacer(GlanceModifier.width(4.dp))
         Text(
@@ -95,18 +100,23 @@ private fun CharacterNames(snapshot: WidgetSnapshot, avatarDp: Int) {
         )
         Spacer(GlanceModifier.width(4.dp))
         Image(
-            ImageProvider(widgetDrawable(partner)),
+            ImageProvider(widgetDrawable(partner, context)),
             contentDescription = null,
-            modifier = GlanceModifier.size(avatarDp.dp),
+            modifier = avatarModifier(partner),
         )
     }
 }
 
-internal fun widgetDrawable(c: Character): Int = when (c) {
-    Character.DRAGON -> R.drawable.char_dragon
-    Character.BUNNY -> R.drawable.char_bunny
-    Character.COUPLE_HE -> R.drawable.char_couple_he
-    Character.COUPLE_SHE -> R.drawable.char_couple_she
+internal fun widgetDrawable(c: Character, context: android.content.Context? = null): Int {
+    // 우리 캐릭터 얼굴 그림이 들어 있으면 그것을
+    val art = if (context != null) c.artName?.let { com.uridul.app.ui.CharArt.res(context, it) } ?: 0 else 0
+    if (art != 0) return art
+    return when (c) {
+        Character.DRAGON -> R.drawable.char_dragon
+        Character.BUNNY -> R.drawable.char_bunny
+        Character.COUPLE_HE, Character.OUR_HE -> R.drawable.char_couple_he
+        Character.COUPLE_SHE, Character.OUR_SHE -> R.drawable.char_couple_she
+    }
 }
 
 @Composable

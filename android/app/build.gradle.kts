@@ -25,6 +25,11 @@ if (googleServicesFile.exists()) {
 // 초대 링크 도메인 (Firebase Hosting 기본 도메인)
 val inviteHost = "$firebaseProjectId.web.app"
 
+// 우리 캐릭터 그림: scripts/import_characters.ps1 이 src/chars/res 에 만든다 (개인 그림이라 git 에는 없음).
+// 폴더가 있을 때만 앱에 넣고, 없으면(새로 받은 저장소) 예전 캐릭터·하트 아이콘 그대로 빌드된다.
+val charsRes = file("src/chars/res")
+val hasCharIcon = file("src/chars/res/mipmap-anydpi-v26/ic_launcher_char.xml").exists()
+
 android {
     namespace = "com.uridul.app"
     compileSdk = 36
@@ -38,6 +43,15 @@ android {
 
         manifestPlaceholders["inviteHost"] = inviteHost
         buildConfigField("String", "INVITE_HOST", "\"$inviteHost\"")
+        // 앱 아이콘: 캐릭터 그림이 있으면 "하트 쥔 두 얼굴", 없으면 하트
+        manifestPlaceholders["appIcon"] = if (hasCharIcon) "@mipmap/ic_launcher_char" else "@mipmap/ic_launcher"
+        manifestPlaceholders["appRoundIcon"] = if (hasCharIcon) "@mipmap/ic_launcher_char_round" else "@mipmap/ic_launcher_round"
+    }
+
+    sourceSets {
+        getByName("main") {
+            if (charsRes.exists()) res.srcDir(charsRes)
+        }
     }
 
     buildTypes {

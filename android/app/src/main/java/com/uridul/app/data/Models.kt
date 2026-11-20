@@ -13,7 +13,10 @@ enum class Character(val key: String, val label: String) {
     DRAGON("dragon", "아기 용"),
     BUNNY("bunny", "토끼"),
     COUPLE_HE("couple_he", "연인 (남)"),
-    COUPLE_SHE("couple_she", "연인 (여)");
+    COUPLE_SHE("couple_she", "연인 (여)"),
+    /** 우리 캐릭터 그림(얼굴). 그림이 들어 있는 앱에서만 고를 수 있고, 없으면 연인 캐릭터로 보인다 */
+    OUR_HE("our_he", "우리 캐릭터 (남)"),
+    OUR_SHE("our_she", "우리 캐릭터 (여)");
 
     /** 짝 캐릭터 (용↔토끼, 연인 남↔여) */
     val other: Character get() = when (this) {
@@ -21,6 +24,15 @@ enum class Character(val key: String, val label: String) {
         BUNNY -> DRAGON
         COUPLE_HE -> COUPLE_SHE
         COUPLE_SHE -> COUPLE_HE
+        OUR_HE -> OUR_SHE
+        OUR_SHE -> OUR_HE
+    }
+
+    /** 우리 캐릭터 그림 리소스 이름 (없는 캐릭터는 null) */
+    val artName: String? get() = when (this) {
+        OUR_HE -> "char_bust_he"
+        OUR_SHE -> "char_bust_she"
+        else -> null
     }
 
     companion object {
