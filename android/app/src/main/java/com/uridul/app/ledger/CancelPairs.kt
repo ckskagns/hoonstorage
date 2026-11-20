@@ -1,5 +1,9 @@
 package com.uridul.app.ledger
 
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
 /**
  * 결제 취소를 원래 결제와 짝짓는다.
  *
@@ -29,12 +33,24 @@ class CancelPairs private constructor(
 
     val size: Int get() = cancelToPayment.size
 
+    /**
+     * 짝이 된 거래 목록에 붙일 말 (없으면 null).
+     * 결제엔 "19일 취소됨", 취소엔 "17일 결제 취소". 다른 달이면 "10월 28일 …" (같은 달은 날짜만: 줄이 잘리지 않게)
+     */
+    fun note(e: LedgerEntry): String? {
+        if (!isPaired(e.id)) return null
+        val other = partnerAt(e.id)?.let(LedgerEntry::dateOf) ?: return if (e.cancel) "결제 취소" else "취소됨"
+        val day = if (YearMonth.from(other) == YearMonth.from(e.date)) "${other.dayOfMonth}일" else other.format(MONTH_DAY)
+        return if (e.cancel) "$day 결제 취소" else "$day 취소됨"
+    }
+
     companion object {
         /** 결제와 취소 사이 최대 날짜 */
         const val WINDOW_DAYS = 45L
         private const val WINDOW_MS = WINDOW_DAYS * 24 * 60 * 60 * 1000
 
         val NONE = CancelPairs(emptyMap(), emptyMap())
+        private val MONTH_DAY = DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
 
         private fun LedgerEntry.live(): Boolean = !deleted && status == EntryStatus.CONFIRMED && type == EntryType.EXPENSE
 

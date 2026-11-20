@@ -90,4 +90,28 @@ class BalanceGapTest {
         // 지난 알림 시각을 모르는 예전 계산 입금은 건드리지 않는다
         assertNull(BalanceGap.absorb(manual(600_000, "2026-11-17T12:00:00"), listOf(gap.copy(gapFrom = null))))
     }
+
+    @Test
+    fun usedManualIncomeIsNotSubtractedAgain() {
+        // 11시에 들어온 돈을 13시에 직접 기록 → 12시 결제의 차이에 반영됨(표시) → 15시 결제의 새 차이에서는 빼지 않는다
+        val m = manual(30_000, "2026-11-20T13:00:00")
+        val first = BalanceGap.explaining("date_account", t("2026-11-20T09:00:00"), t("2026-11-20T12:00:00"), listOf(m))
+        assertEquals(listOf(m), first)
+        val used = m.copy(tags = listOf(BalanceGap.USED_TAG))
+        assertEquals(20_000L, BalanceGap.remaining(20_000, "date_account", t("2026-11-20T12:00:00"), t("2026-11-20T15:00:00"), listOf(used)))
+        // 계산 입금을 줄이는 쪽도 이미 반영한 직접 기록은 쓰지 않는다
+        val gap = LedgerEntry(
+            id = "g", type = EntryType.INCOME, amount = 20_000, at = t("2026-11-20T14:59:59"), assetId = "date_account",
+            parser = BalanceGap.PARSER, gapFrom = t("2026-11-20T12:00:00"),
+        )
+        assertNull(BalanceGap.absorb(used, listOf(gap)))
+    }
+
+    @Test
+    fun absorbedMemoAndWon() {
+        assertEquals("${BalanceGap.MEMO} (직접 기록한 30,000원 뺌)", BalanceGap.absorbedMemo(30_000))
+        assertEquals("-51,435원", Won.signed(-51_435))
+        assertEquals("+346,712원", Won.signed(346_712))
+        assertEquals("0원", Won.text(0))
+    }
 }

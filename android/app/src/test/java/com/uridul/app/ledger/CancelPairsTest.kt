@@ -119,5 +119,19 @@ class CancelPairsTest {
         assertNull(CancelPairs.pick(cancel, listOf(linked)))
     }
 
+    @Test
+    fun noteText() {
+        val p = CancelPairs.of(november)
+        assertEquals("19일 취소됨", p.note(november.first { it.id == "a17" }))
+        assertEquals("17일 결제 취소", p.note(november.first { it.id == "c19" }))
+        assertNull(p.note(november.first { it.id == "f19" }))
+        // 다른 달 짝은 달까지
+        val oct = pay("oct", "2026-10-28T10:00:00", 20_000, "Agoda").copy(cancelPair = "nov", cancelPairAt = at("2026-11-03T10:00:00"))
+        assertEquals("11월 3일 취소됨", CancelPairs.of(listOf(oct)).note(oct))
+        // 시각을 모르는 짝
+        val bare = pay("x", "2026-11-03T10:00:00", 20_000, "Agoda", cancel = true).copy(cancelPair = "y")
+        assertEquals("결제 취소", CancelPairs.of(listOf(bare)).note(bare))
+    }
+
     private fun pickOf(list: List<LedgerEntry>): String? = CancelPairs.pick(list.last { it.cancel }, list)?.id
 }

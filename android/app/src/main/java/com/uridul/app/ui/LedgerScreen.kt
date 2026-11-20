@@ -52,31 +52,15 @@ import com.uridul.app.ledger.MonthSummary
 import com.uridul.app.ledger.PaymentInbox
 import com.uridul.app.ledger.PayerNames
 import com.uridul.app.ledger.PaymentNotificationService
+import com.uridul.app.ledger.Won
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
 import java.time.YearMonth
-import java.util.Locale
 
 // 가계부 탭 (1차): 자동 기록 켜기 안내, 확인 필요, 이 폰에만 온 다른 결제, 이번 달 합계·자산·내역.
 // 자산·내역·통계·예산 네 칸 화면은 docs/가계부_설계.md 의 제안안대로 2차에 같은 데이터 위에 올린다.
 
-private val won = NumberFormat.getNumberInstance(Locale.KOREA)
-internal fun wonText(amount: Long): String = "${won.format(amount)}원"
-
-/** 부호 붙인 금액: 양수 "+1,000원", 음수 "-1,000원" (부호는 한 번만) */
-internal fun signedWonText(amount: Long): String = (if (amount < 0) "-" else "+") + wonText(kotlin.math.abs(amount))
-
-/** 취소 짝이 된 거래에 붙일 말: 결제엔 "M월 d일 취소됨", 취소엔 "M월 d일 결제 취소" (없으면 null) */
-internal fun pairNote(e: LedgerEntry, pairs: CancelPairs): String? {
-    if (!pairs.isPaired(e.id)) return null
-    val other = pairs.partnerAt(e.id)?.let(LedgerEntry::dateOf) ?: return if (e.cancel) "결제 취소" else "취소됨"
-    // 같은 달이면 날짜만 (줄이 잘리지 않게)
-    val day = if (YearMonth.from(other) == YearMonth.from(e.date)) "${other.dayOfMonth}일" else other.format(KoreanMonthDayShort)
-    return if (e.cancel) "$day 결제 취소" else "$day 취소됨"
-}
-
-private val KoreanMonthDayShort = java.time.format.DateTimeFormatter.ofPattern("M월 d일", Locale.KOREAN)
+internal fun wonText(amount: Long): String = Won.text(amount)
 
 @Composable
 fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) {
@@ -87,6 +71,15 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     val entries by remember(month, repo) { repo?.observeMonth(couple.id, month) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     // 취소 짝: 서버에 적어 둔 짝 + 아직 안 이어진 것은 이 달 안에서 찾기
     val pairs = remember(entries) { CancelPairs.of(entries) }
+    // 예전 기록(이 폰에서 처음 한 번)이나 다른 폰이 올린, 아직 짝이 안 적힌 취소를 원래 결제와 잇는다.
+    // 다 이어진 뒤에는 이 달에 짝 없는 취소가 보일 때만 서버를 읽는다
+    val unlinkedCancels = remember(entries) { entries.count { it.cancel && it.cancelPair == null && it.status == EntryStatus.CONFIRMED } }
+    LaunchedEffect(repo, unlinkedCancels) {
+        val r = repo ?: return@LaunchedEffect
+        val done = PaymentInbox.cancelLinksDone(context, couple.id)
+        if (done && unlinkedCancels == 0) return@LaunchedEffect
+        runCatching { r.linkCancels(couple.id, myUid) }.onSuccess { if (!done) PaymentInbox.markCancelLinksDone(context, couple.id) }
+    }
     val pending by remember(repo) { repo?.observePending(couple.id) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     val assets by remember(repo) { repo?.observeAssets(couple.id) ?: flowOf(emptyList()) }.collectAsState(initial = emptyList())
     val learned by remember(repo) { repo?.observeLearned(couple.id) ?: flowOf(emptyMap()) }.collectAsState(initial = emptyMap())
@@ -109,8 +102,6 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
     LaunchedEffect(repo) {
         if (repo == null) return@LaunchedEffect
         repo.ensureDefaultAssets(context, couple.id, myUid)
-        // 예전 기록이나 다른 폰이 올린 취소도 원래 결제와 잇는다 (이미 이어졌으면 읽기만)
-        runCatching { repo.linkCancels(couple.id, myUid) }
         // 앱이 꺼져 있을 때 모인 결제가 있으면 올린다
         if (PaymentInbox.pendingUploads(context).isNotEmpty()) LedgerUploadWorker.enqueue(context)
     }
@@ -196,13 +187,13 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
                     // 그날 쓴 돈 (취소된 결제는 빼고). 짝 없는 환불이 더 많으면 +로
                     val dayExpense = LedgerTotals.expense(list, pairs)
                     if (dayExpense != 0L) Text(
-                        signedWonText(-dayExpense),
+                        Won.signed(-dayExpense),
                         style = MaterialTheme.typography.labelLarge,
                         color = if (dayExpense < 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            items(list, key = { it.id }) { e -> EntryRow(e, assets, pairNote(e, pairs), onClick = { editing = e }) }
+            items(list, key = { it.id }) { e -> EntryRow(e, assets, pairs.note(e), onClick = { editing = e }) }
         }
         item(key = "next") {
             Text(
@@ -232,11 +223,11 @@ fun LedgerContent(couple: Couple, myUid: String, modifier: Modifier = Modifier) 
             defaultDate = if (month == YearMonth.now()) java.time.LocalDate.now() else month.atDay(1),
             learned = learned,
             onSave = { e ->
-                repo?.save(couple.id, myUid, e)
+                val id = repo?.save(couple.id, myUid, e)
                 learnAfterSave(null, e)
                 creating = false
                 // 잔액으로 계산해 이미 적힌 입금과 같은 돈이면 그쪽을 줄인다 (두 번 세지 않게)
-                if (repo != null && e.type == EntryType.INCOME) scope.launch { runCatching { repo.absorbManualIncome(couple.id, myUid, e) } }
+                if (repo != null && id != null && e.type == EntryType.INCOME) scope.launch { runCatching { repo.absorbManualIncome(couple.id, myUid, e.copy(id = id)) } }
             },
             onTrash = null,
             onDismiss = { creating = false },

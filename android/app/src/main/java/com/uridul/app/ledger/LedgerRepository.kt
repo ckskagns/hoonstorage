@@ -151,7 +151,7 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         val account = if (balance != null) capture.assetId?.let { balanceAccount(coupleId, it) } else null
         val gapId = BalanceGap.entryId(id)
         // 지난 잔액 알림 뒤 직접 기록한 입금 (잔액 차이에서 빼서 같은 돈을 두 번 적지 않게)
-        val recorded = if (account != null) manualIncomesSince(coupleId, account, capture.postedAt) else emptyList()
+        val recorded = if (account != null && balance != null) manualIncomesSince(coupleId, account, capture, balance) else emptyList()
         val withBalance = runCatching { db.runTransaction { tx ->
             val here = tx.get(entries(coupleId).document(id))
             val before = tx.get(entries(coupleId).document(prevId))
@@ -170,16 +170,23 @@ class LedgerRepository(private val db: FirebaseFirestore) {
             } else {
                 null
             }
-            val rest = if (gap != null && lastAt != null) BalanceGap.remaining(gap, account, lastAt, capture.postedAt, recorded) else null
-            if (rest != null && gapDoc?.exists() != true) {
-                val income = BalanceGap.entry(rest, entry, account, uid, from = lastAt)
-                tx.set(
-                    entries(coupleId).document(gapId),
-                    entryData(income, uid).apply {
-                        put("createdBy", uid)
-                        put("createdAt", FieldValue.serverTimestamp())
-                    },
-                )
+            if (gap != null && lastAt != null && gapDoc?.exists() != true) {
+                val used = BalanceGap.explaining(account, lastAt, capture.postedAt, recorded)
+                val rest = BalanceGap.remaining(gap, account, lastAt, capture.postedAt, recorded)
+                if (rest != null) {
+                    val income = BalanceGap.entry(rest, entry, account, uid, from = lastAt)
+                    tx.set(
+                        entries(coupleId).document(gapId),
+                        entryData(income, uid).apply {
+                            put("createdBy", uid)
+                            put("createdAt", FieldValue.serverTimestamp())
+                        },
+                    )
+                }
+                // 반영한 직접 기록은 표시해 두어 같은 날 다음 결제의 차이에서 또 빼지 않는다
+                used.forEach { m ->
+                    tx.update(entries(coupleId).document(m.id), mapOf("tags" to FieldValue.arrayUnion(BalanceGap.USED_TAG), "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()))
+                }
             }
             tx.update(
                 assets(coupleId).document(account),
@@ -208,10 +215,16 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         return runCatching { assets(coupleId).document(assetId).get().await().getString("linkedAssetId") }.getOrNull() ?: assetId
     }
 
-    /** 그 통장의 지난 잔액 알림 날부터 이번 결제 날까지 직접 기록한 입금 (최대 62일, 못 읽으면 빈 목록) */
-    private suspend fun manualIncomesSince(coupleId: String, account: String, paymentAt: Long): List<LedgerEntry> = runCatching {
-        val lastAt = assets(coupleId).document(account).get().await().getLong("lastBalanceAt") ?: return@runCatching emptyList()
-        val to = LedgerEntry.dateOf(paymentAt)
+    /**
+     * 그 통장의 지난 잔액 알림 날부터 이번 결제 날까지 직접 기록한 입금 (최대 62일, 못 읽으면 빈 목록).
+     * 잔액 차이가 없을 결제(대부분)는 거래를 읽지 않는다: 통장의 지난 잔액으로 먼저 계산해 본다.
+     */
+    private suspend fun manualIncomesSince(coupleId: String, account: String, capture: PaymentCapture, balance: Long): List<LedgerEntry> = runCatching {
+        val acc = assets(coupleId).document(account).get().await()
+        val lastAt = acc.getLong("lastBalanceAt") ?: return@runCatching emptyList()
+        val p = capture.parsed
+        if (capture.postedAt <= lastAt || BalanceGap.missingIncome(acc.getLong("lastBalance"), p.kind, p.amount, balance) == null) return@runCatching emptyList()
+        val to = LedgerEntry.dateOf(capture.postedAt)
         val from = maxOf(LedgerEntry.dateOf(lastAt), to.minusDays(62))
         entries(coupleId)
             .whereGreaterThanOrEqualTo("date", from.toString())
@@ -233,13 +246,15 @@ class LedgerRepository(private val db: FirebaseFirestore) {
      * 저장: id 가 비어 있으면 직접 기록(새 거래), 있으면 고치기(확인 필요였으면 확정으로).
      * 고칠 때 알림 원문·출처·만든 사람은 그대로 둔다.
      */
-    fun save(coupleId: String, uid: String, entry: LedgerEntry, onError: (Exception) -> Unit = {}) {
+    fun save(coupleId: String, uid: String, entry: LedgerEntry, onError: (Exception) -> Unit = {}): String {
         if (entry.id.isEmpty()) {
             val data = entryData(entry.copy(status = EntryStatus.CONFIRMED), uid).apply {
                 put("createdBy", uid)
                 put("createdAt", FieldValue.serverTimestamp())
             }
-            entries(coupleId).document().set(data).addOnFailureListener(onError)
+            val ref = entries(coupleId).document()
+            ref.set(data).addOnFailureListener(onError)
+            return ref.id
         } else {
             entries(coupleId).document(entry.id).update(
                 mapOf(
@@ -259,6 +274,7 @@ class LedgerRepository(private val db: FirebaseFirestore) {
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),
             ).addOnFailureListener(onError)
+            return entry.id
         }
     }
 
@@ -317,13 +333,19 @@ class LedgerRepository(private val db: FirebaseFirestore) {
         if (manual.type != EntryType.INCOME || manual.source != EntrySource.MANUAL) return false
         val gaps = entries(coupleId).whereEqualTo("parser", BalanceGap.PARSER).get().await().documents.mapNotNull { it.toEntry() }
         val (gap, amount) = BalanceGap.absorb(manual, gaps) ?: return false
+        // 이 직접 기록은 반영했다고 표시 (다음 결제의 잔액 차이에서 또 빼지 않게)
+        if (manual.id.isNotEmpty()) {
+            entries(coupleId).document(manual.id).update(
+                mapOf("tags" to FieldValue.arrayUnion(BalanceGap.USED_TAG), "updatedBy" to uid, "updatedAt" to FieldValue.serverTimestamp()),
+            ).await()
+        }
         if (amount == 0L) {
             moveToTrash(coupleId, uid, gap)
         } else {
             entries(coupleId).document(gap.id).update(
                 mapOf(
                     "amount" to amount,
-                    "memo" to "${BalanceGap.MEMO} (직접 기록한 ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(manual.amount)}원 뺌)".take(LedgerEntry.MEMO_MAX),
+                    "memo" to BalanceGap.absorbedMemo(manual.amount),
                     "updatedBy" to uid,
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),

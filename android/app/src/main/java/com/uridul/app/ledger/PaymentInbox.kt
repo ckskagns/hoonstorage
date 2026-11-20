@@ -33,6 +33,10 @@ object PaymentInbox {
     fun assetsReady(c: Context, coupleId: String): Boolean = prefs(c).getBoolean("assets_v${LedgerAsset.defaults.size}_$coupleId", false)
     fun markAssetsReady(c: Context, coupleId: String) = prefs(c).edit().putBoolean("assets_v${LedgerAsset.defaults.size}_$coupleId", true).apply()
 
+    /** 이 폰에서 예전 취소 기록을 원래 결제와 한 번 다 이었는지 (그 뒤엔 짝 없는 취소가 보일 때만 다시 찾는다) */
+    fun cancelLinksDone(c: Context, coupleId: String): Boolean = prefs(c).getBoolean("cancel_links_$coupleId", false)
+    fun markCancelLinksDone(c: Context, coupleId: String) = prefs(c).edit().putBoolean("cancel_links_$coupleId", true).apply()
+
     const val PAYER_ME = "me"
     const val PAYER_PARTNER = "partner"
 
