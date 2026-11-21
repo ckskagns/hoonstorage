@@ -63,6 +63,12 @@ try {
     Pop-Location
 }
 $apkSrc = Join-Path $Root "android\app\build\outputs\apk\debug\app-debug.apk"
+# 작업 폴더 경로에 한글이 있는 PC(노트북)는 빌드 결과를 영문 경로(URIDUL_BUILD_ROOT)에 둔다 (GRADLE_USER_HOME\init.d)
+if ($Root -match '[^\x00-\x7F]') {
+    $buildRoot = if ($env:URIDUL_BUILD_ROOT) { $env:URIDUL_BUILD_ROOT } else { "C:\uridul_build" }
+    $apkSrc = Join-Path $buildRoot "app\outputs\apk\debug\app-debug.apk"
+}
+if (-not (Test-Path $apkSrc)) { throw "빌드된 APK 를 찾지 못했어요: $apkSrc" }
 $work = Join-Path $env:TEMP "uridul-release"
 New-Item -ItemType Directory -Force $work | Out-Null
 $apk = Join-Path $work "uridul.apk"
